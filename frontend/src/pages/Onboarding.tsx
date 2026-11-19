@@ -30,6 +30,8 @@ import { api, type ProviderField } from '@/lib/api'
 import { usePreferences, useSettings } from '@/lib/useSharedQueries'
 import { QK } from '@/lib/queryKeys'
 import { Logo } from '@/components/Logo'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
+import { useI18n } from '@/lib/i18n'
 import { PROJECT_LICENSE_NAME, PROJECT_LICENSE_TEXT, PROJECT_REPO_URL } from '@/data/ossLicenses'
 
 // ===== 引导页:5 步向导 =====
@@ -52,6 +54,7 @@ const HIGHLIGHTS = [
 ]
 
 export function Onboarding() {
+  const { tx } = useI18n()
   const navigate = useNavigate()
   const qc = useQueryClient()
   const reduceMotion = useReducedMotion()
@@ -111,17 +114,18 @@ export function Onboarding() {
           />
           <span className="text-sm font-semibold tracking-tight">Tick Stock Panel</span>
         </div>
-        <ol aria-label="初始设置进度" className="order-last flex w-full items-center gap-2 md:order-none md:w-auto md:gap-3">
+        <ol aria-label={tx('初始设置进度')} className="order-last flex w-full items-center gap-2 md:order-none md:w-auto md:gap-3">
           {STEPS.map((label, i) => (
             <li key={label} aria-current={i === step ? 'step' : undefined} className="min-w-0 flex-1 md:w-14 md:flex-none">
               <div aria-hidden="true" className={`h-1 rounded-full ${i <= step ? 'bg-accent' : 'bg-border'}`} />
               <span className={`mt-2 block whitespace-nowrap text-center text-[11px] ${i === step ? 'font-semibold text-foreground' : 'text-secondary'}`}>
-                {label}
+                {tx(label)}
               </span>
             </li>
           ))}
         </ol>
-        <div className="text-right sm:w-[88px]">
+        <div className="flex items-center justify-end gap-3">
+          <LanguageSwitcher variant="select" />
           <span className="text-xs text-secondary tabular">
             {step + 1} / {STEPS.length}
           </span>
@@ -157,30 +161,31 @@ export function Onboarding() {
 // ===== Step 0: 使用须知 =====
 
 function DisclaimerStep({ onNext }: { onNext: () => void }) {
+  const { tx } = useI18n()
   return (
     <div>
       <div className="grid gap-6 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] md:gap-12 lg:gap-16">
         <section aria-labelledby="onboarding-intro-title" className="flex flex-col items-start">
           <h1 id="onboarding-intro-title" className="text-3xl font-semibold leading-snug tracking-tight text-foreground sm:text-4xl sm:leading-snug">
-            TSP · 智能量化<br /><span className="text-violet-700 dark:text-violet-300">工作台引擎</span>
+            {tx('TSP · 智能量化')}<br /><span className="text-violet-700 dark:text-violet-300">{tx('工作台引擎')}</span>
           </h1>
           <p className="mt-5 max-w-md text-sm leading-7 text-secondary">
-            接入行情与扩展数据，用开源引擎回测自己的策略，盘后复核结果。
+            {tx('接入行情与扩展数据，用开源引擎回测自己的策略，盘后复核结果。')}
           </p>
 
-          <ol aria-label="研究流程" className="mt-6 grid w-full grid-cols-3 gap-3 md:mt-10 md:block md:space-y-6">
+          <ol aria-label={tx('研究流程')} className="mt-6 grid w-full grid-cols-3 gap-3 md:mt-10 md:block md:space-y-6">
             {[
-              { icon: Database, title: '接入数据', description: '连接已获授权的数据源，建立研究基础。', tint: 'bg-sky-100 text-sky-700 dark:bg-sky-400/10 dark:text-sky-300' },
-              { icon: Code2, title: '定义规则', description: '创建或导入策略，将研究想法转为条件。', tint: 'bg-violet-100 text-violet-700 dark:bg-violet-400/10 dark:text-violet-300' },
-              { icon: LineChart, title: '回测验证', description: '检验历史表现，理解结果与局限。', tint: 'bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300' },
+              { icon: Database, title: tx('接入数据'), description: tx('连接已获授权的数据源，建立研究基础。'), tint: 'bg-sky-100 text-sky-700 dark:bg-sky-400/10 dark:text-sky-300' },
+              { icon: Code2, title: tx('定义规则'), description: tx('创建或导入策略，将研究想法转为条件。'), tint: 'bg-violet-100 text-violet-700 dark:bg-violet-400/10 dark:text-violet-300' },
+              { icon: LineChart, title: tx('回测验证'), description: tx('检验历史表现，理解结果与局限。'), tint: 'bg-teal-100 text-teal-700 dark:bg-teal-400/10 dark:text-teal-300' },
             ].map(({ icon: Icon, title, description, tint }) => (
               <li key={title} className="flex flex-col items-start gap-2 md:flex-row md:gap-3.5">
                 <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tint}`}>
                   <Icon aria-hidden="true" className="h-5 w-5" strokeWidth={1.5} />
                 </span>
                 <div>
-                  <h2 className="text-sm font-medium text-foreground">{title}</h2>
-                  <p className="mt-1 hidden text-sm leading-6 text-secondary md:block">{description}</p>
+                  <h2 className="text-sm font-medium text-foreground">{tx(title)}</h2>
+                  <p className="mt-1 hidden text-sm leading-6 text-secondary md:block">{tx(description)}</p>
                 </div>
               </li>
             ))}
@@ -191,40 +196,37 @@ function DisclaimerStep({ onNext }: { onNext: () => void }) {
             rel="noopener noreferrer"
             className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-btn text-sm text-violet-700 underline decoration-violet-300 underline-offset-4 transition-colors hover:text-violet-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-4 focus-visible:ring-offset-base dark:text-violet-300 dark:decoration-violet-500/50 dark:hover:text-violet-200 md:mt-8"
           >
-            查看引擎源码
+            {tx('查看引擎源码')}
             <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
-            <span className="sr-only">（在新标签页打开）</span>
           </a>
         </section>
 
         <section aria-labelledby="onboarding-notice-title" className="rounded-2xl border border-violet-200 bg-violet-50/70 p-5 dark:border-violet-400/20 dark:bg-violet-950/30 sm:p-7">
-          <h2 id="onboarding-notice-title" className="text-lg font-semibold text-violet-950 dark:text-violet-100">开始前，请了解</h2>
+          <h2 id="onboarding-notice-title" className="text-lg font-semibold text-violet-950 dark:text-violet-100">{tx('开始前，请了解')}</h2>
           <dl className="mt-5 divide-y divide-violet-200/70 text-sm dark:divide-violet-400/15 [&_dt]:font-semibold [&_dt]:text-amber-800 dark:[&_dt]:text-amber-300">
             <div className="pb-5">
-              <dt>不内置策略</dt>
+              <dt>{tx('不内置策略')}</dt>
               <dd className="mt-2 leading-6 text-violet-950/75 dark:text-violet-100/80">
-                初次安装的策略库为空，策略由你自行创建或导入。
-                第三方策略和 AI 生成内容均需自行审查与验证。
+                {tx('初次安装的策略库为空，策略由你自行创建或导入。第三方策略和 AI 生成内容均需自行审查与验证。')}
               </dd>
             </div>
             <div className="py-5">
-              <dt>不荐股，不预测，不承诺收益</dt>
+              <dt>{tx('不荐股，不预测，不承诺收益')}</dt>
               <dd className="mt-2 leading-6 text-violet-950/75 dark:text-violet-100/80">
-                筛选、评分、监控和 AI 输出仅用于学习与研究，不构成投资建议。
-                回测呈现历史表现，不代表未来收益。
+                {tx('筛选、评分、监控和 AI 输出仅用于学习与研究，不构成投资建议。回测呈现历史表现，不代表未来收益。')}
               </dd>
             </div>
             <div className="pt-5">
-              <dt>遵守开源许可与服务协议</dt>
+              <dt>{tx('遵守开源许可与服务协议')}</dt>
               <dd className="mt-2 space-y-2 leading-6 text-violet-950/75 dark:text-violet-100/80">
-                <p>使用、修改或分发本项目须遵守 {PROJECT_LICENSE_NAME} 许可，保留版权与许可声明。软件按现状提供，不作保证。</p>
-                <p>数据源、插件与模型服务适用各自条款。请取得必要授权，遵守使用范围与访问限制；软件开源不等于数据开放授权。</p>
+                <p>{tx('使用、修改或分发本项目须遵守 {license} 许可，保留版权与许可声明。软件按现状提供，不作保证。', { license: PROJECT_LICENSE_NAME })}</p>
+                <p>{tx('数据源、插件与模型服务适用各自条款。请取得必要授权，遵守使用范围与访问限制；软件开源不等于数据开放授权。')}</p>
               </dd>
             </div>
           </dl>
           <details className="group mt-4">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-btn text-sm font-medium text-violet-700 underline decoration-violet-300 underline-offset-4 transition-colors hover:text-violet-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-4 focus-visible:ring-offset-surface dark:text-violet-300 dark:decoration-violet-500/50 dark:hover:text-violet-200 [&::-webkit-details-marker]:hidden">
-              查看完整开源许可（{PROJECT_LICENSE_NAME}）
+              {tx('查看完整开源许可（{license}）', { license: PROJECT_LICENSE_NAME })}
               <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180 motion-reduce:transition-none" />
             </summary>
             <pre className="mt-3 whitespace-pre-wrap break-words border-t border-violet-200 pt-4 font-mono text-xs leading-6 text-violet-950/75 dark:border-violet-400/15 dark:text-violet-100/80" lang="en">{PROJECT_LICENSE_TEXT}</pre>
@@ -234,15 +236,15 @@ function DisclaimerStep({ onNext }: { onNext: () => void }) {
 
       <div className="mt-8 flex flex-col gap-5 border-t border-border pt-6 sm:mt-10 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
         <div className="max-w-xl text-sm leading-6">
-          <p className="font-medium text-amber-800 dark:text-amber-300">独立判断，审慎使用。</p>
-          <p className="mt-1 text-secondary">市场有风险，请自行核验数据与结果，并承担决策风险。</p>
+          <p className="font-medium text-amber-800 dark:text-amber-300">{tx('独立判断，审慎使用。')}</p>
+          <p className="mt-1 text-secondary">{tx('市场有风险，请自行核验数据与结果，并承担决策风险。')}</p>
         </div>
         <button
           type="button"
           onClick={onNext}
           className="inline-flex min-h-12 shrink-0 items-center justify-center gap-3 rounded-xl bg-violet-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-violet-700 active:bg-violet-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-4 focus-visible:ring-offset-base"
         >
-          我已了解，继续
+          {tx('我已了解，继续')}
           <ArrowRight aria-hidden="true" className="h-4 w-4" />
         </button>
       </div>
@@ -253,6 +255,7 @@ function DisclaimerStep({ onNext }: { onNext: () => void }) {
 // ===== Step 1: 欢迎 =====
 
 function WelcomeStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => void }) {
+  const { tx } = useI18n()
   return (
     <div className="text-center">
       {/* 品牌 badge */}
@@ -267,11 +270,10 @@ function WelcomeStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => voi
       </motion.div>
 
       <h1 className="mt-6 text-3xl font-bold text-foreground tracking-tight">
-        欢迎使用 TSP
+        {tx('欢迎使用 TSP')}
       </h1>
       <p className="mt-3 text-sm text-secondary leading-relaxed max-w-md mx-auto">
-        一个本地化的 A 股量化分析面板 —— 行情、策略、回测、监控、财务一体化。
-        花一分钟配置,即可开始使用。
+        {tx('一个本地化的量化分析面板 —— 行情、策略、回测、监控、财务与日美股 AI 分析一体化。花一分钟配置，即可开始使用。')}
       </p>
 
       {/* 特性卡片 —— 3×3 网格,横向布局压缩高度 */}
@@ -289,8 +291,8 @@ function WelcomeStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => voi
               <h.icon className={`h-4 w-4 ${h.tint} transition-transform group-hover:scale-110`} />
             </div>
             <div className="min-w-0">
-              <div className="text-xs font-medium text-foreground">{h.title}</div>
-              <div className="mt-0.5 text-[11px] text-muted leading-snug line-clamp-2">{h.desc}</div>
+              <div className="text-xs font-medium text-foreground">{tx(h.title)}</div>
+              <div className="mt-0.5 text-[11px] text-muted leading-snug line-clamp-2">{tx(h.desc)}</div>
             </div>
           </motion.div>
         ))}
@@ -301,14 +303,14 @@ function WelcomeStep({ onNext, onSkip }: { onNext: () => void; onSkip: () => voi
           onClick={onNext}
           className="inline-flex items-center gap-2 px-6 h-11 rounded-xl bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 hover:shadow-accent/30 transition-all"
         >
-          开始配置
+          {tx('开始配置')}
           <ArrowRight className="h-4 w-4" />
         </button>
         <button
           onClick={onSkip}
           className="px-4 h-11 rounded-xl text-sm text-secondary hover:text-foreground hover:bg-elevated transition-colors"
         >
-          稍后再说
+          {tx('稍后再说')}
         </button>
       </div>
     </div>
@@ -351,6 +353,7 @@ type SourceRow = {
 }
 
 function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const settings = useSettings()
   const sources = useQuery({
@@ -392,22 +395,22 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
         setExpanded(s => ({ ...s, [vars.name]: false }))
         setError(null)
         if (vars.name === 'tickflow') {
-          setSaved(`TickFlow Key 已保存${data.tier_label ? `,当前档位:${data.tier_label}` : ''}`)
+          setSaved(tx('TickFlow Key 已保存{tier}', { tier: data.tier_label ? tx(',当前档位:{label}', { label: data.tier_label }) : '' }))
         } else if (vars.name === 'fuyao' && data.plugin_available) {
           // fuyao 定位为增强源: 仅实时行情 + 除权因子路由过去, 其余数据集保持 TickFlow
           routeFuyaoEnhanced.mutate()
-          setSaved('fuyao Key 已保存:实时行情与除权因子已切换到 fuyao,其余数据集保持 TickFlow')
+          setSaved(tx('fuyao Key 已保存:实时行情与除权因子已切换到 fuyao,其余数据集保持 TickFlow'))
         } else if (vars.name === 'tdxquant' && data.plugin_available) {
           // 积分计费源不自动切路由: 消耗积分的选择权留给用户
-          setSaved('TdxQuant Key 已保存。该源按积分计费,请在「设置 → 数据源」按需启用')
+          setSaved(tx('TdxQuant Key 已保存。该源按积分计费,请在「设置 → 数据源」按需启用'))
         } else if (data.plugin_available) {
-          setSaved('Key 已保存,该数据源已就绪')
+          setSaved(tx('Key 已保存,该数据源已就绪'))
         }
       } else {
-        setError(data.error || (data.reason === 'invalid' ? 'Key 验证失败,请检查后重试' : '保存失败,请重试'))
+        setError(data.error || (data.reason === 'invalid' ? tx('Key 验证失败,请检查后重试') : tx('保存失败,请重试')))
       }
     },
-    onError: (e: Error, vars) => setErrors(s => ({ ...s, [vars.name]: `保存失败: ${e.message}` })),
+    onError: (e: Error, vars) => setErrors(s => ({ ...s, [vars.name]: tx('保存失败: {msg}', { msg: e.message }) })),
   })
 
   // fuyao 增强路由: 只切实时行情 + 除权因子两个字段 (updateDataProviders 部分更新, 其余不动)
@@ -431,8 +434,8 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
       icon: { Comp: LineChart, cls: 'bg-accent/12 text-accent' },
       configured: !!settings.data?.has_tickflow_key,
       masked: settings.data?.tickflow_api_key_masked ?? '',
-      desc: '不填 Key 即免费档(历史日K可用);填写后按订阅档位解锁实时、分钟、盘口、财务等能力。',
-      link: { label: '注册获取 Key', url: 'https://tickflow.org/auth/register?ref=V3KDKGXPEA' },
+      desc: tx('不填 Key 即免费档(历史日K可用);填写后按订阅档位解锁实时、分钟、盘口、财务等能力。'),
+      link: { label: tx('注册获取 Key'), url: 'https://tickflow.org/auth/register?ref=V3KDKGXPEA' },
       autoFocus: !settings.data?.has_tickflow_key,
     },
     {
@@ -443,8 +446,8 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
       icon: { Comp: Landmark, cls: 'bg-bear/10 text-bear' },
       configured: !!fyPlugin?.api_key_masked,
       masked: fyPlugin?.api_key_masked ?? '',
-      desc: '同花顺金融数据 API。保存后实时行情与除权因子自动切换到 fuyao,其余能力保持 TickFlow。',
-      link: { label: '前往官网申请 Key', url: 'https://fuyao.aicubes.cn' },
+      desc: tx('同花顺金融数据 API。保存后实时行情与除权因子自动切换到 fuyao,其余能力保持 TickFlow。'),
+      link: { label: tx('前往官网申请 Key'), url: 'https://fuyao.aicubes.cn' },
     },
     {
       name: 'tdxquant',
@@ -455,13 +458,13 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
       paid: true,
       configured: !!tdxPlugin?.api_key_masked,
       masked: tdxPlugin?.api_key_masked ?? '',
-      desc: '通达信 TdxAiData 数据服务,覆盖实时快照、盘口、日K、除权、分钟K 等六项能力。配置后不自动切换路由,可在「设置 → 数据源」按需启用。',
+      desc: tx('通达信 TdxAiData 数据服务,覆盖实时快照、盘口、日K、除权、分钟K 等六项能力。配置后不自动切换路由,可在「设置 → 数据源」按需启用。'),
       // 计费提示优先用清单 billing_note (单一来源); 缺失时用下方兜底文案
       warn: tdxPlugin?.billing_note
         || '积分消耗与频率、范围直接相关: 间隔越短、范围越大消耗越高,具体以商城「积分明细」为准。',
       link: tdxPlugin?.key_manage_url
-        ? { label: '管理 Key / 查询积分', url: tdxPlugin.key_manage_url }
-        : { label: '通达信量化平台', url: 'https://help.tdx.com.cn/quant/' },
+        ? { label: tx('管理 Key / 查询积分'), url: tdxPlugin.key_manage_url }
+        : { label: tx('通达信量化平台'), url: 'https://help.tdx.com.cn/quant/' },
       slowProbe: true,
     },
   ]
@@ -472,19 +475,16 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
         <div className="rounded-lg bg-accent/10 p-2">
           <Database className="h-4 w-4 text-accent" />
         </div>
-        <h2 className="text-xl font-bold text-foreground">配置数据源</h2>
+        <h2 className="text-xl font-bold text-foreground">{tx('配置数据源')}</h2>
       </div>
       <p className="mt-2.5 text-sm text-secondary leading-relaxed">
-        下方数据服务均由第三方提供。TickFlow 不填 Key 即可用,填写后按档位解锁更多能力;
-        其余服务填写 Key 后启用。所有 Key 仅存本地,保存前会先验证。
-      </p>
+        {tx('下方数据服务均由第三方提供。TickFlow 不填 Key 即可用,填写后按档位解锁更多能力; 其余服务填写 Key 后启用。所有 Key 仅存本地,保存前会先验证。')}</p>
 
       {/* 数据源面板: 每行一个源, 行内完成「看懂 → 配 Key」的闭环 */}
       {sources.isLoading ? (
         <div className="mt-4 flex items-center gap-2 text-xs text-muted">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          正在加载数据源…
-        </div>
+          {tx('正在加载数据源…')}</div>
       ) : (
         <div className="mt-4 overflow-hidden rounded-card border border-border/70 bg-surface/60 backdrop-blur-sm">
           <div className="divide-y divide-border/40">
@@ -507,20 +507,19 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
                       {/* 名称行: 名称 + 弱化归属 + 费用小标 + 右侧状态胶囊 */}
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="text-[15px] font-semibold leading-5 text-foreground">{row.display}</span>
-                        <span className="text-[10px] leading-none text-muted/45">第三方</span>
+                        <span className="text-[10px] leading-none text-muted/45">{tx('第三方')}</span>
                         {row.paid && (
-                          <span className="rounded bg-warning/12 px-1 py-0.5 text-[9px] font-medium leading-none text-warning">消耗积分</span>
+                          <span className="rounded bg-warning/12 px-1 py-0.5 text-[9px] font-medium leading-none text-warning">{tx('消耗积分')}</span>
                         )}
                         <span className="ml-auto shrink-0">
                           {row.configured ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-bear/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-bear">
                               <CheckCircle2 className="h-2.5 w-2.5" />
-                              已配置
-                            </span>
+                              {tx('已配置')}</span>
                           ) : row.name === 'tickflow' ? (
-                            <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-accent">免 Key 可用</span>
+                            <span className="rounded-full bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-accent">{tx('免 Key 可用')}</span>
                           ) : (
-                            <span className="rounded-full bg-elevated/60 px-1.5 py-0.5 text-[10px] leading-none text-muted/70">未配置</span>
+                            <span className="rounded-full bg-elevated/60 px-1.5 py-0.5 text-[10px] leading-none text-muted/70">{tx('未配置')}</span>
                           )}
                         </span>
                       </div>
@@ -534,7 +533,7 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
                             </span>
                           ))
                         ) : (
-                          <span className="text-[10px] text-muted/50">未声明数据集</span>
+                          <span className="text-[10px] text-muted/50">{tx('未声明数据集')}</span>
                         )}
                       </div>
 
@@ -555,7 +554,7 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
                                 setInputs(s => ({ ...s, [row.name]: e.target.value }))
                                 setErrors(s => ({ ...s, [row.name]: null }))
                               }}
-                              placeholder={`粘贴 ${row.env}`}
+                              placeholder={tx('粘贴 {env}', { env: row.env })}
                               autoFocus={row.autoFocus}
                               autoComplete="off"
                               className="h-8 min-w-0 flex-1 rounded-lg border border-border bg-base px-2.5 font-mono text-xs text-foreground placeholder:text-muted/50 focus:border-accent/60 focus:outline-none transition-colors"
@@ -566,7 +565,7 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
                               className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-50 transition-colors"
                             >
                               {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                              {pending ? (row.slowProbe ? '验证中(约 30 秒)…' : '验证中…') : '验证并保存'}
+                              {pending ? (row.slowProbe ? tx('验证中(约 30 秒)…') : tx('验证中…')) : tx('验证并保存')}
                             </button>
                             {row.configured && (
                               <button
@@ -574,22 +573,20 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
                                 onClick={() => setExpanded(s => ({ ...s, [row.name]: false }))}
                                 className="shrink-0 text-[11px] text-muted/60 hover:text-secondary transition-colors"
                               >
-                                取消
-                              </button>
+                                {tx('取消')}</button>
                             )}
                           </form>
                         ) : (
                           <div className="flex items-center gap-2">
                             <code className="truncate rounded-md bg-elevated/40 px-1.5 py-0.5 font-mono text-[11px] text-secondary">
-                              {row.masked || '已保存'}
+                              {row.masked || tx('已保存')}
                             </code>
                             <button
                               type="button"
                               onClick={() => setExpanded(s => ({ ...s, [row.name]: true }))}
                               className="shrink-0 text-[11px] text-accent/75 hover:text-accent transition-colors"
                             >
-                              替换 Key
-                            </button>
+                              {tx('替换 Key')}</button>
                           </div>
                         )}
                       </div>
@@ -637,14 +634,11 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
       <div className="mt-3 flex items-start gap-2 rounded-card border border-border/60 bg-surface/60 px-3 py-2.5">
         <Puzzle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent/70" />
         <div className="text-[11px] leading-relaxed text-muted">
-          <span className="text-secondary">数据源已插件化</span>
-          {customCount > 0 && <>,当前已加载 {customCount} 个自有数据源</>}
-          ,接入自有行情或切换数据源请前往
-          <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-[10px] text-secondary">设置 → 数据源</span>
-          ,方法详见
-          <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-[10px] text-secondary">docs/custom-data-source.md</span>
-          与
-          <span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-[10px] text-secondary">docs/plugin-development.md</span>
+          <span className="text-secondary">{tx('数据源已插件化')}</span>
+          {customCount > 0 && <>{tx(',当前已加载')} {customCount} {tx('个自有数据源')}</>}
+          {tx(',接入自有行情或切换数据源请前往')}<span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-[10px] text-secondary">{tx('设置 → 数据源')}</span>
+          {tx(',方法详见')}<span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-[10px] text-secondary">docs/custom-data-source.md</span>
+          {tx('与')}<span className="mx-0.5 rounded bg-elevated/70 px-1 py-px font-mono text-[10px] text-secondary">docs/plugin-development.md</span>
           。
         </div>
       </div>
@@ -656,14 +650,12 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
           className="inline-flex items-center gap-1.5 px-3 h-9 rounded-btn text-sm text-secondary hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          上一步
-        </button>
+          {tx('上一步')}</button>
         <button
           onClick={onNext}
           className="inline-flex items-center gap-2 px-5 h-9 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/90 transition-colors"
         >
-          下一步
-          <ArrowRight className="h-4 w-4" />
+          {tx('下一步')}<ArrowRight className="h-4 w-4" />
         </button>
       </div>
     </div>
@@ -682,6 +674,7 @@ const ROUTE_PRIORITY = [
 ]
 
 function ResultStep({ onNext, onBack }: { onNext: () => void; onBack: () => void }) {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const settings = useSettings()
   const prefs = usePreferences()
@@ -722,7 +715,7 @@ function ResultStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
         return qc.invalidateQueries({ queryKey: QK.preferences })
       })
       .then(() => qc.invalidateQueries({ queryKey: QK.capabilityMatrix }))
-      .catch(e => setApplyError(`自动设置能力路由失败: ${(e as Error).message}`))
+      .catch(e => setApplyError(tx('自动设置能力路由失败: {msg}', { msg: (e as Error).message })))
   }, [matrix.data])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const activeName = prefs.data?.daily_data_provider || 'tickflow'
@@ -738,14 +731,11 @@ function ResultStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
         <div className="rounded-lg bg-accent/10 p-2">
           <Route className="h-4 w-4 text-accent" />
         </div>
-        <h2 className="text-xl font-bold text-foreground">能力路由检测</h2>
+        <h2 className="text-xl font-bold text-foreground">{tx('能力路由检测')}</h2>
       </div>
       <p className="mt-2.5 text-sm text-secondary leading-relaxed">
-        进入本步时已按默认优先级
-        <span className="text-foreground font-medium"> TickFlow → fuyao </span>
-        自动设置各数据集的路由:前者可用的能力归前者,没有则顺延下一个可用源。后续可随时在
-        <span className="text-foreground font-medium"> 设置 → 数据源 </span>按数据集改选。
-      </p>
+        {tx('进入本步时已按默认优先级')}<span className="text-foreground font-medium"> TickFlow → fuyao </span>
+        {tx('自动设置各数据集的路由:前者可用的能力归前者,没有则顺延下一个可用源。后续可随时在')}<span className="text-foreground font-medium"> {tx('设置 → 数据源')} </span>{tx('按数据集改选。')}</p>
 
       {/* 自动路由执行结果 */}
       {applyError && (
@@ -759,10 +749,10 @@ function ResultStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
           <CheckCircle2 className="h-3.5 w-3.5 mt-px shrink-0 text-bull" />
           {appliedChanges.length > 0 ? (
             <span>
-              已按优先级自动路由:{appliedChanges.map(c => `${c.label} → ${c.to}`).join('、')}
+              {tx('已按优先级自动路由:')}{appliedChanges.map(c => `${c.label} → ${c.to}`).join('、')}
             </span>
           ) : (
-            <span>当前能力路由已符合默认优先级,无需调整。</span>
+            <span>{tx('当前能力路由已符合默认优先级,无需调整。')}</span>
           )}
         </div>
       )}
@@ -770,11 +760,10 @@ function ResultStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
       {matrix.isLoading ? (
         <div className="mt-5 flex items-center gap-2 text-xs text-muted">
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          正在检测能力路由…
-        </div>
+          {tx('正在检测能力路由…')}</div>
       ) : matrix.isError ? (
         <div className="mt-5 flex flex-col items-center gap-2 rounded-card border border-danger/30 bg-danger/[0.04] p-5 text-center">
-          <span className="text-xs text-secondary">能力路由检测失败，请重试</span>
+          <span className="text-xs text-secondary">{tx('能力路由检测失败，请重试')}</span>
           <button
             type="button"
             onClick={() => matrix.refetch()}
@@ -782,13 +771,11 @@ function ResultStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
             className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-accent transition-colors hover:bg-elevated disabled:opacity-50"
           >
             <Loader2 className={matrix.isFetching ? 'h-3 w-3 animate-spin' : 'h-3 w-3'} />
-            重试
-          </button>
+            {tx('重试')}</button>
         </div>
       ) : routes.length === 0 ? (
         <div className="mt-5 rounded-card border border-border bg-surface/80 p-5 text-center text-xs text-muted">
-          暂未获取到能力路由矩阵,可稍后在 设置 → 数据源 中重新检测。
-        </div>
+          {tx('暂未获取到能力路由矩阵,可稍后在 设置 → 数据源 中重新检测。')}</div>
       ) : (
         <>
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -807,21 +794,21 @@ function ResultStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
                   )}
                   <span className="text-sm font-medium text-foreground">{r.label}</span>
                   <span className="ml-auto shrink-0 text-[10px] font-medium text-secondary">
-                    {r.usable ? '可用' : '不可用'}
+                    {r.usable ? tx('可用') : tx('不可用')}
                   </span>
                 </div>
                 <div className="mt-1 flex items-center gap-1.5 pl-5 text-[10px] text-muted">
-                  <span className="truncate">生效源:{r.effective_display}</span>
+                  <span className="truncate">{tx('生效源:')}{r.effective_display}</span>
                   <span className="shrink-0 text-muted/50">·</span>
                   <span className="shrink-0">{r.desc}</span>
                 </div>
                 {!r.usable && (
                   <div className="mt-1 pl-5 text-[10px] text-warning/80 leading-relaxed">
     {r.candidates.length > 0
-      ? `可切换候选:${r.candidates.map(c => c.display).join(' / ')}`
+      ? tx('可切换候选:{list}', { list: r.candidates.map(c => c.display).join(' / ') })
       : isTickflow && !hasKey
-        ? '该能力目前不可用'
-        : '暂无可用候选,可在设置中排查该源'}
+        ? tx('该能力目前不可用')
+        : tx('暂无可用候选,可在设置中排查该源')}
                   </div>
                 )}
               </div>
@@ -830,8 +817,7 @@ function ResultStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
 
           <div className="mt-3 flex items-center justify-between rounded-btn bg-elevated/50 px-3.5 py-2 text-[11px] text-muted">
             <span>
-              {usableCount}/{routes.length} 个数据集可用
-              {isTickflow && !hasKey && ' · 未配置 TickFlow Key,按 None 档运行,历史日K不受影响'}
+              {usableCount}/{routes.length} {tx('个数据集可用')}{isTickflow && !hasKey && tx(' · 未配置 TickFlow Key,按 None 档运行,历史日K不受影响')}
             </span>
             <LinkMark />
           </div>
@@ -845,14 +831,12 @@ function ResultStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
           className="inline-flex items-center gap-1.5 px-3 h-9 rounded-btn text-sm text-secondary hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          上一步
-        </button>
+          {tx('上一步')}</button>
         <button
           onClick={onNext}
           className="inline-flex items-center gap-2 px-5 h-9 rounded-xl bg-accent text-white text-sm font-semibold hover:bg-accent/90 transition-colors"
         >
-          下一步
-          <ArrowRight className="h-4 w-4" />
+          {tx('下一步')}<ArrowRight className="h-4 w-4" />
         </button>
       </div>
     </div>
@@ -861,12 +845,14 @@ function ResultStep({ onNext, onBack }: { onNext: () => void; onBack: () => void
 
 /** 指向设置数据源的行内提示 (能力路由可随时调整) */
 function LinkMark() {
-  return <span className="shrink-0">调整: 设置 → 数据源</span>
+  const { tx } = useI18n()
+  return <span className="shrink-0">{tx('调整: 设置 → 数据源')}</span>
 }
 
 // ===== Step 4: 完成 =====
 
 function FinishStep({ onNext, onBack, pending }: { onNext: () => void; onBack: () => void; pending: boolean }) {
+  const { tx } = useI18n()
   const settings = useSettings()
   // 是否已配置 Key(free 或 api_key 都算,None 档算未配置)
   const hasKey = settings.data?.mode === 'free' || settings.data?.mode === 'api_key'
@@ -874,9 +860,9 @@ function FinishStep({ onNext, onBack, pending }: { onNext: () => void; onBack: (
   // 首要行动:获取数据(不管配没配 Key, 新用户都需要先拉数据)
   // 快速上手入口(精简为核心功能)
   const tips = [
-    { icon: TrendingUp, text: '「个股分析」:输入代码,AI 四维分析 + 关键价位' },
-    { icon: ScanSearch, text: '「策略」页:内置多套策略,一键扫描全市场' },
-    { icon: ShieldCheck, text: '「回测」页:用历史数据验证策略表现,用数据说话' },
+    { icon: TrendingUp, text: tx('「个股分析」:输入代码,AI 四维分析 + 关键价位') },
+    { icon: ScanSearch, text: tx('「策略」页:内置多套策略,一键扫描全市场') },
+    { icon: ShieldCheck, text: tx('「回测」页:用历史数据验证策略表现,用数据说话') },
   ]
 
   return (
@@ -901,11 +887,11 @@ function FinishStep({ onNext, onBack, pending }: { onNext: () => void; onBack: (
         </div>
       </motion.div>
 
-      <h1 className="mt-6 text-2xl font-bold text-foreground">一切就绪!</h1>
+      <h1 className="mt-6 text-2xl font-bold text-foreground">{tx('一切就绪!')}</h1>
       <p className="mt-2.5 text-sm text-secondary leading-relaxed max-w-md mx-auto">
         {hasKey
-          ? 'Key 已生效,进入面板后系统会自动引导你获取行情数据,完成后即可使用全部功能。'
-          : '当前为 None 档,进入面板后系统会自动引导你获取历史日K数据(无需 Key),即可开始体验。'}
+          ? tx('Key 已生效,进入面板后系统会自动引导你获取行情数据,完成后即可使用全部功能。')
+          : tx('当前为 None 档,进入面板后系统会自动引导你获取历史日K数据(无需 Key),即可开始体验。')}
       </p>
 
       {/* 首要行动:获取数据 */}
@@ -919,9 +905,9 @@ function FinishStep({ onNext, onBack, pending }: { onNext: () => void; onBack: (
           <Database className="h-4 w-4 text-accent" />
         </div>
         <div className="min-w-0">
-          <div className="text-sm font-medium text-foreground">下一步:获取行情数据</div>
+          <div className="text-sm font-medium text-foreground">{tx('下一步:获取行情数据')}</div>
           <p className="mt-1 text-xs text-secondary leading-relaxed">
-            进入面板后,看板会自动引导你拉取近 1 年全 A 股日K(约 5500 只,预计 1-3 分钟)。同步期间可浏览其他页面。
+            {tx('进入面板后,看板会自动引导你拉取近 1 年全 A 股日K(约 5500 只,预计 1-3 分钟)。同步期间可浏览其他页面。')}
           </p>
         </div>
       </motion.div>
@@ -939,7 +925,7 @@ function FinishStep({ onNext, onBack, pending }: { onNext: () => void; onBack: (
             <div className="rounded-lg bg-accent/10 p-1.5 shrink-0">
               <t.icon className="h-3.5 w-3.5 text-accent" />
             </div>
-            <span className="text-xs text-secondary">{t.text}</span>
+            <span className="text-xs text-secondary">{tx(t.text)}</span>
           </motion.div>
         ))}
       </div>
@@ -951,7 +937,7 @@ function FinishStep({ onNext, onBack, pending }: { onNext: () => void; onBack: (
           className="inline-flex items-center gap-1.5 px-3 h-10 rounded-btn text-sm text-secondary hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
-          上一步
+          {tx('上一步')}
         </button>
         <button
           onClick={onNext}
@@ -959,7 +945,7 @@ function FinishStep({ onNext, onBack, pending }: { onNext: () => void; onBack: (
           className="inline-flex items-center gap-2 px-6 h-10 rounded-xl bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 hover:shadow-accent/30 disabled:opacity-60 transition-all"
         >
           {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          {pending ? '正在进入…' : '进入面板'}
+          {pending ? tx('正在进入…') : tx('进入面板')}
         </button>
       </div>
     </div>

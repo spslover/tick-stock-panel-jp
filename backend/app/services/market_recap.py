@@ -293,6 +293,8 @@ async def recap_market_stream(
     as_of: date | None = None,
     focus: str = "",
     news: list[dict] | None = None,
+    *,
+    locale: str = "zh-CN",
 ) -> AsyncIterator[str]:
     """流式大盘复盘:yield 出每个 NDJSON 事件。
 
@@ -327,10 +329,9 @@ async def recap_market_stream(
 
     # 3+4. 构建 prompt + 流式调用 LLM(整体 try-except,任何异常 yield error,避免前端卡死)
     try:
-        from app.services.ai_provider import stream_ai_text
-
         # 龙虎榜摘要 (fuyao 专有): 拉取失败/未配置 → 空串, 复盘主流程不受影响
         from app.services import dragon_tiger as dragon_tiger_svc
+        from app.services.ai_provider import language_instruction, stream_ai_text
 
         lhb_ctx = dragon_tiger_svc.build_recap_context(repo.store.data_dir)
 
@@ -342,7 +343,7 @@ async def recap_market_stream(
         got_content = False
         async for delta in stream_ai_text(
             [
-                {"role": "system", "content": effective_system_prompt()},
+                {"role": "system", "content": effective_system_prompt() + language_instruction(locale)},
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.5,

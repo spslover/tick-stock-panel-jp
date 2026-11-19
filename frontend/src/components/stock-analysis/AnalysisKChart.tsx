@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useChartTheme } from '@/lib/theme'
+import { useI18n } from '@/lib/i18n'
 import { plotPaneHeights } from '@/lib/chart-layout'
 import { FinancialPlot } from '@/components/charts/FinancialPlot'
 import type { KlineRow, LevelSeries } from '@/lib/api'
@@ -72,6 +73,7 @@ export function AnalysisKChart({
   height = 460,
   className,
 }: Props) {
+  const { tx, locale } = useI18n()
   const [activeTypes, setActiveTypes] = useState<Set<LevelType>>(() => new Set(defaultLevelTypes))
   /** 枢轴点显示到第几档:1=只P+R1/S1, 2=到R2/S2, 3=全档(R3/S3) */
   const [pivotRank, setPivotRank] = useState<1 | 2 | 3>(1)
@@ -80,7 +82,7 @@ export function AnalysisKChart({
 
   const model = useMemo(() => buildAnalysisChartModel({
     rows, levels, series, seriesDates, activeTypes, pivotRank, hoveredKey, markers, ranges,
-  }), [rows, levels, series, seriesDates, activeTypes, pivotRank, hoveredKey, markers, ranges])
+  }), [rows, levels, series, seriesDates, activeTypes, pivotRank, hoveredKey, markers, ranges, locale])
 
   const paneHeights = useMemo(() => plotPaneHeights(height, 1), [height])
   const scope = `${scopeKey ?? ''}:${model.rows[0]?.date ?? ''}:${model.rows.length}`
@@ -107,7 +109,7 @@ export function AnalysisKChart({
       {/* 价位开关按钮组 */}
       {levels && (
         <div className="flex flex-wrap items-center gap-1.5 mb-2">
-          <span className="text-[10px] text-muted mr-1">关键价位</span>
+          <span className="text-[10px] text-muted mr-1">{tx('关键价位')}</span>
           {LEVEL_GROUPS.map(group => {
             const active = activeTypes.has(group.key)
             // 枢轴点数量按当前档位过滤显示;其他组显示原始数量
@@ -115,12 +117,13 @@ export function AnalysisKChart({
             const count = group.key === 'pivot'
               ? raw.filter(point => point.rank === undefined || point.rank <= pivotRank).length
               : raw.length
+            const groupLabel = tx(group.label)
             return (
               <button
                 key={group.key}
                 onClick={() => toggleType(group.key)}
                 disabled={raw.length === 0}
-                title={`${group.label} (${count} 个)`}
+                title={`${groupLabel} (${count})`}
                 className={`inline-flex items-center gap-1 h-6 px-2 rounded-md text-[10px] font-medium border transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
                   active
                     ? 'text-foreground'
@@ -129,7 +132,7 @@ export function AnalysisKChart({
                 style={active ? { borderColor: group.color + '66', backgroundColor: group.color + '1a' } : undefined}
               >
                 <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: active ? group.color : '#52525B' }} />
-                {group.label}
+                {groupLabel}
                 <span className="opacity-50">{count}</span>
               </button>
             )
@@ -138,12 +141,12 @@ export function AnalysisKChart({
           {/* 枢轴点档位选择器 —— 仅当枢轴点开启时显示 */}
           {activeTypes.has('pivot') && (levels.pivot?.length ?? 0) > 0 && (
             <div className="inline-flex items-center gap-0.5 ml-1 pl-2 border-l border-border/40">
-              <span className="text-[10px] text-muted mr-1">档位</span>
+              <span className="text-[10px] text-muted mr-1">{tx('档位')}</span>
               {([1, 2, 3] as const).map(rank => (
                 <button
                   key={rank}
                   onClick={() => setPivotRank(rank)}
-                  title={rank === 1 ? 'P + R1/S1(3 个)' : rank === 2 ? '到 R2/S2(5 个)' : '全档 R3/S3(7 个)'}
+                  title={rank === 1 ? 'P + R1/S1 (3)' : rank === 2 ? 'P..R2/S2 (5)' : 'P..R3/S3 (7)'}
                   className={`h-6 px-2 rounded-md text-[10px] font-mono border transition-all ${
                     pivotRank === rank
                       ? 'bg-[#8B5CF6]/15 border-[#8B5CF6]/40 text-[#c4b5fd]'
@@ -168,7 +171,7 @@ export function AnalysisKChart({
         visibleBars={VISIBLE_BARS}
         rightOffsetPixels={ANALYSIS_LABEL_BAND_PX}
         annotations={model.annotations}
-        paneTitles={['', '成交量']}
+        paneTitles={['', tx('成交量')]}
         onSelect={date => onDateClick?.(date)}
         onCrosshairMove={point => {
           if (!point) { setHoveredKey(null); return }
@@ -204,6 +207,7 @@ function LevelOverview({
   hoveredKey: string | null
   onHover: (key: string | null) => void
 }) {
+  const { tx } = useI18n()
   const theme = useChartTheme()
   // 收集当前显示的点位(同 collectPriceLines 的过滤逻辑)
   const visible: PriceLevel[] = []
@@ -259,13 +263,13 @@ function LevelOverview({
     <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 rounded-lg border border-border/40 bg-base/20 px-3 py-2">
       {/* 当前价 */}
       <div className="sm:col-span-2 flex items-center gap-2 pb-1 border-b border-border/30 mb-0.5">
-        <span className="text-[10px] text-muted">当前价</span>
+        <span className="text-[10px] text-muted">{tx('当前价')}</span>
         <span className="text-xs font-mono font-medium text-foreground">{cur.toFixed(2)}</span>
       </div>
       {/* 压力位(从近到远,即从低到高)倒序展示:最高的在最上 */}
       {resistances.length > 0 && (
         <div>
-          <div className="text-[10px] font-medium text-bear mb-0.5">压力位 ↑</div>
+          <div className="text-[10px] font-medium text-bear mb-0.5">{tx('压力位 ↑')}</div>
           {[...resistances].reverse().map((point, index) => <Row key={`r-${index}`} point={point} />)}
         </div>
       )}
@@ -273,13 +277,13 @@ function LevelOverview({
       <div>
         {supports.length > 0 && (
           <>
-            <div className="text-[10px] font-medium text-bull mb-0.5">支撑位 ↓</div>
+            <div className="text-[10px] font-medium text-bull mb-0.5">{tx('支撑位 ↓')}</div>
             {supports.map((point, index) => <Row key={`s-${index}`} point={point} />)}
           </>
         )}
         {neutrals.length > 0 && (
           <div className={supports.length > 0 ? 'mt-2' : ''}>
-            {supports.length === 0 && <div className="text-[10px] font-medium text-muted mb-0.5">枢轴位</div>}
+            {supports.length === 0 && <div className="text-[10px] font-medium text-muted mb-0.5">{tx('枢轴位')}</div>}
             {neutrals.map((point, index) => <Row key={`n-${index}`} point={point} />)}
           </div>
         )}

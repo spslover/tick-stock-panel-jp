@@ -8,6 +8,7 @@ import { SlidersHorizontal, RotateCcw, Save, Zap } from 'lucide-react'
 import { Modal } from '@/components/Modal'
 import { toast } from '@/components/Toast'
 import { storage, type DefaultStrategyBasicFilter } from '@/lib/storage'
+import { useI18n } from '@/lib/i18n'
 import { color } from '@/lib/colors'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
@@ -35,6 +36,7 @@ interface Props {
 }
 
 export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
+  const { tx } = useI18n()
   const [bf, setBf] = useState<DefaultStrategyBasicFilter>(() => loadDefaultBasicFilter())
   // 一键应用: idle → confirm (二次确认) → applying (分批 PATCH) → idle
   const [applyPhase, setApplyPhase] = useState<'idle' | 'confirm' | 'applying'>('idle')
@@ -91,9 +93,9 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
     qc.invalidateQueries({ queryKey: ['screener-strategies'] })
     setApplyPhase('idle')
     if (failed === 0) {
-      toast(`已应用到全部 ${ids.length} 个策略，并保存为默认配置；重跑后生效`, 'success')
+      toast(tx('已应用到全部 {n} 个策略，并保存为默认配置；重跑后生效', { n: ids.length }), 'success')
     } else {
-      toast(`已应用 ${ids.length - failed}/${ids.length} 个策略（${failed} 个失败），并保存为默认配置`, 'error')
+      toast(tx('已应用 {done}/{total} 个策略（{failed} 个失败），并保存为默认配置', { done: ids.length - failed, total: ids.length, failed }), 'error')
     }
   }
 
@@ -108,9 +110,9 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
         <div className="flex items-center gap-2">
           <SlidersHorizontal className="h-4 w-4 text-accent" />
-          <span id="default-strategy-params-title" className="text-sm font-semibold text-foreground">默认基础参数</span>
+          <span id="default-strategy-params-title" className="text-sm font-semibold text-foreground">{tx('默认基础参数')}</span>
         </div>
-        <button onClick={onClose} className="p-1 rounded hover:bg-elevated text-muted hover:text-foreground transition-colors cursor-pointer" title="关闭">
+        <button onClick={onClose} className="p-1 rounded hover:bg-elevated text-muted hover:text-foreground transition-colors cursor-pointer" title={tx('关闭')}>
           <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18M6 6l12 12" /></svg>
         </button>
       </div>
@@ -118,21 +120,20 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
       {/* 内容 */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
         <p className="text-[11px] text-muted leading-relaxed">
-          之后新建的策略（含 AI 生成）将默认使用以下基础过滤参数；已存在的策略不受影响，可用下方「一键应用」批量同步，或逐策略修改。
-        </p>
+          {tx('之后新建的策略（含 AI 生成）将默认使用以下基础过滤参数；已存在的策略不受影响，可用下方「一键应用」批量同步，或逐策略修改。')}</p>
         <div className="space-y-2">
-          <RangeField label="价格" minVal={bf.price_min} maxVal={bf.price_max} onMinChange={v => set('price_min', v)} onMaxChange={v => set('price_max', v)} unit="元" step="1" />
-          <RangeField label="流通市值" minVal={bf.float_cap_min != null ? bf.float_cap_min / 1e8 : null} maxVal={bf.float_cap_max != null ? bf.float_cap_max / 1e8 : null} onMinChange={v => set('float_cap_min', v != null ? v * 1e8 : null)} onMaxChange={v => set('float_cap_max', v != null ? v * 1e8 : null)} unit="亿" step="5" />
-          <RangeField label="成交额" minVal={bf.amount_min != null ? bf.amount_min / 1e8 : null} maxVal={bf.amount_max != null ? bf.amount_max / 1e8 : null} onMinChange={v => set('amount_min', v != null ? v * 1e8 : null)} onMaxChange={v => set('amount_max', v != null ? v * 1e8 : null)} unit="亿" step="0.5" />
-          <RangeField label="换手率" minVal={bf.turnover_min} maxVal={bf.turnover_max} onMinChange={v => set('turnover_min', v)} onMaxChange={v => set('turnover_max', v)} unit="%" step="0.5" />
+          <RangeField label={tx('价格')} minVal={bf.price_min} maxVal={bf.price_max} onMinChange={v => set('price_min', v)} onMaxChange={v => set('price_max', v)} unit={tx('元')} step="1" />
+          <RangeField label={tx('流通市值')} minVal={bf.float_cap_min != null ? bf.float_cap_min / 1e8 : null} maxVal={bf.float_cap_max != null ? bf.float_cap_max / 1e8 : null} onMinChange={v => set('float_cap_min', v != null ? v * 1e8 : null)} onMaxChange={v => set('float_cap_max', v != null ? v * 1e8 : null)} unit={tx('亿')} step="5" />
+          <RangeField label={tx('成交额')} minVal={bf.amount_min != null ? bf.amount_min / 1e8 : null} maxVal={bf.amount_max != null ? bf.amount_max / 1e8 : null} onMinChange={v => set('amount_min', v != null ? v * 1e8 : null)} onMaxChange={v => set('amount_max', v != null ? v * 1e8 : null)} unit={tx('亿')} step="0.5" />
+          <RangeField label={tx('换手率')} minVal={bf.turnover_min} maxVal={bf.turnover_max} onMinChange={v => set('turnover_min', v)} onMaxChange={v => set('turnover_max', v)} unit="%" step="0.5" />
           <div className="flex items-start gap-1.5">
-            <span className="text-[11px] text-secondary w-16 shrink-0 text-right pt-0.5">板块</span>
+            <span className="text-[11px] text-secondary w-16 shrink-0 text-right pt-0.5">{tx('板块')}</span>
             <div className="flex flex-wrap gap-0.5">
               {ALL_BOARDS.map(b => {
                 const active = bf.boards.includes(b)
                 return (
                   <button key={b} onClick={() => { const next = active ? bf.boards.filter(x => x !== b) : [...bf.boards, b]; set('boards', next.length === 0 ? [...ALL_BOARDS] : next) }}
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer ${active ? `${color.select.border} ${color.select.bgLight} ${color.select.text}` : `border-border bg-base text-muted ${color.select.borderHover}`}`}>{b}</button>
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer ${active ? `${color.select.border} ${color.select.bgLight} ${color.select.text}` : `border-border bg-base text-muted ${color.select.borderHover}`}`}>{tx(b)}</button>
                 )
               })}
             </div>
@@ -140,7 +141,7 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] text-secondary w-16 shrink-0 text-right">ST</span>
             <button onClick={() => set('exclude_st', !bf.exclude_st)}
-              className={`px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer ${bf.exclude_st ? 'border-danger/40 bg-danger/10 text-danger' : 'border-border bg-base text-muted hover:border-danger/30'}`}>{bf.exclude_st ? '排除' : '包含'}</button>
+              className={`px-1.5 py-0.5 rounded text-[10px] font-medium border transition-colors cursor-pointer ${bf.exclude_st ? 'border-danger/40 bg-danger/10 text-danger' : 'border-border bg-base text-muted hover:border-danger/30'}`}>{bf.exclude_st ? tx('排除') : tx('包含')}</button>
           </div>
         </div>
       </div>
@@ -149,30 +150,29 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
       <div className="px-4 py-3 border-t border-border/50">
         {applyPhase === 'idle' && (
           <button onClick={() => setApplyPhase('confirm')} disabled={!strategyCount}
-            title="把当前参数写入全部股票策略的基础参数（不影响各策略已调的其他配置）"
+            title={tx('把当前参数写入全部股票策略的基础参数（不影响各策略已调的其他配置）')}
             className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-btn text-xs font-medium
               border border-amber-500/40 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20
               transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
             <Zap className="h-3 w-3" />
-            一键应用到全部策略{strategyCount ? `（${strategyCount} 个）` : ''}
+            {tx('一键应用到全部策略')}{strategyCount ? tx('（{n} 个）', { n: strategyCount }) : ''}
           </button>
         )}
         {applyPhase === 'confirm' && (
           <div className="flex items-center gap-2">
             <span className="flex-1 text-[11px] text-muted leading-tight">
-              将覆盖全部 <span className="text-amber-500 font-medium">{strategyCount}</span> 个策略的基础参数（只动基础过滤，不碰各策略的参数/评分），重跑后生效。
-            </span>
+              {tx('将覆盖全部')} <span className="text-amber-500 font-medium">{strategyCount}</span> {tx('个策略的基础参数（只动基础过滤，不碰各策略的参数/评分），重跑后生效。')}</span>
             <button onClick={() => setApplyPhase('idle')}
-              className="px-2.5 py-1.5 rounded-btn text-xs text-secondary border border-border hover:text-foreground transition-colors cursor-pointer shrink-0">取消</button>
+              className="px-2.5 py-1.5 rounded-btn text-xs text-secondary border border-border hover:text-foreground transition-colors cursor-pointer shrink-0">{tx('取消')}</button>
             <button onClick={applyToAll}
-              className="px-3 py-1.5 rounded-btn text-xs font-medium text-white bg-amber-500 hover:bg-amber-500/90 transition-colors cursor-pointer shrink-0">确认覆盖</button>
+              className="px-3 py-1.5 rounded-btn text-xs font-medium text-white bg-amber-500 hover:bg-amber-500/90 transition-colors cursor-pointer shrink-0">{tx('确认覆盖')}</button>
           </div>
         )}
         {applyPhase === 'applying' && (
           <div className="flex items-center justify-center gap-2 px-3 py-1.5 rounded-btn text-xs text-muted border border-border/50 bg-elevated/50">
             <span className="h-3 w-3 rounded-full border-2 border-amber-500/30 border-t-amber-500 animate-spin" />
-            应用中 {applyProgress.done}/{applyProgress.total}
-            {applyProgress.failed > 0 && <span className="text-danger">（{applyProgress.failed} 失败）</span>}
+            {tx('应用中')} {applyProgress.done}/{applyProgress.total}
+            {applyProgress.failed > 0 && <span className="text-danger">{tx('（{n} 失败）', { n: applyProgress.failed })}</span>}
           </div>
         )}
       </div>
@@ -182,15 +182,13 @@ export function DefaultStrategyParamsDialog({ show, onClose }: Props) {
         <button onClick={() => setBf({ ...BUILTIN_DEFAULT_BASIC_FILTER })}
           className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-btn text-xs text-muted border border-border hover:text-foreground hover:border-accent/40 transition-colors cursor-pointer">
           <RotateCcw className="h-3 w-3" />
-          恢复默认
-        </button>
+          {tx('恢复默认')}</button>
         <div className="flex items-center gap-2">
-          <button onClick={onClose} className="px-3 py-1.5 rounded-btn text-xs text-secondary border border-border hover:text-foreground transition-colors cursor-pointer">取消</button>
+          <button onClick={onClose} className="px-3 py-1.5 rounded-btn text-xs text-secondary border border-border hover:text-foreground transition-colors cursor-pointer">{tx('取消')}</button>
           <button onClick={save}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-btn text-xs font-medium text-white bg-accent hover:bg-accent/90 transition-colors cursor-pointer">
             <Save className="h-3 w-3" />
-            保存
-          </button>
+            {tx('保存')}</button>
         </div>
       </div>
     </Modal>

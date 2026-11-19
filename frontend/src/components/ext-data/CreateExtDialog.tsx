@@ -17,6 +17,7 @@ import {
   Check,
 } from 'lucide-react'
 import { api, type ExtDataDetectUrlResult, type ExtDataField } from '@/lib/api'
+import { tx, useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
 import {
@@ -31,12 +32,14 @@ type MappingChoice = {
   need: 'symbol' | 'code' | 'both'
 }
 
-const WEEKDAY_OPTS: [number, string][] = [
-  [1, '周一'], [2, '周二'], [3, '周三'], [4, '周四'], [5, '周五'], [6, '周六'], [7, '周日'],
-]
-const MONTHDAY_OPTS: [number, string][] = Array.from({ length: 31 }, (_, i) => [i + 1, `${i + 1} 号`])
+// 星期标签在渲染时才翻译: 模块级调用 tx() 会把语言冻结在导入那一刻
+const WEEKDAY_CN = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+const WEEKLY_SUMMARY_CN = ['每周一', '每周二', '每周三', '每周四', '每周五', '每周六', '每周日']
+const WEEKDAY_OPTS = (): [number, string][] => WEEKDAY_CN.map((label, i) => [i + 1, tx(label)])
+const MONTHDAY_OPTS = (): [number, string][] => Array.from({ length: 31 }, (_, i) => [i + 1, tx('{n} 号', { n: i + 1 })] as [number, string])
 
 export function CreateExtDialog({ onClose }: { onClose: () => void }) {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const backdrop = useDialogBackdrop(onClose)
   const [sourceMode, setSourceMode] = useState<SourceMode>('url')
@@ -91,12 +94,12 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
         Object.entries(parsed).map(([k, v]) => [k, String(v)]),
       )
     } catch {
-      throw new Error(`${labelText} 不是有效 JSON 对象`)
+      throw new Error(tx('{v} 不是有效 JSON 对象', { v: labelText }))
     }
   }
 
   const buildPullFieldMap = () => {
-    const base = parseJsonObject(fieldMapStr, '字段映射') ?? {}
+    const base = parseJsonObject(fieldMapStr, tx('字段映射')) ?? {}
     const finalMap: Record<string, string> = { ...base }
 
     fields.forEach((field, index) => {
@@ -127,7 +130,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
   const create = useMutation({
     mutationFn: async () => {
       if (scheduleMode === 'fixed' && !scheduleTime) {
-        throw new Error('固定时刻模式请先选择时刻（或切回「按间隔」）')
+        throw new Error(tx('固定时刻模式请先选择时刻（或切回「按间隔」）'))
       }
       const shouldSavePull = sourceMode === 'url' && (savePull || importNow || enablePull)
       if (shouldSavePull) {
@@ -146,8 +149,8 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
         fields: marketLevel
           ? userF
           : [
-            { name: 'symbol', dtype: 'string', label: '标的代码' },
-            { name: 'code', dtype: 'string', label: '代码' },
+            { name: 'symbol', dtype: 'string', label: tx('标的代码') },
+            { name: 'code', dtype: 'string', label: tx('代码') },
             ...userF,
           ],
         description: description.trim() || undefined,
@@ -290,7 +293,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
 
   const handleDetectUrl = () => {
     if (!url.trim()) {
-      setError('请先填写 URL')
+      setError(tx('请先填写 URL'))
       return
     }
     setDetecting(true)
@@ -302,7 +305,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
     let fieldMap: Record<string, string> | undefined
     try {
       headers = parseJsonObject(headerStr, 'Headers')
-      fieldMap = parseJsonObject(fieldMapStr, '字段映射')
+      fieldMap = parseJsonObject(fieldMapStr, tx('字段映射'))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setDetecting(false)
@@ -375,15 +378,15 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
               <Database className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-[15px] leading-6 font-semibold text-foreground">新增扩展数据</h3>
+              <h3 className="text-[15px] leading-6 font-semibold text-foreground">{tx('新增扩展数据')}</h3>
               <p className="text-[11px] text-muted mt-0.5 leading-relaxed [text-wrap:balance]">
-                接入第三方接口或本地文件，自动识别字段并与标的关联 — 适用于概念、人气、资金流、评分标签等场景
+                {tx('接入第三方接口或本地文件，自动识别字段并与标的关联 — 适用于概念、人气、资金流、评分标签等场景')}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            aria-label="关闭"
+            aria-label={tx('关闭')}
             className="p-1.5 rounded-lg text-secondary hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors shrink-0"
           >
             <X className="h-4 w-4" />
@@ -393,12 +396,12 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
         <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-6">
           {/* 01 接入方式 */}
           <section>
-            <SectionHead num="01" title="接入方式" />
+            <SectionHead num="01" title={tx('接入方式')} />
             <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-elevated/40 p-1 border border-border/40">
               {([
-                ['url', '接口 URL', Link2],
-                ['file', '数据文件', FileText],
-                ['manual', '手动定义', Keyboard],
+                ['url', tx('接口 URL'), Link2],
+                ['file', tx('数据文件'), FileText],
+                ['manual', tx('手动定义'), Keyboard],
               ] as const).map(([key, text, Icon]) => {
                 const active = sourceMode === key
                 return (
@@ -421,7 +424,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
 
           {/* 02 数据类型 */}
           <section>
-            <SectionHead num="02" title="数据类型" />
+            <SectionHead num="02" title={tx('数据类型')} />
             <div className="grid grid-cols-2 gap-2.5">
               {(['snapshot', 'timeseries'] as const).map((m) => {
                 const active = mode === m
@@ -442,11 +445,11 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className={`text-xs font-medium ${active ? 'text-foreground' : 'text-secondary'}`}>
-                        {m === 'snapshot' ? '快照型' : '时序型'}
-                        <span className="ml-1.5 text-[10px] font-normal text-muted">{m === 'snapshot' ? '每股一条' : '按日分区'}</span>
+                        {m === 'snapshot' ? tx('快照型') : tx('时序型')}
+                        <span className="ml-1.5 text-[10px] font-normal text-muted">{m === 'snapshot' ? tx('每股一条') : tx('按日分区')}</span>
                       </div>
                       <div className="text-[10px] text-muted mt-1 leading-relaxed">
-                        {m === 'snapshot' ? '每个标的一条最新值，如概念、行业、人气排名' : '按日期记录历史，如资金流、情绪指数、竞价序列'}
+                        {m === 'snapshot' ? tx('每个标的一条最新值，如概念、行业、人气排名') : tx('按日期记录历史，如资金流、情绪指数、竞价序列')}
                       </div>
                     </div>
                     {active && (
@@ -477,9 +480,9 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                 className="h-3.5 w-3.5 shrink-0 accent-amber-500"
               />
               <span className="text-[11px] text-secondary">
-                市场级数据
-                <span className="ml-1.5 text-muted" title="行 = 全市场每日一条, 无标的代码列。适用于市场环境/情绪指数/择时状态等序列, 跳过标的关联; 通过 /rows 与 /values 接口消费">
-                  每行是全市场一条（无标的列），跳过标的关联
+                {tx('市场级数据')}
+                <span className="ml-1.5 text-muted" title={tx('行 = 全市场每日一条, 无标的代码列。适用于市场环境/情绪指数/择时状态等序列, 跳过标的关联; 通过 /rows 与 /values 接口消费')}>
+                  {tx('每行是全市场一条（无标的列），跳过标的关联')}
                 </span>
               </span>
             </label>
@@ -487,36 +490,36 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
 
           {/* 03 基本信息 */}
           <section>
-            <SectionHead num="03" title="基本信息" />
+            <SectionHead num="03" title={tx('基本信息')} />
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <div className="text-[11px] font-medium text-secondary mb-1.5">显示名称</div>
+                <div className="text-[11px] font-medium text-secondary mb-1.5">{tx('显示名称')}</div>
                 <input
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
-                  placeholder={mode === 'snapshot' ? '例: 概念' : '例: 资金流'}
+                  placeholder={mode === 'snapshot' ? tx('例: 概念') : tx('例: 资金流')}
                   className={INPUT_CLS}
                 />
               </div>
               <div>
                 <div className="text-[11px] font-medium text-secondary mb-1.5">
-                  标识符
-                  <span className="ml-1.5 text-[10px] font-normal text-muted">建表后不可改</span>
+                  {tx('标识符')}
+                  <span className="ml-1.5 text-[10px] font-normal text-muted">{tx('建表后不可改')}</span>
                 </div>
                 <input
                   value={id}
                   onChange={(e) => setId(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
-                  placeholder={mode === 'snapshot' ? '例: concept' : '例: money_flow'}
+                  placeholder={mode === 'snapshot' ? tx('例: concept') : tx('例: money_flow')}
                   className={`${INPUT_CLS} font-mono`}
                 />
               </div>
             </div>
             <div className="mt-3">
-              <div className="text-[11px] font-medium text-secondary mb-1.5">描述 <span className="text-muted font-normal">可选</span></div>
+              <div className="text-[11px] font-medium text-secondary mb-1.5">{tx('描述')} <span className="text-muted font-normal">{tx('可选')}</span></div>
               <input
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="一句话说明数据用途，展示在表卡片上"
+                placeholder={tx('一句话说明数据用途，展示在表卡片上')}
                 className={INPUT_CLS}
               />
             </div>
@@ -527,8 +530,8 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
             <section className="rounded-xl border border-border/60 bg-elevated/20 p-4 space-y-3">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                 <Link2 className="h-3.5 w-3.5 text-amber-500" />
-                <span>接口请求</span>
-                <span className="ml-1 text-[10px] font-normal text-muted">先测试识别，系统按返回数据生成字段</span>
+                <span>{tx('接口请求')}</span>
+                <span className="ml-1 text-[10px] font-normal text-muted">{tx('先测试识别，系统按返回数据生成字段')}</span>
               </div>
               <div className="flex gap-2">
                 <select
@@ -551,32 +554,31 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                   className="h-9 inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 text-xs font-medium text-white hover:bg-accent/90 active:translate-y-px disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-all"
                 >
                   {detecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                  测试识别
-                </button>
+                  {tx('测试识别')}</button>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <div className="text-[10px] text-muted mb-1">响应数据路径</div>
+                  <div className="text-[10px] text-muted mb-1">{tx('响应数据路径')}</div>
                   <input
                     value={responsePath}
                     onChange={(e) => setResponsePath(e.target.value)}
-                    placeholder="data.list · 可自动识别"
+                    placeholder={tx('data.list · 可自动识别')}
                     className={`${INPUT_SM_CLS} font-mono`}
                   />
                 </div>
                 <div>
-                  <div className="text-[10px] text-muted mb-1">拉取超时（秒）</div>
+                  <div className="text-[10px] text-muted mb-1">{tx('拉取超时（秒）')}</div>
                   <input
                     type="number" min={5} max={300} step={5}
                     value={timeoutSec}
                     onChange={(e) => setTimeoutSec(Number(e.target.value))}
-                    title="测试识别与正式拉取的单次请求超时, 默认 30 秒, 范围 5~300"
+                    title={tx('测试识别与正式拉取的单次请求超时, 默认 30 秒, 范围 5~300')}
                     className={`${INPUT_SM_CLS} font-mono tabular-nums`}
                   />
                 </div>
               </div>
               <div className="rounded-lg border border-border/50 bg-base/40 p-2.5 space-y-2">
-                <div className="text-[10px] text-muted">调度方式</div>
+                <div className="text-[10px] text-muted">{tx('调度方式')}</div>
                 <div className="grid grid-cols-2 gap-1 rounded-lg bg-elevated/50 p-1 border border-border/40">
                   <button
                     onClick={() => { setScheduleMode('interval'); setScheduleTime('') }}
@@ -584,20 +586,18 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                       scheduleMode === 'interval' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary hover:bg-elevated/40'
                     }`}
                   >
-                    按间隔
-                  </button>
+                    {tx('按间隔')}</button>
                   <button
                     onClick={() => setScheduleMode('fixed')}
                     className={`h-8 rounded-md text-[11px] font-medium transition-all ${
                       scheduleMode === 'fixed' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary hover:bg-elevated/40'
                     }`}
                   >
-                    固定时刻
-                  </button>
+                    {tx('固定时刻')}</button>
                 </div>
                 {scheduleMode === 'interval' ? (
                   <div>
-                    <div className="text-[10px] text-muted/70 mb-1">间隔</div>
+                    <div className="text-[10px] text-muted/70 mb-1">{tx('间隔')}</div>
                     <div className="flex gap-1">
                       <input
                         type="number"
@@ -617,16 +617,15 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                           setSchedule(unit === 'seconds' ? schedule * 60 : Math.ceil(schedule / 60))
                           setScheduleUnit(unit)
                         }}
-                        title={`间隔单位: 秒 (${MIN_PULL_INTERVAL_SECONDS}~${MAX_PULL_INTERVAL_SECONDS}) / 分钟 (1~)`}
+                        title={tx('间隔单位: 秒 ({min}~{max}) / 分钟 (1~)', { min: MIN_PULL_INTERVAL_SECONDS, max: MAX_PULL_INTERVAL_SECONDS })}
                         className="h-8 shrink-0 rounded-lg border border-border bg-base px-1.5 text-[11px] text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/25"
                       >
-                        <option value="minutes">分钟</option>
-                        <option value="seconds">秒</option>
+                        <option value="minutes">{tx('分钟')}</option>
+                        <option value="seconds">{tx('秒')}</option>
                       </select>
                     </div>
                     <div className="text-[9px] text-muted/70 mt-1">
-                      每隔 N 秒/分钟拉取一次（从启用时刻起算）—「每天 09:30」这类日程请用固定时刻；秒级（≥10s）适合盘中快照
-                    </div>
+                      {tx('每隔 N 秒/分钟拉取一次（从启用时刻起算）—「每天 09:30」这类日程请用固定时刻；秒级（≥10s）适合盘中快照')}</div>
                   </div>
                 ) : (
                   <>
@@ -636,18 +635,18 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                         onChange={(e) => setSchedulePeriod(e.target.value as 'daily' | 'weekly' | 'monthly')}
                         className="h-8 rounded-lg border border-border bg-base px-2 text-[11px] text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/25"
                       >
-                        <option value="daily">每日</option>
-                        <option value="weekly">每周</option>
-                        <option value="monthly">每月</option>
+                        <option value="daily">{tx('每日')}</option>
+                        <option value="weekly">{tx('每周')}</option>
+                        <option value="monthly">{tx('每月')}</option>
                       </select>
                       <select
                         value={String(scheduleDay)}
                         onChange={(e) => setScheduleDay(Number(e.target.value))}
                         disabled={schedulePeriod === 'daily'}
-                        title={schedulePeriod === 'weekly' ? '每周几拉取' : '每月几号拉取 (短月无该日则该月跳过)'}
+                        title={schedulePeriod === 'weekly' ? tx('每周几拉取') : tx('每月几号拉取 (短月无该日则该月跳过)')}
                         className="h-8 rounded-lg border border-border bg-base px-2 text-[11px] text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/25 disabled:opacity-40"
                       >
-                        {(schedulePeriod === 'weekly' ? WEEKDAY_OPTS : MONTHDAY_OPTS).map(([v, t]) => (
+                        {(schedulePeriod === 'weekly' ? WEEKDAY_OPTS() : MONTHDAY_OPTS()).map(([v, t]) => (
                           <option key={v} value={String(v)}>{t}</option>
                         ))}
                       </select>
@@ -656,7 +655,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                           type="time"
                           value={scheduleTime}
                           onChange={(e) => setScheduleTime(e.target.value)}
-                          title="如 09:30 — 周期日该时刻拉取一次; 启用时若当天已过该时刻且未拉过会立即补拉一次"
+                          title={tx('如 09:30 — 周期日该时刻拉取一次; 启用时若当天已过该时刻且未拉过会立即补拉一次')}
                           className={`${INPUT_SM_CLS} flex-1 min-w-0 font-mono`}
                         />
                         {scheduleTime && (
@@ -665,8 +664,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                             onClick={() => setScheduleTime('')}
                             className="h-8 shrink-0 px-2.5 rounded-lg border border-border bg-base text-[10px] text-muted hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                           >
-                            清除
-                          </button>
+                            {tx('清除')}</button>
                         )}
                       </div>
                     </div>
@@ -678,8 +676,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                         className="h-3.5 w-3.5 shrink-0 accent-amber-500"
                       />
                       <span className="text-[10px] text-secondary">
-                        仅交易日 — 跳过周六日
-                        <span className="text-muted/70">（节假日无法离线判定，仍会按期尝试）</span>
+                        {tx('仅交易日 — 跳过周六日')}<span className="text-muted/70">{tx('（节假日无法离线判定，仍会按期尝试）')}</span>
                       </span>
                     </label>
                   </>
@@ -687,7 +684,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <div className="text-[10px] text-muted mb-1">Headers（JSON，可选）</div>
+                  <div className="text-[10px] text-muted mb-1">{tx('Headers（JSON，可选）')}</div>
                   <textarea
                     value={headerStr}
                     onChange={(e) => setHeaderStr(e.target.value)}
@@ -697,7 +694,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                   />
                 </div>
                 <div>
-                  <div className="text-[10px] text-muted mb-1">字段映射（外部名 → 内部名，可选）</div>
+                  <div className="text-[10px] text-muted mb-1">{tx('字段映射（外部名 → 内部名，可选）')}</div>
                   <textarea
                     value={fieldMapStr}
                     onChange={(e) => setFieldMapStr(e.target.value)}
@@ -709,7 +706,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
               </div>
               {method === 'POST' && (
                 <div>
-                  <div className="text-[10px] text-muted mb-1">请求体（JSON，可选）</div>
+                  <div className="text-[10px] text-muted mb-1">{tx('请求体（JSON，可选）')}</div>
                   <textarea
                     value={body}
                     onChange={(e) => setBody(e.target.value)}
@@ -723,11 +720,11 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                 <div className="rounded-lg border border-border/50 bg-base/60 p-3 space-y-2">
                   <div className="flex items-center justify-between text-[10px]">
                     <span className="text-secondary tabular-nums">
-                      识别到 <span className="text-foreground font-medium">{urlPreview.total_rows}</span> 行 · 路径{' '}
-                      <span className="font-mono">{urlPreview.response_path || '根数组'}</span>
+                      {tx('识别到')} <span className="text-foreground font-medium">{urlPreview.total_rows}</span> {tx('行 · 路径')}{' '}
+                      <span className="font-mono">{urlPreview.response_path || tx('根数组')}</span>
                     </span>
                     {urlPreview.response_path_candidates.length > 1 && (
-                      <span className="text-muted">候选路径 {urlPreview.response_path_candidates.length} 个</span>
+                      <span className="text-muted">{tx('候选路径 {n} 个', { n: urlPreview.response_path_candidates.length })}</span>
                     )}
                   </div>
                   {previewColumns.length > 0 && (
@@ -759,7 +756,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
 
           {/* 04 字段定义 */}
           <section>
-            <SectionHead num="04" title="字段定义">
+            <SectionHead num="04" title={tx('字段定义')}>
               {(sourceMode === 'manual' || fields.length > 0) && (
                 <div className="flex items-center gap-1.5">
                   {sourceMode !== 'url' && (
@@ -769,16 +766,14 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] text-muted hover:text-accent hover:bg-accent/[0.06] disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                     >
                       {detecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-                      从数据文件识别
-                    </button>
+                      {tx('从数据文件识别')}</button>
                   )}
                   <button
                     onClick={addField}
                     className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] text-muted hover:text-accent hover:bg-accent/[0.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                   >
                     <Plus className="h-3 w-3" />
-                    添加字段
-                  </button>
+                    {tx('添加字段')}</button>
                 </div>
               )}
             </SectionHead>
@@ -799,8 +794,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                 className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-3 py-2.5 space-y-2"
               >
                 <div className="text-[10px] text-amber-500 font-medium">
-                  未自动识别到唯一标的代码，请选择哪一列作为标的代码
-                </div>
+                  {tx('未自动识别到唯一标的代码，请选择哪一列作为标的代码')}</div>
                 <div className="flex flex-wrap gap-1.5">
                   {selectMapping.fields.map(f => (
                     <button
@@ -815,8 +809,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                     onClick={() => setSelectMapping(null)}
                     className="px-2.5 py-1 rounded-md bg-elevated text-muted text-[10px] hover:text-secondary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                   >
-                    取消
-                  </button>
+                    {tx('取消')}</button>
                 </div>
               </motion.div>
             )}
@@ -841,38 +834,37 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                 }`}
               >
                 {detecting ? (
-                  <><Loader2 className="h-5 w-5 text-amber-500 animate-spin" /><span className="text-[11px] text-muted">检测字段中…</span></>
+                  <><Loader2 className="h-5 w-5 text-amber-500 animate-spin" /><span className="text-[11px] text-muted">{tx('检测字段中…')}</span></>
                 ) : (
                   <>
                     <div className="p-2.5 rounded-xl bg-elevated/60 text-muted/70">
                       <Upload className="h-5 w-5" />
                     </div>
-                    <span className="text-[11px] text-secondary">拖拽或点击上传数据文件（CSV / Excel）</span>
-                    <span className="text-[10px] text-muted/70">自动识别列名和类型，symbol / code 列自动匹配</span>
+                    <span className="text-[11px] text-secondary">{tx('拖拽或点击上传数据文件（CSV / Excel）')}</span>
+                    <span className="text-[10px] text-muted/70">{tx('自动识别列名和类型，symbol / code 列自动匹配')}</span>
                   </>
                 )}
               </div>
             ) : sourceMode === 'url' && fields.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border/40 bg-elevated/20 py-6 flex flex-col items-center gap-1.5">
                 <RefreshCw className="h-4 w-4 text-muted/50" />
-                <span className="text-[11px] text-muted">填写 URL 后点击「测试识别」，按返回数据自动生成字段</span>
+                <span className="text-[11px] text-muted">{tx('填写 URL 后点击「测试识别」，按返回数据自动生成字段')}</span>
               </div>
             ) : sourceMode === 'manual' && fields.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border/40 bg-elevated/20 py-6 flex flex-col items-center gap-2.5">
-                <span className="text-[11px] text-muted">手动添加字段后即可创建空表结构</span>
+                <span className="text-[11px] text-muted">{tx('手动添加字段后即可创建空表结构')}</span>
                 <button
                   onClick={addField}
                   className="inline-flex items-center gap-1 rounded-lg bg-accent px-3.5 py-1.5 text-xs font-medium text-white hover:bg-accent/90 active:translate-y-px focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-all"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  添加字段
-                </button>
+                  {tx('添加字段')}</button>
               </div>
             ) : (
               <div className="space-y-1">
                 {[
-                  { name: '标的代码', key: 'symbol', mapped: matchStatus !== 'none', hint: symbolMap.type === 'mapped' ? `← ${symbolMap.col}` : '← 计算' },
-                  { name: '代码', key: 'code', mapped: matchStatus !== 'none', hint: codeMap.type === 'mapped' ? `← ${codeMap.col}` : codeMap.method === 'strip_exchange' ? '← symbol截取' : '← 推算' },
+                  { name: tx('标的代码'), key: 'symbol', mapped: matchStatus !== 'none', hint: symbolMap.type === 'mapped' ? `← ${symbolMap.col}` : tx('← 计算') },
+                  { name: tx('代码'), key: 'code', mapped: matchStatus !== 'none', hint: codeMap.type === 'mapped' ? `← ${codeMap.col}` : codeMap.method === 'strip_exchange' ? tx('← symbol截取') : tx('← 推算') },
                 ].map(row => (
                   <div
                     key={row.key}
@@ -882,7 +874,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                   >
                     <span className="w-16 shrink-0 text-[11px] text-secondary">{row.name}</span>
                     <span className="flex-1 text-[11px] font-mono text-muted">{row.key}</span>
-                    <span className="w-10 text-center text-[10px] text-muted/50">文本</span>
+                    <span className="w-10 text-center text-[10px] text-muted/50">{tx('文本')}</span>
                     {row.mapped
                       ? <span className="inline-flex items-center gap-1 text-[10px] text-green-600 dark:text-green-500/80 shrink-0">
                           <Check className="h-3 w-3" strokeWidth={2.5} />
@@ -898,13 +890,13 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                       <input
                         value={f.label}
                         onChange={(e) => updateField(idx, 'label', e.target.value)}
-                        placeholder="显示名"
+                        placeholder={tx('显示名')}
                         className="w-24 h-8 px-2.5 rounded-lg border border-border bg-base text-[11px] text-foreground placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow"
                       />
                       <input
                         value={f.name}
                         onChange={(e) => updateField(idx, 'name', e.target.value)}
-                        placeholder="字段名（英文）"
+                        placeholder={tx('字段名（英文）')}
                         className="flex-1 h-8 px-2.5 rounded-lg border border-border bg-base text-[11px] font-mono text-foreground placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow"
                       />
                       <select
@@ -912,14 +904,14 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                         onChange={(e) => updateField(idx, 'dtype', e.target.value)}
                         className="h-8 px-2 rounded-lg border border-border bg-base text-[11px] text-foreground focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50"
                       >
-                        <option value="string">文本</option>
-                        <option value="int">整数</option>
-                        <option value="float">小数</option>
-                        <option value="bool">布尔</option>
+                        <option value="string">{tx('文本')}</option>
+                        <option value="int">{tx('整数')}</option>
+                        <option value="float">{tx('小数')}</option>
+                        <option value="bool">{tx('布尔')}</option>
                       </select>
                       <button
                         onClick={() => removeField(idx)}
-                        aria-label="删除字段"
+                        aria-label={tx('删除字段')}
                         className="p-1.5 rounded-md text-muted/40 hover:text-danger hover:bg-danger/10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-danger/40 transition-all"
                       >
                         <X className="h-3 w-3" />
@@ -934,20 +926,22 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
           {/* 创建选项 */}
           {sourceMode === 'url' && (
             <section className="rounded-xl border border-border/60 bg-elevated/20 p-4 space-y-1">
-              <div className="text-xs font-semibold text-foreground mb-1.5">创建选项</div>
+              <div className="text-xs font-semibold text-foreground mb-1.5">{tx('创建选项')}</div>
               {([
-                { checked: savePull, set: (v: boolean) => { setSavePull(v); if (!v) { setImportNow(false); setEnablePull(false) } }, label: '保存为拉取配置', hint: '记录请求参数，之后可在表卡片中调整', disabled: false },
-                { checked: importNow, set: (v: boolean) => { setImportNow(v); if (v) setSavePull(true) }, label: '创建后立即导入本次数据', hint: '立刻执行一次拉取并写入 Parquet', disabled: !savePull },
-                { checked: enablePull, set: (v: boolean) => { setEnablePull(v); if (v) setSavePull(true) }, label: '启用定时拉取', hint: scheduleMode === 'fixed' && scheduleTime
+                { checked: savePull, set: (v: boolean) => { setSavePull(v); if (!v) { setImportNow(false); setEnablePull(false) } }, label: tx('保存为拉取配置'), hint: tx('记录请求参数，之后可在表卡片中调整'), disabled: false },
+                { checked: importNow, set: (v: boolean) => { setImportNow(v); if (v) setSavePull(true) }, label: tx('创建后立即导入本次数据'), hint: tx('立刻执行一次拉取并写入 Parquet'), disabled: !savePull },
+                { checked: enablePull, set: (v: boolean) => { setEnablePull(v); if (v) setSavePull(true) }, label: tx('启用定时拉取'), hint: scheduleMode === 'fixed' && scheduleTime
                   ? `${
-                    schedulePeriod === 'weekly' ? `每周${WEEKDAY_OPTS[scheduleDay - 1][1].slice(1)}`
-                      : schedulePeriod === 'monthly' ? `每月 ${scheduleDay} 号`
-                        : '每天'
-                    } ${scheduleTime}${scheduleTradingOnly ? '（仅交易日）' : ''}`
-                  : `${formatIntervalSummary(
-                    scheduleUnit === 'seconds' ? schedule : null,
-                    schedule,
-                  )} 自动拉取`, disabled: !savePull },
+                    schedulePeriod === 'weekly' ? tx(WEEKLY_SUMMARY_CN[scheduleDay - 1])
+                      : schedulePeriod === 'monthly' ? tx('每月 {n} 号', { n: scheduleDay })
+                        : tx('每天')
+                    } ${scheduleTime}${scheduleTradingOnly ? tx('（仅交易日）') : ''}`
+                  : tx('{summary} 自动拉取', {
+                    summary: formatIntervalSummary(
+                      scheduleUnit === 'seconds' ? schedule : null,
+                      schedule,
+                    ),
+                  }), disabled: !savePull },
               ] as const).map(opt => (
                 <label
                   key={opt.label}
@@ -979,26 +973,25 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between gap-4 px-6 py-4 border-t border-border/50 bg-elevated/30">
           <div className="text-[10px] text-muted/70 leading-relaxed">
             {sourceMode === 'url'
-              ? '创建后可在扩展数据卡片中继续调整拉取配置'
+              ? tx('创建后可在扩展数据卡片中继续调整拉取配置')
               : sourceMode === 'file'
-                ? '文件识别用于生成表结构，创建后仍可上传文件写入数据'
-                : '手动创建后可通过文件、推送或拉取写入数据'}
+                ? tx('文件识别用于生成表结构，创建后仍可上传文件写入数据')
+                : tx('手动创建后可通过文件、推送或拉取写入数据')}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={onClose}
               className="px-4 py-2 rounded-lg bg-elevated text-secondary text-xs hover:bg-elevated/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
             >
-              取消
-            </button>
+              {tx('取消')}</button>
             <button
               onClick={() => create.mutate()}
               disabled={!valid || create.isPending}
               className="px-5 py-2 inline-flex items-center gap-1.5 rounded-lg bg-accent text-white text-xs font-medium hover:bg-accent/90 active:translate-y-px disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-all shadow-sm shadow-accent/20"
             >
               {create.isPending
-                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />创建中…</>
-                : <><Plus className="h-3.5 w-3.5" />创建</>}
+                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />{tx('创建中…')}</>
+                : <><Plus className="h-3.5 w-3.5" />{tx('创建')}</>}
             </button>
           </div>
         </div>

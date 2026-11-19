@@ -8,6 +8,8 @@ DLL 与运行时 ini 随 wheel 分发。两个实测约束决定本模块的形�
 """
 from __future__ import annotations
 
+import contextlib
+import getpass
 import hashlib
 import json
 import logging
@@ -15,12 +17,14 @@ import math
 import os
 import re
 import shutil
+import subprocess
 import sys
 import time
 from datetime import date, datetime
 from pathlib import Path
 
 from app.data_providers.base import ProviderRequestError
+from app.services.fs_utils import atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +89,26 @@ def package_lib_dir() -> Path:
     return Path(tdxaidata.__file__).resolve().parent / "lib"
 
 
+def _restrict_private_acl(path: Path) -> None:
+    """Best-effort owner-only ACL restriction on Windows (POSIX uses chmod 0600/0700)."""
+    if sys.platform != "win32":
+        return
+    try:
+        user = os.environ.get("USERNAME") or getpass.getuser()
+    except Exception:  # noqa: BLE001
+        user = ""
+    if not user:
+        return
+    with contextlib.suppress(Exception):
+        subprocess.run(
+            ["icacls", str(path), "/inheritance:r", "/grant:r", f"{user}:F"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+
+
 def write_token_ini(ini: Path, api_key: str) -> None:
     """把 [Token] token=<key> 写入 ini, 保留其余配置行。"""
     lines = (
@@ -114,7 +138,8 @@ def write_token_ini(ini: Path, api_key: str) -> None:
     elif not replaced:
         idx = next(i for i, line in enumerate(out) if line.strip().lower() == "[token]")
         out.insert(idx + 1, f"token={api_key}")
-    ini.write_text("\n".join(out) + "\n", encoding="utf-8")
+    atomic_write_text(ini, "\n".join(out) + "\n", mode=0o600)
+    _restrict_private_acl(ini)
 
 
 def materialize_lib(api_key: str, lib_root: Path, source: Path | None = None) -> Path:
@@ -128,6 +153,9 @@ def materialize_lib(api_key: str, lib_root: Path, source: Path | None = None) ->
     if not dll.exists():
         raise TdxQuantError(f"tdxaidata lib 缺少 {LIB_DLL_NAME}: {src}")
     lib_root.mkdir(parents=True, exist_ok=True)
+    with contextlib.suppress(OSError):
+        os.chmod(lib_root, 0o700)
+    _restrict_private_acl(lib_root)
     marker = lib_root / ".tdxquant_lib_marker"
     stat = dll.stat()
     want = f"{hashlib.sha256(api_key.encode()).hexdigest()}:{stat.st_mtime_ns}:{stat.st_size}"
@@ -139,7 +167,7 @@ def materialize_lib(api_key: str, lib_root: Path, source: Path | None = None) ->
             shutil.copy2(item, lib_root / item.name)
     for ini_name in ("TdxAiData.ini", "user.ini"):
         write_token_ini(lib_root / ini_name, api_key)
-    marker.write_text(want, encoding="utf-8")
+    atomic_write_text(marker, want, mode=0o600)
     return copied
 
 
@@ -152,12 +180,13 @@ class TdxQuantClient:
         self.api_key = api_key
         self._lib_root = lib_root or (settings.data_dir / "user_data" / "tdxquant_lib")
         dll = materialize_lib(api_key, self._lib_root)
-        os.environ[LIB_ENV] = str(dll)
         from tdxaidata import tqs
         from tdxaidata.tdxaidata import _NativeTdxAiData
 
         self._tqs = tqs
         self._native_cls = _NativeTdxAiData
+        if getattr(self._native_cls, "_instance", None) is None:
+            self._native_cls(dll_path=str(dll))
         self._universe: list[str] = []
         self._universe_at = 0.0
         self._warmup()

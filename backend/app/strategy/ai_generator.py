@@ -82,6 +82,8 @@ _FORBIDDEN_REF_NAMES = frozenset({
     "globals", "locals", "vars", "dir", "getattr",
     "setattr", "delattr", "type", "input", "breakpoint",
     "memoryview", "exit", "quit",
+    "hasattr", "callable", "issubclass", "format",
+    "bytes", "bytearray", "chr", "ord", "ascii",
 })
 
 # 危险属性名: 按属性名匹配任意接收者 (x.system() 也拦)。收录进程/命令执行、
@@ -110,9 +112,11 @@ _FORBIDDEN_ATTR_NAMES = frozenset({
     "read_excel", "read_database", "scan_csv", "scan_parquet", "scan_ndjson",
     "scan_ipc", "loadtxt", "genfromtxt", "memmap", "load_module", "save",
     "load", "loads",
-    # 类型对象句柄 (构造任意可调用/代码对象的原料)
+    # 类型/栈帧/字节码反射句柄 (构造任意可调用/逃逸的原料)
     "Path", "PurePath", "ModuleType", "CodeType", "FunctionType", "MethodType",
     "BuiltinFunctionType", "LambdaType", "MappingProxyType",
+    "mro", "format_map", "gi_frame", "gi_code", "cr_frame", "ag_frame",
+    "f_globals", "f_locals", "f_builtins", "f_back", "co_consts", "co_code",
 })
 
 _MODULE_ATTR_CACHE: dict[str, frozenset[str]] = {}
@@ -360,6 +364,18 @@ class AIStrategyGenerator:
             self._validate_meta_semantics(code, meta)
             self._validate_signals(code, execution_backend=backend)
         except ValueError as e:
+            return {
+                "code": code,
+                "meta": meta,
+                "valid": False,
+                "error": str(e),
+            }
+
+        try:
+            from app.strategy.sandbox_runner import dry_validate_strategy_code
+
+            dry_validate_strategy_code(code)
+        except Exception as e:  # noqa: BLE001 — fail-closed sandbox dry-run validation
             return {
                 "code": code,
                 "meta": meta,
@@ -647,6 +663,19 @@ META = {{...}}，{entrypoint_requirement}。只输出完整 Python 代码。
             if isinstance(node, ast.Constant) and isinstance(node.value, str) \
                     and id(node) not in docstrings:
                 _reject_dunder_text(node.value, "字符串常量")
+            if isinstance(node, ast.JoinedStr):
+                literal_parts = [
+                    part.value
+                    for part in node.values
+                    if isinstance(part, ast.Constant) and isinstance(part.value, str)
+                ]
+                if literal_parts:
+                    _reject_dunder_text("".join(literal_parts), "f-string 常量")
+                    for part in literal_parts:
+                        if "__" in part and part not in _BENIGN_DUNDER_TEXTS:
+                            raise ValueError(
+                                f"禁止 f-string 片段 {part[:40]!r} (策略不允许 dunder 构造逃逸)"
+                            )
             if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
                 folded = _fold_string(node)
                 if folded is not None:

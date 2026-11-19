@@ -5,6 +5,7 @@ import { Sparkles, X } from 'lucide-react'
 import { Modal } from '@/components/Modal'
 import { toast } from '@/components/Toast'
 import { api, type MiningAvailability, type MiningBudgetProfile } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { startAutoMining } from '@/lib/miningTask'
 import { QK } from '@/lib/queryKeys'
 
@@ -36,6 +37,7 @@ export function AutoMiningDialog({
   onClose: () => void
   defaultAssetType?: 'stock' | 'etf'
 }) {
+  const { tx } = useI18n()
   const navigate = useNavigate()
   const [assetType, setAssetType] = useState<'stock' | 'etf'>(defaultAssetType)
   const [profile, setProfile] = useState<MiningBudgetProfile>('balanced')
@@ -80,7 +82,7 @@ export function AutoMiningDialog({
       const fallback = PROFILE_ORDER.filter(p => availability[p]?.eligible).pop()
       if (fallback && fallback !== profile) {
         setProfile(fallback)
-        toast(`当前数据 ${availability.balanced.trading_bars} 个交易日不够「均衡」档 (需 ${availability.balanced.required_bars})，已自动切到「${PROFILE_LABELS[fallback]}」档`)
+        toast(tx('当前数据 {n} 个交易日不够「{p}」档 (需 {r})，已自动切到「{q}」', { n: availability.balanced.trading_bars, p: tx('均衡'), r: availability.balanced.required_bars, q: tx(PROFILE_LABELS[fallback]) }))
       }
     }
   }, [availability.exploratory, availability.balanced, availability.strict, profile, profileTouched])
@@ -94,7 +96,7 @@ export function AutoMiningDialog({
       start: start || null,
       end: end || null,
     })
-    toast('已提交自动挖掘：正在后台筛选因子，可离开本页，进度见「发现 · 挖掘工作台」', 'success')
+    toast(tx('已提交自动挖掘：正在后台筛选因子，可离开本页，进度见「发现 · 挖掘工作台」'), 'success')
     onClose()
     navigate('/factors?tab=discover&view=mining')
   }
@@ -109,13 +111,12 @@ export function AutoMiningDialog({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 shrink-0 text-accent" />
-            <span id="auto-mining-title" className="text-sm font-semibold text-foreground">自动挖掘达标组合</span>
+            <span id="auto-mining-title" className="text-sm font-semibold text-foreground">{tx('自动挖掘达标组合')}</span>
           </div>
           <p className="mt-1 text-[11px] leading-relaxed text-muted">
-            不用挑因子：先全量统计筛选（|t|≥2、q≤0.1、IC/IR 达标），再用达标池做相关性去重 → 组合搜索 → 嵌套样本外验证。结果里能看到哪些因子/组合达标、不达标的差在哪。
-          </p>
+            {tx('不用挑因子：先全量统计筛选（|t|≥2、q≤0.1、IC/IR 达标），再用达标池做相关性去重 → 组合搜索 → 嵌套样本外验证。结果里能看到哪些因子/组合达标、不达标的差在哪。')}</p>
         </div>
-        <button type="button" onClick={onClose} aria-label="关闭" className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-muted transition-colors hover:text-foreground">
+        <button type="button" onClick={onClose} aria-label={tx('关闭')} className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-muted transition-colors hover:text-foreground">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -123,7 +124,7 @@ export function AutoMiningDialog({
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         <div className="space-y-3">
           <div>
-            <div className="mb-1 text-[10px] text-muted">资产</div>
+            <div className="mb-1 text-[10px] text-muted">{tx('资产')}</div>
             <div className="inline-flex rounded-btn border border-border bg-surface/80 p-0.5">
               {(['stock', 'etf'] as const).map(value => (
                 <button
@@ -132,13 +133,13 @@ export function AutoMiningDialog({
                   onClick={() => setAssetType(value)}
                   className={`h-7 rounded-[5px] px-3 text-[11px] font-medium transition-colors ${assetType === value ? 'bg-accent text-white' : 'text-secondary hover:text-foreground'}`}
                 >
-                  {value === 'stock' ? '股票' : 'ETF'}
+                  {value === 'stock' ? tx('股票') : 'ETF'}
                 </button>
               ))}
             </div>
           </div>
           <label className="block">
-            <span className="mb-1 block text-[10px] text-muted">验证档位（决定筛选门槛与样本要求）</span>
+            <span className="mb-1 block text-[10px] text-muted">{tx('验证档位（决定筛选门槛与样本要求）')}</span>
             <select
               value={profile}
               onChange={event => { setProfileTouched(true); setProfile(event.target.value as MiningBudgetProfile) }}
@@ -146,10 +147,10 @@ export function AutoMiningDialog({
             >
               {PROFILE_ORDER.map(value => {
                 const info = availability[value]
-                const mark = info == null ? '' : info.eligible ? ' ✓' : ` · 需 ${info.required_bars} 日`
+                const mark = info == null ? '' : info.eligible ? ' ✓' : tx(' · 需 {n} 日', { n: info.required_bars })
                 return (
                   <option key={value} value={value}>
-                    {PROFILE_LABELS[value]} · {PROFILE_HINTS[value]}{mark}
+                    {tx(PROFILE_LABELS[value])} · {tx(PROFILE_HINTS[value])}{mark}
                   </option>
                 )
               })}
@@ -157,25 +158,23 @@ export function AutoMiningDialog({
           </label>
           <div className="grid grid-cols-2 gap-2">
             <label className="block">
-              <span className="mb-1 block text-[10px] text-muted">开始</span>
+              <span className="mb-1 block text-[10px] text-muted">{tx('开始')}</span>
               <input type="date" value={start} onChange={event => setStart(event.target.value)} className={INPUT_CLS} />
             </label>
             <label className="block">
-              <span className="mb-1 block text-[10px] text-muted">结束</span>
+              <span className="mb-1 block text-[10px] text-muted">{tx('结束')}</span>
               <input type="date" value={end} onChange={event => setEnd(event.target.value)} className={INPUT_CLS} />
             </label>
           </div>
           {currentAvailable === false && availability[profile] && (
             <div className="rounded-btn border border-danger/40 bg-danger/5 px-3 py-2 text-[11px] leading-relaxed text-danger">
-              当前区间 {bars} 个交易日，不够「{PROFILE_LABELS[profile]}」档（需 {availability[profile]!.required_bars} 日）。
-              {availability.exploratory?.eligible
-                ? '可改选「探索」档，或在数据页补充更早的历史行情后重试。'
-                : '请在数据页补充更多历史行情后重试。'}
+              {tx('当前区间')} {bars} {tx('个交易日，不够「')}{tx(PROFILE_LABELS[profile])}{tx('」档（需')} {availability[profile]!.required_bars} {tx('日）。')}{availability.exploratory?.eligible
+                ? tx('可改选「探索」档，或在数据页补充更早的历史行情后重试。')
+                : tx('请在数据页补充更多历史行情后重试。')}
             </div>
           )}
           <p className="text-[10px] leading-relaxed text-muted">
-            点击后立即转入「挖掘」页：第一步全量筛选（近一年窗口，约 1-3 分钟）在后台运行，可随意切换页面；筛选完成后挖掘任务自动开跑，结果在「最近运行」查看。
-          </p>
+            {tx('点击后立即转入「挖掘」页：第一步全量筛选（近一年窗口，约 1-3 分钟）在后台运行，可随意切换页面；筛选完成后挖掘任务自动开跑，结果在「最近运行」查看。')}</p>
         </div>
       </div>
 
@@ -187,8 +186,7 @@ export function AutoMiningDialog({
           className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Sparkles className="h-3.5 w-3.5" />
-          开始自动挖掘
-        </button>
+          {tx('开始自动挖掘')}</button>
       </div>
     </Modal>
   )

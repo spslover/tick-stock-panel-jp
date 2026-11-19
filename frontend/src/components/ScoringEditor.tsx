@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { tx } from '@/lib/i18n'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, Pencil, Plus, Save, Trash2, X } from 'lucide-react'
 import { api, type FactorColumn, type ScoringDirection } from '@/lib/api'
@@ -224,7 +225,7 @@ export function ScoringEditor({ value, directions, onChange, fallbackLabels = {}
             <ScoringRow
               key={name}
               name={name}
-              label={factorLabels[name] ?? fallbackLabels[name] ?? name}
+              label={factorLabels[name] ?? (fallbackLabels[name] ? tx(fallbackLabels[name]) : name)}
               weight={visibleWeights[name] ?? 0}
               direction={visibleDirections[name] ?? 'high'}
               editing={editing}

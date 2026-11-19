@@ -1,6 +1,7 @@
 // capability 内部名 → 用户能理解的中文标签
 import { useNavigate } from 'react-router-dom'
 import type { CapabilityMatrix, CapabilityRoute } from './api'
+import { t, tx } from './i18n'
 
 export const CAP_LABELS: Record<string, { name: string; hint: string }> = {
   'quote.by_symbol':         { name: '自选实时监控', hint: 'Free 可按标的查询实时行情,用于少量自选监控' },
@@ -24,7 +25,8 @@ export const CAP_LABELS: Record<string, { name: string; hint: string }> = {
 
 /** 能力键 → 用户可读能力名 */
 export function capName(capKey: string): string {
-  return CAP_LABELS[capKey]?.name ?? capKey
+  const raw = CAP_LABELS[capKey]?.name
+  return raw ? tx(raw) : capKey
 }
 
 /** 数据不可用标准徽章: 「分钟 K(批量) · 不可用」, 通用状态陈述, 默认点击跳转 设置→数据源 (to=null 关闭跳转) */
@@ -36,14 +38,15 @@ export function MissingCapChip({ capKey, label, to = '/settings?tab=data-sources
 }) {
   const navigate = useNavigate()
   const text = label ?? (capKey != null ? capName(capKey) : '')
+  const unavail = t('cap.unavailable')
   const content = (
     <>
-      {text ? `${text} · 不可用` : '不可用'}
+      {text ? `${text} · ${unavail}` : unavail}
     </>
   )
   if (to == null) {
     return (
-      <span className={`text-[10px] text-warning/90 bg-warning/8 rounded px-1.5 py-px font-medium ${className}`} title="该数据当前不可用">
+      <span className={`text-[10px] text-warning/90 bg-warning/8 rounded px-1.5 py-px font-medium ${className}`} title={t('cap.unavailableTip')}>
         {content}
       </span>
     )
@@ -53,7 +56,7 @@ export function MissingCapChip({ capKey, label, to = '/settings?tab=data-sources
       type="button"
       onClick={(e) => { e.stopPropagation(); navigate(to) }}
       className={`text-[10px] text-warning/90 bg-warning/8 rounded px-1.5 py-px font-medium hover:bg-warning/15 transition-colors ${className}`}
-      title="前往 设置 → 数据源"
+      title={t('cap.goDataSources')}
     >
       {content}
     </button>

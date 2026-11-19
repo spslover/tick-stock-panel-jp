@@ -5,7 +5,7 @@
  */
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
-import { Settings2, Trash2, RefreshCw, Bell, Volume2, ExternalLink, ZoomIn, Minus, Plus, ShieldCheck, RotateCcw, ChevronDown, Layers, Upload, MemoryStick } from 'lucide-react'
+import { Settings2, Trash2, RefreshCw, Bell, Volume2, ExternalLink, ZoomIn, Minus, Plus, ShieldCheck, RotateCcw, ChevronDown, Layers, Upload, MemoryStick, Languages } from 'lucide-react'
 import { usePreferences } from '@/lib/useSharedQueries'
 import { api } from '@/lib/api'
 import type { UpgradeGuardCategory } from '@/lib/api'
@@ -13,6 +13,8 @@ import { toast } from '@/components/Toast'
 import { QK } from '@/lib/queryKeys'
 import { PageHeader } from '@/components/PageHeader'
 import { ExtensionSlot } from '@/extensions/ExtensionSlot'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
+import { useI18n } from '@/lib/i18n'
 import { refreshAlertToastConfig } from '@/components/AlertToast'
 import { mergeSoundOptions, previewSound, CUSTOM_SOUND_PREFIX } from '@/lib/notificationSound'
 import { setUiPref } from '@/lib/uiPrefs'
@@ -33,6 +35,7 @@ const BACKTEST_RSS_LIMIT_GIB_MIN = 0
 const BACKTEST_RSS_LIMIT_GIB_MAX = 64
 
 export function SettingsSystemPanel() {
+  const { t, tx } = useI18n()
   const qc = useQueryClient()
   const { data: prefs } = usePreferences()
   const [saving, setSaving] = useState(false)
@@ -91,15 +94,15 @@ export function SettingsSystemPanel() {
   const uploadSoundPack = useMutation({
     mutationFn: (file: File) => api.uploadSoundPack(file),
     onSuccess: (r) => {
-      toast(`已上传 ${r.pack.name}`, 'success')
+      toast(tx('已上传 {name}', { name: r.pack.name }), 'success')
       qc.invalidateQueries({ queryKey: QK.soundPacks })
     },
-    onError: (e: Error) => toast(e.message || '上传失败', 'error'),
+    onError: (e: Error) => toast(e.message || tx('上传失败'), 'error'),
   })
   const deleteSoundPack = useMutation({
     mutationFn: (name: string) => api.deleteSoundPack(name),
     onSuccess: (_r, name) => {
-      toast(`已删除 ${name}`, 'success')
+      toast(tx('已删除 {name}', { name }), 'success')
       // 删掉的恰是当前选中音 → 回退默认, 避免悬空引用
       if (soundType === CUSTOM_SOUND_PREFIX + name) {
         setUiPref('alert_sound', 'ding')
@@ -107,7 +110,7 @@ export function SettingsSystemPanel() {
       }
       qc.invalidateQueries({ queryKey: QK.soundPacks })
     },
-    onError: (e: Error) => toast(e.message || '删除失败', 'error'),
+    onError: (e: Error) => toast(e.message || tx('删除失败'), 'error'),
   })
   const onSoundFilePicked = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
@@ -148,7 +151,7 @@ export function SettingsSystemPanel() {
       setKlineBatchLimits({ daily: daily_batch_symbols })
       qc.invalidateQueries({ queryKey: QK.preferences })
     },
-    onError: (e: Error) => toast(e.message || '保存失败', 'error'),
+    onError: (e: Error) => toast(e.message || tx('保存失败'), 'error'),
   })
   const saveMinuteBatch = useMutation({
     mutationFn: (size: number) => api.updateMinuteBatchSymbols(size),
@@ -156,7 +159,7 @@ export function SettingsSystemPanel() {
       setKlineBatchLimits({ minute: minute_batch_symbols })
       qc.invalidateQueries({ queryKey: QK.preferences })
     },
-    onError: (e: Error) => toast(e.message || '保存失败', 'error'),
+    onError: (e: Error) => toast(e.message || tx('保存失败'), 'error'),
   })
 
   // 回测内存上限: worker 每任务启动时从后端读取, 保存后下一个回测/优化任务即生效
@@ -165,7 +168,7 @@ export function SettingsSystemPanel() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QK.preferences })
     },
-    onError: (e: Error) => toast(e.message || '保存失败', 'error'),
+    onError: (e: Error) => toast(e.message || tx('保存失败'), 'error'),
   })
 
   // 刷新前端缓存: 清除 react-query 缓存 + 强制重载 (绕过浏览器缓存)
@@ -182,19 +185,33 @@ export function SettingsSystemPanel() {
   return (
     <>
       <PageHeader
-        title="系统设置"
-        subtitle="全局行为开关"
+        title={t('settings.system.title')}
+        subtitle={t('settings.system.subtitle')}
       />
+
+      <section className="rounded-card border border-border bg-surface p-5 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Languages className="h-4 w-4 text-accent" />
+          <h3 className="text-sm font-medium text-foreground">{t('settings.system.languageTitle')}</h3>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-4 py-1">
+          <div className="min-w-0">
+            <div className="text-sm text-foreground">{t('settings.system.languageLabel')}</div>
+            <div className="text-[11px] text-muted">{t('settings.system.languageDesc')}</div>
+          </div>
+          <LanguageSwitcher variant="segmented" />
+        </div>
+      </section>
 
       <section className="rounded-card border border-border bg-surface p-5">
         <div className="flex items-center gap-2 mb-4">
           <Settings2 className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-medium text-foreground">策略页</h3>
+          <h3 className="text-sm font-medium text-foreground">{tx('策略页')}</h3>
         </div>
 
         <ToggleRow
-          label="进入策略页自动运行策略"
-          desc="开启后进入策略页自动跑所有策略获取命中数; 关闭则需手动点击"
+          label={tx('进入策略页自动运行策略')}
+          desc={tx('开启后进入策略页自动跑所有策略获取命中数; 关闭则需手动点击')}
           checked={screenerAutoRun}
           disabled={saving}
           onChange={(v) => save({ screener_auto_run: v })}
@@ -204,12 +221,12 @@ export function SettingsSystemPanel() {
       <section className="rounded-card border border-border bg-surface p-5 mt-6">
         <div className="flex items-center gap-2 mb-4">
           <Bell className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-medium text-foreground">通知弹窗</h3>
+          <h3 className="text-sm font-medium text-foreground">{tx('通知弹窗')}</h3>
         </div>
 
         <ToggleRow
-          label="开启监控通知弹窗"
-          desc="收到监控告警时在右下角弹出通知卡片"
+          label={tx('开启监控通知弹窗')}
+          desc={tx('收到监控告警时在右下角弹出通知卡片')}
           checked={toastEnabled}
           disabled={saving}
           onChange={(v) => {
@@ -221,8 +238,8 @@ export function SettingsSystemPanel() {
 
         <div className="flex items-center justify-between gap-4 py-2">
           <div className="min-w-0">
-            <div className="text-sm text-foreground">最大弹窗个数</div>
-            <div className="text-[11px] text-muted truncate">同时显示的通知数量 (1-5), 超出丢弃最旧的</div>
+            <div className="text-sm text-foreground">{tx('最大弹窗个数')}</div>
+            <div className="text-[11px] text-muted truncate">{tx('同时显示的通知数量 (1-5), 超出丢弃最旧的')}</div>
           </div>
           <select
             value={toastMax}
@@ -240,8 +257,8 @@ export function SettingsSystemPanel() {
         </div>
 
         <ToggleRow
-          label="通知声效"
-          desc="收到监控告警时播放提示音"
+          label={tx('通知声效')}
+          desc={tx('收到监控告警时播放提示音')}
           checked={soundEnabled}
           disabled={!toastEnabled}
           onChange={(v) => {
@@ -255,8 +272,8 @@ export function SettingsSystemPanel() {
           <div className="min-w-0 flex items-center gap-1.5">
             <Volume2 className="h-3.5 w-3.5 text-muted" />
             <div>
-              <div className="text-sm text-foreground">声效选择</div>
-              <div className="text-[11px] text-muted truncate">选择提示音风格</div>
+              <div className="text-sm text-foreground">{tx('声效选择')}</div>
+              <div className="text-[11px] text-muted truncate">{tx('选择提示音风格')}</div>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
@@ -278,8 +295,7 @@ export function SettingsSystemPanel() {
               disabled={!toastEnabled || !soundEnabled || soundType === 'none'}
               className="px-2 h-8 rounded-btn border border-border bg-base text-xs text-secondary hover:text-foreground hover:border-accent/30 disabled:opacity-50 transition-colors cursor-pointer"
             >
-              试听
-            </button>
+              {tx('试听')}</button>
           </div>
         </div>
 
@@ -287,8 +303,8 @@ export function SettingsSystemPanel() {
           <div className="min-w-0 flex items-center gap-1.5">
             <Upload className="h-3.5 w-3.5 text-muted" />
             <div>
-              <div className="text-sm text-foreground">自定义语音包</div>
-              <div className="text-[11px] text-muted truncate">上传自己的提示音 (mp3/wav/ogg/m4a/flac/aac, ≤4MB), 同名重传替换</div>
+              <div className="text-sm text-foreground">{tx('自定义语音包')}</div>
+              <div className="text-[11px] text-muted truncate">{tx('上传自己的提示音 (mp3/wav/ogg/m4a/flac/aac, ≤4MB), 同名重传替换')}</div>
             </div>
           </div>
           <input
@@ -304,7 +320,7 @@ export function SettingsSystemPanel() {
             className="inline-flex items-center gap-1.5 px-3 h-8 rounded-btn text-xs bg-elevated text-secondary hover:text-foreground transition-colors disabled:opacity-50 shrink-0 cursor-pointer"
           >
             <Upload className="h-3.5 w-3.5" />
-            {uploadSoundPack.isPending ? '上传中…' : '上传'}
+            {uploadSoundPack.isPending ? tx('上传中…') : tx('上传')}
           </button>
         </div>
         {soundPacks.length > 0 && (
@@ -320,14 +336,13 @@ export function SettingsSystemPanel() {
                     onClick={() => previewSound(CUSTOM_SOUND_PREFIX + p.name)}
                     className="px-2 py-0.5 rounded-btn border border-border text-xs text-secondary hover:text-foreground hover:border-accent/30 transition-colors cursor-pointer"
                   >
-                    试听
-                  </button>
+                    {tx('试听')}</button>
                   <button
                     onClick={() => deleteSoundPack.mutate(p.name)}
                     disabled={deleteSoundPack.isPending && deleteSoundPack.variables === p.name}
                     className="px-2 py-0.5 rounded-btn border border-border text-xs text-secondary hover:text-foreground hover:border-accent/30 transition-colors disabled:opacity-50 cursor-pointer"
                   >
-                    {deleteSoundPack.isPending && deleteSoundPack.variables === p.name ? '删除中' : '删除'}
+                    {deleteSoundPack.isPending && deleteSoundPack.variables === p.name ? tx('删除中') : tx('删除')}
                   </button>
                 </div>
               </div>
@@ -339,12 +354,12 @@ export function SettingsSystemPanel() {
       <section className="rounded-card border border-border bg-surface p-5 mt-6">
         <div className="flex items-center gap-2 mb-4">
           <Volume2 className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-medium text-foreground">语音播报</h3>
+          <h3 className="text-sm font-medium text-foreground">{tx('语音播报')}</h3>
         </div>
 
         <ToggleRow
-          label="监控告警语音播报"
-          desc="收到告警时用中文语音播报内容 (需浏览器支持, 默认关闭)"
+          label={tx('监控告警语音播报')}
+          desc={tx('收到告警时用中文语音播报内容 (需浏览器支持, 默认关闭)')}
           checked={voiceEnabled}
           disabled={!toastEnabled}
           onChange={(v) => {
@@ -358,11 +373,11 @@ export function SettingsSystemPanel() {
           <div className="min-w-0 flex items-center gap-1.5">
             <Volume2 className="h-3.5 w-3.5 text-muted" />
             <div>
-              <div className="text-sm text-foreground">语音音色</div>
+              <div className="text-sm text-foreground">{tx('语音音色')}</div>
               <div className="text-[11px] text-muted truncate">
                 {voices.length === 0
-                  ? '未检测到中文语音, 将用系统默认'
-                  : '默认优先 Google 中国大陆 (音质最佳)'}
+                  ? tx('未检测到中文语音, 将用系统默认')
+                  : tx('默认优先 Google 中国大陆 (音质最佳)')}
               </div>
             </div>
           </div>
@@ -384,7 +399,7 @@ export function SettingsSystemPanel() {
               }}
               className="w-32 h-8 px-1.5 rounded-btn border border-border bg-base text-xs text-foreground disabled:opacity-50"
             >
-              <option value="">默认偏好</option>
+              <option value="">{tx('默认偏好')}</option>
               {voices.map(v => (
                 <option key={v.voiceURI} value={v.voiceURI}>{v.name}</option>
               ))}
@@ -394,15 +409,14 @@ export function SettingsSystemPanel() {
               disabled={!toastEnabled || !voiceEnabled}
               className="px-2 h-8 rounded-btn border border-border bg-base text-xs text-secondary hover:text-foreground hover:border-accent/30 disabled:opacity-50 transition-colors cursor-pointer"
             >
-              试听
-            </button>
+              {tx('试听')}</button>
           </div>
         </div>
 
         <div className="flex items-center justify-between gap-4 py-2">
           <div className="min-w-0">
-            <div className="text-sm text-foreground">语速</div>
-            <div className="text-[11px] text-muted truncate">0.5 慢 — 2.0 快</div>
+            <div className="text-sm text-foreground">{tx('语速')}</div>
+            <div className="text-[11px] text-muted truncate">{tx('0.5 慢 — 2.0 快')}</div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <input
@@ -423,13 +437,13 @@ export function SettingsSystemPanel() {
       <section className="rounded-card border border-border bg-surface p-5 mt-6">
         <div className="flex items-center gap-2 mb-4">
           <ExternalLink className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-medium text-foreground">个股详情外链</h3>
+          <h3 className="text-sm font-medium text-foreground">{tx('个股详情外链')}</h3>
         </div>
 
         <div className="flex items-center justify-between gap-4 py-2">
           <div className="min-w-0">
-            <div className="text-sm text-foreground">详情页 URL 模板</div>
-            <div className="text-[11px] text-muted truncate">{"支持 {code} {market} {symbol} · 留空关闭外链"}</div>
+            <div className="text-sm text-foreground">{tx('详情页 URL 模板')}</div>
+            <div className="text-[11px] text-muted truncate">{tx('支持 {code} {market} {symbol} · 留空关闭外链')}</div>
           </div>
           <input
             value={extTpl}
@@ -447,60 +461,56 @@ export function SettingsSystemPanel() {
       <section className="rounded-card border border-border bg-surface p-5 mt-6">
         <div className="flex items-center gap-2 mb-4">
           <Layers className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-medium text-foreground">批量请求</h3>
+          <h3 className="text-sm font-medium text-foreground">{tx('批量请求')}</h3>
         </div>
 
         <p className="text-[11px] leading-relaxed text-muted mb-3">
-          自选 / 选股列表的 K 线按这里的数量分批请求，单批越大请求越少、速度越快，
-          但单次内存峰值也越高。改完立即生效，无需重启。
-        </p>
+          {tx('自选 / 选股列表的 K 线按这里的数量分批请求，单批越大请求越少、速度越快， 但单次内存峰值也越高。改完立即生效，无需重启。')}</p>
 
         <BatchSymbolsRow
-          label="日K批量上限"
-          desc="每只约 12 根 K 线，成本较低"
+          label={tx('日K批量上限')}
+          desc={tx('每只约 12 根 K 线，成本较低')}
           min={DAILY_BATCH_SYMBOLS_MIN}
           max={DAILY_BATCH_SYMBOLS_MAX}
           value={prefs?.daily_batch_symbols ?? 400}
           saving={saveDailyBatch.isPending}
           onSave={(size) => saveDailyBatch.mutate(size)}
           warnAt={2000}
-          warnText="超过 2000 只时，多标签页或分时同时刷新会叠加内存峰值，可能触发浏览器卡顿或后端内存告警。"
+          warnText={tx('超过 2000 只时，多标签页或分时同时刷新会叠加内存峰值，可能触发浏览器卡顿或后端内存告警。')}
         />
         <div className="h-px bg-border/60 my-1" />
         <BatchSymbolsRow
-          label="分时批量上限"
-          desc="每只约 240 根 K 线，内存约为日K的 20 倍"
+          label={tx('分时批量上限')}
+          desc={tx('每只约 240 根 K 线，内存约为日K的 20 倍')}
           min={MINUTE_BATCH_SYMBOLS_MIN}
           max={MINUTE_BATCH_SYMBOLS_MAX}
           value={prefs?.minute_batch_symbols ?? 400}
           saving={saveMinuteBatch.isPending}
           onSave={(size) => saveMinuteBatch.mutate(size)}
           warnAt={800}
-          warnText="分时数据量是日K的 20 倍：超过 800 只时单次响应可达数十 MB，建议保持默认或更低。"
+          warnText={tx('分时数据量是日K的 20 倍：超过 800 只时单次响应可达数十 MB，建议保持默认或更低。')}
         />
       </section>
 
       <section className="rounded-card border border-border bg-surface p-5 mt-6">
         <div className="flex items-center gap-2 mb-4">
           <MemoryStick className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-medium text-foreground">性能与内存</h3>
+          <h3 className="text-sm font-medium text-foreground">{tx('性能与内存')}</h3>
         </div>
 
         <p className="text-[11px] leading-relaxed text-muted mb-3">
-          回测 / 稳健优化 / 因子挖掘在独立进程运行，内存超过上限会被中止并提示
-          （避免把整机拖入卡顿）。保存后对新发起的任务生效，无需重启。
-        </p>
+          {tx('回测 / 稳健优化 / 因子挖掘在独立进程运行，内存超过上限会被中止并提示 （避免把整机拖入卡顿）。保存后对新发起的任务生效，无需重启。')}</p>
 
         <BatchSymbolsRow
-          label="回测内存上限"
-          desc="默认 6 · 0 = 不限制"
+          label={tx('回测内存上限')}
+          desc={tx('默认 6 · 0 = 不限制')}
           min={BACKTEST_RSS_LIMIT_GIB_MIN}
           max={BACKTEST_RSS_LIMIT_GIB_MAX}
           value={prefs?.backtest_worker_rss_limit_gib ?? 6}
           saving={saveBacktestRssLimit.isPending}
           onSave={(gib) => saveBacktestRssLimit.mutate(gib)}
           warnAt={16}
-          warnText="上限超过物理内存时会触发系统交换（swap），回测速度反而断崖式下降；内存不足时优先缩小回测时间范围/标的数量。"
+          warnText={tx('上限超过物理内存时会触发系统交换（swap），回测速度反而断崖式下降；内存不足时优先缩小回测时间范围/标的数量。')}
           unit="GiB"
           rangeUnit="GiB"
         />
@@ -509,14 +519,14 @@ export function SettingsSystemPanel() {
       <section className="rounded-card border border-border bg-surface p-5 mt-6">
         <div className="flex items-center gap-2 mb-4">
           <Trash2 className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-medium text-foreground">缓存</h3>
+          <h3 className="text-sm font-medium text-foreground">{tx('缓存')}</h3>
         </div>
 
         <div className="flex items-center justify-between gap-4 py-2">
           <div className="min-w-0">
-            <div className="text-sm text-foreground">刷新前端缓存</div>
+            <div className="text-sm text-foreground">{tx('刷新前端缓存')}</div>
             <div className="text-[11px] text-muted truncate">
-              清除页面缓存并强制重新加载 (不影响个人配置和本地股票数据)
+              {tx('清除页面缓存并强制重新加载 (不影响个人配置和本地股票数据)')}
             </div>
           </div>
           <button
@@ -531,7 +541,7 @@ export function SettingsSystemPanel() {
             ) : (
               <RefreshCw className="h-3.5 w-3.5" />
             )}
-            {clearing ? '清理中…' : '清理并刷新'}
+            {clearing ? tx('清理中…') : tx('清理并刷新')}
           </button>
         </div>
       </section>
@@ -539,14 +549,14 @@ export function SettingsSystemPanel() {
       <section className="rounded-card border border-border bg-surface p-5 mt-6">
         <div className="flex items-center gap-2 mb-4">
           <ZoomIn className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-medium text-foreground">界面</h3>
+          <h3 className="text-sm font-medium text-foreground">{tx('界面')}</h3>
         </div>
 
         <div className="flex items-center justify-between gap-4 py-2">
           <div className="min-w-0">
-            <div className="text-sm text-foreground">界面缩放</div>
+            <div className="text-sm text-foreground">{tx('界面缩放')}</div>
             <div className="text-[11px] text-muted truncate">
-              整个界面等比缩放, 立即生效并记忆 (80%–150%)
+              {tx('整个界面等比缩放, 立即生效并记忆 (80%–150%)')}
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -556,13 +566,13 @@ export function SettingsSystemPanel() {
                 className="px-2.5 py-1.5 rounded-btn text-xs bg-elevated text-secondary
                            hover:text-foreground transition-colors"
               >
-                重置
+                {t('common.reset')}
               </button>
             )}
             <button
               onClick={() => changeZoom(-ZOOM_STEP)}
               disabled={pageZoom <= ZOOM_MIN}
-              aria-label="缩小界面"
+              aria-label={tx('缩小界面')}
               className="inline-flex items-center justify-center h-7 w-7 rounded-btn
                          bg-elevated text-secondary hover:text-foreground transition-colors
                          disabled:opacity-40 disabled:cursor-not-allowed"
@@ -575,7 +585,7 @@ export function SettingsSystemPanel() {
             <button
               onClick={() => changeZoom(ZOOM_STEP)}
               disabled={pageZoom >= ZOOM_MAX}
-              aria-label="放大界面"
+              aria-label={tx('放大界面')}
               className="inline-flex items-center justify-center h-7 w-7 rounded-btn
                          bg-elevated text-secondary hover:text-foreground transition-colors
                          disabled:opacity-40 disabled:cursor-not-allowed"
@@ -604,6 +614,7 @@ const UPGRADE_CATEGORY_LABEL: Record<UpgradeGuardCategory, string> = {
 }
 
 function UpgradeGuardCard() {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const { data: st, isLoading } = useQuery({
     queryKey: ['upgrade-guard', 'status'],
@@ -622,7 +633,7 @@ function UpgradeGuardCard() {
       await api.upgradeGuardScan()
       await refresh()
     } catch (e: any) {
-      toast(`扫描失败: ${e?.message ?? e}`, 'error')
+      toast(tx('扫描失败: {msg}', { msg: e?.message ?? e }), 'error')
     } finally {
       setBusy(null)
     }
@@ -632,10 +643,10 @@ function UpgradeGuardCard() {
     setBusy(relpath)
     try {
       await api.upgradeGuardRestore(reportId, relpath)
-      toast(`已恢复 ${relpath}`, 'success')
+      toast(tx('已恢复 {path}', { path: relpath }), 'success')
       await refresh()
     } catch (e: any) {
-      toast(`恢复失败: ${e?.message ?? e}`, 'error')
+      toast(tx('恢复失败: {msg}', { msg: e?.message ?? e }), 'error')
     } finally {
       setBusy(null)
     }
@@ -650,7 +661,7 @@ function UpgradeGuardCard() {
         ok += 1
       } catch { /* 单个失败继续其余 */ }
     }
-    toast(`已恢复 ${ok}/${files.length} 个文件`, ok === files.length ? 'success' : 'error')
+    toast(tx('已恢复 {ok}/{total} 个文件', { ok, total: files.length }), ok === files.length ? 'success' : 'error')
     await refresh()
     setBusy(null)
   }
@@ -675,22 +686,22 @@ function UpgradeGuardCard() {
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4 text-secondary" />
-            <h3 className="text-sm font-medium text-foreground">升级保护（二次开发）</h3>
+            <h3 className="text-sm font-medium text-foreground">{tx('升级保护（二次开发）')}</h3>
           </div>
           <div className="mt-1.5 text-[11px] leading-relaxed text-muted">
-            {isLoading ? '加载中…' : st?.enabled
-              ? <>修改/新增的程序文件每次启动自动备份到 <code className="text-secondary">{st?.backup_dir}</code>，升级不会丢失</>
-              : '当前安装未携带版本清单（源码运行）— 请使用 Git 管理二次开发改动，配合 scripts/upgrade_check.py 做升级预检'}
+            {isLoading ? tx('加载中…') : st?.enabled
+              ? <>{tx('修改/新增的程序文件每次启动自动备份到')} <code className="text-secondary">{st?.backup_dir}</code>{tx('，升级不会丢失')}</>
+              : tx('当前安装未携带版本清单（源码运行）— 请使用 Git 管理二次开发改动，配合 scripts/upgrade_check.py 做升级预检')}
           </div>
         </div>
         {st?.enabled && (
           <div className="flex shrink-0 items-center gap-2">
-            <span className="text-[10px] text-muted">清单 {st?.manifest_version ?? '—'} · 当前 {st?.current_version}</span>
+            <span className="text-[10px] text-muted">{tx('清单')} {st?.manifest_version ?? '—'} {tx('· 当前')} {st?.current_version}</span>
             <button onClick={scan} disabled={busy === 'scan' || !!st?.scanning}
-              title="重新扫描程序目录, 刷新常备备份 (修改程序文件后可手动执行)"
+              title={tx('重新扫描程序目录, 刷新常备备份 (修改程序文件后可手动执行)')}
               className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs text-secondary transition-colors hover:bg-elevated hover:text-foreground disabled:opacity-50">
               <RefreshCw className={`h-3 w-3 ${busy === 'scan' || st?.scanning ? 'animate-spin' : ''}`} />
-              {busy === 'scan' || st?.scanning ? '扫描中' : '重新扫描'}
+              {busy === 'scan' || st?.scanning ? tx('扫描中') : tx('重新扫描')}
             </button>
           </div>
         )}
@@ -700,15 +711,14 @@ function UpgradeGuardCard() {
         <div className="mt-3 border-t border-border/60 pt-3">
           <button onClick={() => setListOpen(v => !v)} className="flex w-full items-center gap-1.5 text-left text-xs text-secondary hover:text-foreground">
             <ChevronDown className={`h-3 w-3 transition-transform ${listOpen ? '' : '-rotate-90'}`} />
-            当前检测到 <b className="text-foreground">{st?.modified?.length ?? 0}</b> 个修改文件、<b className="text-foreground">{st?.added?.length ?? 0}</b> 个新增文件
-            <span className="text-[10px] text-muted">（上次扫描 {st?.last_scan?.replace('T', ' ').slice(0, 19) ?? '—'}）</span>
+            {tx('当前检测到')} <b className="text-foreground">{st?.modified?.length ?? 0}</b> {tx('个修改文件、')}<b className="text-foreground">{st?.added?.length ?? 0}</b> {tx('个新增文件')}<span className="text-[10px] text-muted">{tx('（上次扫描')} {st?.last_scan?.replace('T', ' ').slice(0, 19) ?? '—'}）</span>
           </button>
           {listOpen && (
             <div className="mt-2 max-h-48 overflow-y-auto rounded-lg border border-border/60 bg-base/40 p-2 font-mono text-[10px] leading-5">
               {st?.modified?.map(f => <div key={f} className="truncate text-warning">✎ {f}</div>)}
               {st?.added?.map(f => <div key={f} className="truncate text-bear">＋ {f}</div>)}
               {(st?.modified?.length ?? 0) + (st?.added?.length ?? 0) === 0 && (
-                <div className="text-muted">无二次开发改动</div>
+                <div className="text-muted">{tx('无二次开发改动')}</div>
               )}
             </div>
           )}
@@ -720,13 +730,10 @@ function UpgradeGuardCard() {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 text-xs">
               <div className="font-medium text-foreground">
-                升级检测: {report.from_version} → {report.to_version}
+                {tx('升级检测:')} {report.from_version} → {report.to_version}
               </div>
               <div className="mt-1 text-[11px] leading-relaxed text-muted">
-                你的 {reportFiles.length} 个二次开发文件已归档比对 —
-                可恢复 <b className="text-bear">{report.counts.restorable + report.counts.added_lost}</b> ·
-                需手工合并 <b className="text-warning">{report.counts.conflict}</b> ·
-                已一致 <b className="text-muted">{report.counts.match}</b>
+                {tx('你的')} {reportFiles.length} {tx('个二次开发文件已归档比对 — 可恢复')} <b className="text-bear">{report.counts.restorable + report.counts.added_lost}</b> {tx('· 需手工合并')} <b className="text-warning">{report.counts.conflict}</b> {tx('· 已一致')} <b className="text-muted">{report.counts.match}</b>
               </div>
             </div>
             <div className="flex shrink-0 gap-2">
@@ -734,13 +741,12 @@ function UpgradeGuardCard() {
                 <button onClick={() => restoreAll(report.id, restorableFiles)} disabled={!!busy}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1 text-[11px] text-white hover:bg-accent/90 disabled:opacity-50">
                   <RotateCcw className="h-3 w-3" />
-                  恢复可恢复项 ({restorableFiles.length})
+                  {tx('恢复可恢复项 (')}{restorableFiles.length})
                 </button>
               )}
               <button onClick={dismiss} disabled={busy === 'dismiss'}
                 className="rounded-lg px-2.5 py-1 text-[11px] text-secondary hover:bg-elevated hover:text-foreground disabled:opacity-50">
-                知道了
-              </button>
+                {tx('知道了')}</button>
             </div>
           </div>
           <div className="mt-2 max-h-56 overflow-y-auto rounded-md border border-border/40 bg-base/40 p-2">
@@ -749,12 +755,12 @@ function UpgradeGuardCard() {
                 <span className="min-w-0 truncate font-mono text-[10px] text-secondary" title={f.relpath}>{f.relpath}</span>
                 <span className="flex shrink-0 items-center gap-1.5">
                   <span className={`text-[10px] ${f.category === 'conflict' ? 'text-warning' : f.category === 'match' ? 'text-muted' : 'text-bear'}`}>
-                    {UPGRADE_CATEGORY_LABEL[f.category]}
+                    {tx(UPGRADE_CATEGORY_LABEL[f.category])}
                   </span>
                   {(f.category === 'restorable' || f.category === 'added_lost') && (
                     <button onClick={() => restore(report.id, f.relpath)} disabled={busy === f.relpath}
                       className="rounded px-1.5 py-0.5 text-[10px] text-accent hover:bg-accent/10 disabled:opacity-50">
-                      {busy === f.relpath ? '恢复中' : '恢复'}
+                      {busy === f.relpath ? tx('恢复中') : tx('恢复')}
                     </button>
                   )}
                 </span>
@@ -763,8 +769,7 @@ function UpgradeGuardCard() {
           </div>
           {report.counts.conflict > 0 && (
             <div className="mt-2 text-[10px] leading-relaxed text-muted">
-              冲突项不自动合并: 你的版本已归档在 <code>{report.dir}</code>, 磁盘上是新版文件, 请对照手动合并后重新扫描。
-            </div>
+              {tx('冲突项不自动合并: 你的版本已归档在')} <code>{report.dir}</code>{tx(', 磁盘上是新版文件, 请对照手动合并后重新扫描。')}</div>
           )}
         </div>
       )}
@@ -785,8 +790,8 @@ function BatchSymbolsRow({
   onSave,
   warnAt,
   warnText,
-  unit = '只/批',
-  rangeUnit = '只',
+  unit,
+  rangeUnit,
 }: {
   label: string
   desc: string
@@ -802,6 +807,10 @@ function BatchSymbolsRow({
   /** 范围提示「可设 min–max …」的单位后缀 */
   rangeUnit?: string
 }) {
+  const { tx } = useI18n()
+  // 单位后缀的默认值在函数体内解析: 默认参数在 body 之前求值, 拿不到 hook 里的 tx
+  const unitText = unit ?? tx('只/批')
+  const rangeUnitText = rangeUnit ?? tx('只')
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(String(value))
   const [hint, setHint] = useState<string | null>(null)
@@ -813,11 +822,11 @@ function BatchSymbolsRow({
   function commit() {
     const raw = Number.parseInt(draft, 10)
     if (!Number.isFinite(raw)) {
-      setHint(`请输入 ${min}–${max} 之间的整数`)
+      setHint(tx('请输入 {min}–{max} 之间的整数', { min, max }))
       return
     }
-    if (raw < min) { setHint(`已按最小值 ${min} 保存`); onSave(min); setEditing(false); return }
-    if (raw > max) { setHint(`已按上限 ${max} 保存`); onSave(max); setEditing(false); return }
+    if (raw < min) { setHint(tx('已按最小值 {min} 保存', { min })); onSave(min); setEditing(false); return }
+    if (raw > max) { setHint(tx('已按上限 {max} 保存', { max })); onSave(max); setEditing(false); return }
     setHint(null)
     onSave(raw)
     setEditing(false)
@@ -830,7 +839,7 @@ function BatchSymbolsRow({
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <div className="text-sm text-foreground">{label}</div>
-          <div className="text-[11px] text-muted">{desc} · 可设 {min}–{max} {rangeUnit}</div>
+          <div className="text-[11px] text-muted">{desc} {tx('· 可设')} {min}–{max} {rangeUnitText}</div>
         </div>
         {editing ? (
           <div className="flex shrink-0 items-center gap-1.5">
@@ -854,23 +863,22 @@ function BatchSymbolsRow({
               className="px-2.5 py-1.5 rounded-btn text-xs bg-accent/15 text-accent
                          hover:bg-accent/25 transition-colors disabled:opacity-50"
             >
-              {saving ? '…' : '保存'}
+              {saving ? '…' : tx('保存')}
             </button>
             <button
               onClick={() => { setEditing(false); setHint(null) }}
               className="px-2 py-1.5 rounded-btn text-xs bg-elevated text-muted hover:text-foreground transition-colors"
             >
-              取消
-            </button>
+              {tx('取消')}</button>
           </div>
         ) : (
           <button
             onClick={() => setEditing(true)}
             className="shrink-0 px-2.5 py-1 rounded-btn border border-border bg-surface font-mono text-xs
                        text-foreground tabular-nums hover:border-accent/50 transition-colors"
-            title="点击修改"
+            title={tx('点击修改')}
           >
-            {value} {unit}
+            {value} {unitText}
           </button>
         )}
       </div>

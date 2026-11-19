@@ -1,12 +1,13 @@
 import { useEffect, useRef, useCallback, useMemo } from 'react'
 import { chartTheme, getTheme, useTheme } from '@/lib/theme'
 import { fmtPct, pricePrecision } from '@/lib/format'
-import * as echarts from 'echarts'
-import type { ECharts, EChartsOption } from 'echarts'
+import * as echarts from '@/lib/echarts'
+import type { ECharts, EChartsOption } from '@/lib/echarts'
 
 import type { OHLC, ChartMarker, ChartRange, ChartPriceLine, VolumeCompareConfig, DailyChartProps } from '@/lib/chart-types'
 export type { OHLC, ChartMarker, ChartRange, ChartPriceLine, StockInfo, VolumeCompareConfig } from '@/lib/chart-types'
 import { volMaN, volumeRatioAt, SUB_CHART_META } from '@/lib/chart-indicators'
+import { tx } from '@/lib/i18n'
 
 interface SubChartContext {
   compact: boolean
@@ -30,8 +31,8 @@ export interface SubChartDef {
 // ===== 成交量 N 日均量 =====
 function fmtVol(v: number | null | undefined): string {
   if (v == null) return '—'
-  if (v >= 1e8) return (v / 1e8).toFixed(2) + '亿'
-  if (v >= 1e4) return (v / 1e4).toFixed(0) + '万'
+  if (v >= 1e8) return (v / 1e8).toFixed(2) + tx('亿')
+  if (v >= 1e4) return (v / 1e4).toFixed(0) + tx('万')
   return v.toFixed(0)
 }
 
@@ -95,7 +96,7 @@ export const SUB_CHARTS: SubChartDef[] = [
     buildInfo: (d) => {
       if (!d) return []
       return [
-        { label: '量', color: d.close >= d.open ? '#C74040' : '#2D9B65', value: fmtVol(d.volume) },
+        { label: tx('量'), color: d.close >= d.open ? '#C74040' : '#2D9B65', value: fmtVol(d.volume) },
       ]
     },
   },
@@ -284,7 +285,7 @@ function buildSubInfoGraphics(
       if (volumeCompare.enabled) {
         const ratio = volumeRatioAt(data, infoIdx, volumeCompare.days)
         items.push({
-          label: `量比${volumeCompare.days}`,
+          label: tx('量比{v}', { v: volumeCompare.days }),
           color: ratio != null && ratio >= 1 ? '#C74040' : '#2D9B65',
           value: fmtVolumeRatio(ratio),
         })
@@ -659,8 +660,8 @@ function buildOption(
       silent: true,
       lineStyle: { width: 1, color, type: 'dashed' as const }, itemStyle: { color },
     })
-    series.push(bollLine('boll_upper', '#E879F9', 'BOLL上'))
-    series.push(bollLine('boll_lower', '#E879F9', 'BOLL下'))
+    series.push(bollLine('boll_upper', '#E879F9', tx('BOLL上')))
+    series.push(bollLine('boll_lower', '#E879F9', tx('BOLL下')))
   }
 
   // ===== 子图区域 =====
@@ -881,13 +882,13 @@ export function EChartsCandlestick({
 
     let html = `<div style="display:flex;align-items:center;gap:6px;padding:0 8px;font:11px 'JetBrains Mono',monospace;select:none;min-height:20px;flex-wrap:wrap">`
     html += `<span style="color:${CT().text}">${d.date}</span>`
-    html += `<span style="color:${CT().text}">开</span>`
+    html += `<span style="color:${CT().text}">${tx('开')}</span>`
     html += `<span style="color:${d.open >= d.close ? THEME.bear : THEME.bull}">${d.open.toFixed(digits)}</span>`
-    html += `<span style="color:${CT().text}">高</span>`
+    html += `<span style="color:${CT().text}">${tx('高')}</span>`
     html += `<span style="color:${THEME.bull}">${d.high.toFixed(digits)}</span>`
-    html += `<span style="color:${CT().text}">低</span>`
+    html += `<span style="color:${CT().text}">${tx('低')}</span>`
     html += `<span style="color:${THEME.bear}">${d.low.toFixed(digits)}</span>`
-    html += `<span style="color:${CT().text}">收</span>`
+    html += `<span style="color:${CT().text}">${tx('收')}</span>`
     html += `<span style="color:${clr};font-weight:600">${d.close.toFixed(digits)}</span>`
     // 涨跌幅 (收盘后, 换手前; 和收间隔一些距离)
     if (prev) {
@@ -895,7 +896,7 @@ export function EChartsCandlestick({
       html += `<span style="color:${clr};margin-left:8px">${isUp ? '+' : ''}${chgPct.toFixed(2)}%</span>`
     }
     if (turnoverRate != null) {
-      html += `<span style="color:${CT().text}">换手</span>`
+      html += `<span style="color:${CT().text}">${tx('换手')}</span>`
       html += `<span style="color:${CT().text}">${turnoverRate.toFixed(2)}%</span>`
     }
     // 至今: 仅当竖虚线(crosshair)在图上且鼠标悬停某根 K 线时显示。
@@ -906,10 +907,10 @@ export function EChartsCandlestick({
       if (Number.isFinite(latestPrice)) {
         const sinceRatio = (latestPrice - prev.close) / prev.close
         const sinceClr = sinceRatio >= 0 ? THEME.bull : THEME.bear
-        html += `<span style="color:${CT().text}">至今</span>`
+        html += `<span style="color:${CT().text}">${tx('至今')}</span>`
         html += `<span style="color:${sinceClr}">${fmtPct(sinceRatio)}</span>`
         // 周期数: 从该K线(含)到最新一根K线共多少根; 悬停最后一根时为 1
-        html += `<span style="color:${CT().text}">周期 ${data.length - idx}</span>`
+        html += `<span style="color:${CT().text}">${tx('周期 {v}', { v: data.length - idx })}</span>`
       }
     }
     html += `</div>`
@@ -1172,13 +1173,13 @@ export function EChartsCandlestick({
     const turnoverRate = floatShares && d.volume ? (d.volume * 100 / floatShares * 100) : null
     let html = `<div style="display:flex;align-items:center;gap:6px;padding:0 8px;font:11px 'JetBrains Mono',monospace;min-height:20px;flex-wrap:wrap">`
     html += `<span style="color:${CT().text}">${d.date}</span>`
-    html += `<span style="color:${CT().text}">开</span>`
+    html += `<span style="color:${CT().text}">${tx('开')}</span>`
     html += `<span style="color:${d.open >= d.close ? THEME.bear : THEME.bull}">${d.open.toFixed(digits)}</span>`
-    html += `<span style="color:${CT().text}">高</span>`
+    html += `<span style="color:${CT().text}">${tx('高')}</span>`
     html += `<span style="color:${THEME.bull}">${d.high.toFixed(digits)}</span>`
-    html += `<span style="color:${CT().text}">低</span>`
+    html += `<span style="color:${CT().text}">${tx('低')}</span>`
     html += `<span style="color:${THEME.bear}">${d.low.toFixed(digits)}</span>`
-    html += `<span style="color:${CT().text}">收</span>`
+    html += `<span style="color:${CT().text}">${tx('收')}</span>`
     const prevClose0 = data[idx-1]?.close ?? d.close
     const clr0 = d.close >= prevClose0 ? THEME.bull : THEME.bear
     html += `<span style="color:${clr0};font-weight:600">${d.close.toFixed(digits)}</span>`
@@ -1188,7 +1189,7 @@ export function EChartsCandlestick({
       html += `<span style="color:${clr0};margin-left:8px">${chgPct0 >= 0 ? '+' : ''}${chgPct0.toFixed(2)}%</span>`
     }
     if (turnoverRate != null) {
-      html += `<span style="color:${CT().text}">换手</span>`
+      html += `<span style="color:${CT().text}">${tx('换手')}</span>`
       html += `<span style="color:${CT().text}">${turnoverRate.toFixed(2)}%</span>`
     }
     html += `</div>`

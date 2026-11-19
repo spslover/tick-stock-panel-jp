@@ -147,6 +147,8 @@ async def analyze_financials_stream(
     data_dir: Path,
     symbol: str,
     focus: str = "",
+    *,
+    locale: str = "zh-CN",
 ) -> AsyncIterator[str]:
     """流式分析:yield 出每个文本 chunk。
 
@@ -172,13 +174,13 @@ async def analyze_financials_stream(
 
     # 3. 调用 LLM 流式
     try:
-        from app.services.ai_provider import stream_ai_text
+        from app.services.ai_provider import language_instruction, stream_ai_text
 
         user_prompt = _build_user_prompt(fins, symbol, focus)
         got_content = False
         async for delta in stream_ai_text(
             [
-                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "system", "content": _SYSTEM_PROMPT + language_instruction(locale)},
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.4,

@@ -1,13 +1,16 @@
 """扩展数据 API — CRUD + 文件上传 + JSON 写入 + 定时拉取 + schema 发现。"""
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import math
 import re
 import shutil
 import tempfile
+import threading
 import time
+from collections import OrderedDict
 from datetime import date, datetime
 from pathlib import Path
 from typing import Literal
@@ -17,8 +20,9 @@ from fastapi import APIRouter, File, Form, HTTPException, Query, Request, Upload
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
+from app import db_safe
 from app.market_time import CN_TZ, cn_today
-from app.services import ext_config_transfer
+from app.services import ext_config_transfer, safe_http
 from app.services.ext_data import (
     ExtConfig,
     ExtConfigStore,
@@ -38,7 +42,13 @@ from app.services.ext_data import (
 )
 from app.services.ext_data_schema import CreateExtReq, FieldDef, PullConfigReq
 from app.services.ext_data_schema import PullAuthReq as PullAuthReq
-from app.services.ext_pull import _request_json, fetch_and_ingest, pull_scheduler
+from app.services.ext_pull import (
+    _request_json,
+    fetch_and_ingest,
+    pull_scheduler,
+    redact_pull_error,
+    register_post_ingest_hook,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ext-data", tags=["ext-data"])
@@ -146,6 +156,9 @@ async def import_config_package(
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
     await run_ext_data_io(_refresh_views, request)
+    imported_id = config.get("id") if isinstance(config, dict) else getattr(config, "id", None)
+    if imported_id:
+        _invalidate_dimension_intraday_cache(str(imported_id), _data_dir(request))
     # Imported tables are new and disabled; scheduling begins only when the
     # recipient explicitly saves an enabled pull configuration.
     return config
@@ -568,6 +581,7 @@ def update_config(request: Request, config_id: str, body: UpdateExtReq):
     if body.market_level is not None:
         config.market_level = body.market_level
     store.upsert(config)
+    _invalidate_dimension_intraday_cache(config_id, _data_dir(request))
     _refresh_views(request)
     return config.to_dict()
 
@@ -582,6 +596,7 @@ def delete_config(request: Request, config_id: str):
     from app import secrets_store
 
     secrets_store.clear(ext_api_key_field(config_id))
+    _invalidate_dimension_intraday_cache(config_id, _data_dir(request))
     _refresh_views(request)
     return {"status": "deleted"}
 
@@ -791,8 +806,35 @@ def dimension_members(
 
 # 点击触发 + 60s 进程内缓存: 分钟分区是滚动底座 (minute_refresh / 盘后分钟同步),
 # 不做后台预计算 — 板块基数大而单次聚合仅几十毫秒。
-_DIMENSION_INTRADAY_CACHE: dict[tuple[str, str, str, str | None], tuple[float, dict]] = {}
+_DIMENSION_INTRADAY_CACHE: OrderedDict[tuple[str, str, str, str, str | None], tuple[float, dict]] = OrderedDict()
+_DIMENSION_INTRADAY_CACHE_LOCK = threading.Lock()
+_DIMENSION_INTRADAY_CACHE_GEN = 0
+_DIMENSION_INTRADAY_CACHE_MAX = 256
 _DIMENSION_INTRADAY_CACHE_TTL_S = 60.0
+
+
+def _invalidate_dimension_intraday_cache(
+    config_id: str | None = None,
+    data_dir: Path | None = None,
+) -> None:
+    """Invalidate cached dimension-intraday responses on ext config/data writes."""
+    global _DIMENSION_INTRADAY_CACHE_GEN
+    dir_key = str(data_dir) if data_dir is not None else None
+    with _DIMENSION_INTRADAY_CACHE_LOCK:
+        _DIMENSION_INTRADAY_CACHE_GEN += 1
+        if config_id is None and dir_key is None:
+            _DIMENSION_INTRADAY_CACHE.clear()
+            return
+        stale = [
+            k for k in _DIMENSION_INTRADAY_CACHE
+            if (dir_key is None or k[0] == dir_key)
+            and (config_id is None or k[1] == config_id)
+        ]
+        for k in stale:
+            _DIMENSION_INTRADAY_CACHE.pop(k, None)
+
+
+register_post_ingest_hook(_invalidate_dimension_intraday_cache)
 # 成分股网格化 ffill 上限: 超大板块退化为逐时间戳可得均值 (内存保护)。
 _DIMENSION_INTRADAY_FFILL_CAP = 2000
 # 分钟 pct 物理边界 (与 services.sector_rotation._PCT_PHYSICAL_BOUND 同值,
@@ -978,14 +1020,33 @@ def dimension_intraday(
     if not config:
         raise HTTPException(404, f"配置 '{config_id}' 不存在")
 
-    cache_key = (config_id, field, value.strip(), snapshot_date)
+    data_dir = _data_dir(request)
+    cache_key = (str(data_dir), config_id, field, value.strip(), snapshot_date)
     now = time.monotonic()
-    hit = _DIMENSION_INTRADAY_CACHE.get(cache_key)
-    if hit is not None and now - hit[0] < _DIMENSION_INTRADAY_CACHE_TTL_S:
-        return hit[1]
+    with _DIMENSION_INTRADAY_CACHE_LOCK:
+        hit = _DIMENSION_INTRADAY_CACHE.get(cache_key)
+        if hit is not None:
+            if now - hit[0] < _DIMENSION_INTRADAY_CACHE_TTL_S:
+                _DIMENSION_INTRADAY_CACHE.move_to_end(cache_key)
+                return hit[1]
+            _DIMENSION_INTRADAY_CACHE.pop(cache_key, None)
+        start_gen = _DIMENSION_INTRADAY_CACHE_GEN
 
-    payload = _dimension_intraday_compute(config, _data_dir(request), field, value, snapshot_date)
-    _DIMENSION_INTRADAY_CACHE[cache_key] = (now, payload)
+    payload = _dimension_intraday_compute(config, data_dir, field, value, snapshot_date)
+
+    store_ts = time.monotonic()
+    with _DIMENSION_INTRADAY_CACHE_LOCK:
+        if start_gen == _DIMENSION_INTRADAY_CACHE_GEN:
+            expired = [
+                k for k, (ts, _) in _DIMENSION_INTRADAY_CACHE.items()
+                if store_ts - ts >= _DIMENSION_INTRADAY_CACHE_TTL_S
+            ]
+            for k in expired:
+                _DIMENSION_INTRADAY_CACHE.pop(k, None)
+            _DIMENSION_INTRADAY_CACHE[cache_key] = (store_ts, payload)
+            _DIMENSION_INTRADAY_CACHE.move_to_end(cache_key)
+            while len(_DIMENSION_INTRADAY_CACHE) > _DIMENSION_INTRADAY_CACHE_MAX:
+                _DIMENSION_INTRADAY_CACHE.popitem(last=False)
     return payload
 
 
@@ -1084,6 +1145,7 @@ def _upload_data(request: Request, config_id: str, file: UploadFile, snapshot_da
     snap = date.fromisoformat(_partition_date(snapshot_date)) if snapshot_date else cn_today()
 
     rows = write_ext_parquet(df, config, _data_dir(request), snapshot_date=snap)
+    _invalidate_dimension_intraday_cache(config_id, _data_dir(request))
 
     # 刷新 DuckDB 视图
     _refresh_views(request)
@@ -1118,6 +1180,7 @@ def ingest_data(request: Request, config_id: str, body: IngestReq):
     snap = date.fromisoformat(_partition_date(body.date)) if body.date else cn_today()
 
     rows_written = rows_to_parquet(body.rows, config, _data_dir(request), snapshot_date=snap)
+    _invalidate_dimension_intraday_cache(config_id, _data_dir(request))
 
     _refresh_views(request)
 
@@ -1266,7 +1329,7 @@ async def test_pull(request: Request, config_id: str):
             "has_symbol": bool(rows and "symbol" in rows[0]),
         }
     except Exception as e:
-        raise HTTPException(400, f"测试失败: {e}") from e
+        raise HTTPException(400, f"测试失败: {redact_pull_error(e, pull, config.id)}") from e
 
 
 @router.post("/{config_id}/pull/run")
@@ -1281,6 +1344,7 @@ async def run_pull(request: Request, config_id: str):
 
     try:
         n, d = await fetch_and_ingest(config, _data_dir(request))
+        _invalidate_dimension_intraday_cache(config_id, _data_dir(request))
         await run_ext_data_io(_refresh_views, request)
         # 写回执行状态, 让前端"上次执行"面板立即反映
         updated = await run_ext_data_io(store.get, config_id)
@@ -1293,15 +1357,16 @@ async def run_pull(request: Request, config_id: str):
             await run_ext_data_io(store.upsert, updated)
         return {"status": "ok", "rows": n, "date": d}
     except Exception as e:
+        safe_err = redact_pull_error(e, config.pull, config.id)
         # 失败也写回状态, 记录错误信息
         failed = await run_ext_data_io(store.get, config_id)
         if failed and failed.pull:
             from datetime import datetime, timezone
             failed.pull.last_run = datetime.now(timezone.utc).isoformat()
             failed.pull.last_status = "error"
-            failed.pull.last_message = str(e)[:200]
+            failed.pull.last_message = safe_err[:200]
             await run_ext_data_io(store.upsert, failed)
-        raise HTTPException(400, f"拉取失败: {e}") from e
+        raise HTTPException(400, f"拉取失败: {safe_err}") from e
 
 
 @router.post("/{config_id}/backfill")
@@ -1331,7 +1396,8 @@ async def backfill_history_ep(
     try:
         result = await backfill_history(config, _data_dir(request), start_d, end_d)
     except ValueError as e:
-        raise HTTPException(400, str(e)) from e
+        raise HTTPException(400, redact_pull_error(e, config.pull, config.id)) from e
+    _invalidate_dimension_intraday_cache(config_id, _data_dir(request))
     await run_ext_data_io(_refresh_views, request)
     return {"status": "ok", **result}
 
@@ -1350,6 +1416,7 @@ def fix_symbol(request: Request, config_id: str):
         raise HTTPException(404, f"配置 '{config_id}' 不存在")
 
     fixed = fix_symbol_format(config, _data_dir(request))
+    _invalidate_dimension_intraday_cache(config_id, _data_dir(request))
     _refresh_views(request)
     return {"status": "ok", "fixed_files": fixed}
 
@@ -1578,18 +1645,24 @@ async def detect_url(body: DetectUrlReq):
         raise HTTPException(400, "仅支持 GET / POST")
 
     try:
-        async with httpx.AsyncClient(timeout=body.timeout_seconds, follow_redirects=True) as client:
-            headers = body.headers or {}
-            kwargs: dict = {"headers": headers}
-            if method == "POST" and body.body:
-                kwargs["content"] = body.body
-                if "content-type" not in {k.lower() for k in headers}:
-                    kwargs["headers"]["Content-Type"] = "application/json"
-            resp = await client.request(method, body.url, **kwargs)
-            resp.raise_for_status()
-            data = resp.json()
+        headers = dict(body.headers or {})
+        kwargs: dict = {"headers": headers}
+        if method == "POST" and body.body:
+            kwargs["content"] = body.body
+            if "content-type" not in {k.lower() for k in headers}:
+                kwargs["headers"]["Content-Type"] = "application/json"
+        resp = await safe_http.async_request(
+            method,
+            body.url,
+            timeout=body.timeout_seconds,
+            max_redirects=3,
+            client_cls=httpx.AsyncClient,
+            **kwargs,
+        )
+        resp.raise_for_status()
+        data = resp.json()
     except Exception as e:
-        raise HTTPException(400, f"URL 请求失败: {e}") from e
+        raise HTTPException(400, f"URL 请求失败: {safe_http.redact_url_secrets(str(e))}") from e
 
     path_candidates = _find_row_arrays(data)
     response_path = body.response_path
@@ -1646,13 +1719,18 @@ def _describe_parquet_columns(glob: str) -> list[tuple[str, str]]:
 
     # hive_partitioning=false: 时序表目录名形如 date=YYYY-MM-DD, DuckDB 默认据此
     # 推断分区并在真实列之外多出一个 date 列, 污染列选择器里的扩展字段。
-    rel = duckdb.query(
-        f"DESCRIBE SELECT * FROM read_parquet('{glob}', union_by_name=true, hive_partitioning=false)"
-    )
-    names = rel.columns
-    type_idx = names.index("column_type" if "column_type" in names else "data_type")
-    name_idx = names.index("column_name")
-    return [(row[name_idx], row[type_idx]) for row in rel.fetchall()]
+    con = duckdb.connect(":memory:")
+    try:
+        cur = con.execute(
+            "DESCRIBE SELECT * FROM read_parquet(?, union_by_name=true, hive_partitioning=false)",
+            [glob],
+        )
+        names = [d[0] for d in cur.description]
+        type_idx = names.index("column_type" if "column_type" in names else "data_type")
+        name_idx = names.index("column_name")
+        return [(row[name_idx], row[type_idx]) for row in cur.fetchall()]
+    finally:
+        con.close()
 
 
 @router.get("/schema/{config_id}")
@@ -1716,53 +1794,73 @@ def discover_all_schemas(request: Request):
 # 视图刷新
 # ---------------------------------------------------------------------------
 
+def _safe_view_glob(glob_pattern: str) -> str | None:
+    if any(ch in glob_pattern for ch in ("\x00", "\r", "\n")):
+        return None
+    return glob_pattern.replace("'", "''")
+
+
+def _exec_refresh_view(repo, db, view_name: str, glob_pattern: str) -> None:
+    escaped_glob = _safe_view_glob(glob_pattern)
+    if escaped_glob is None or not view_name.isidentifier():
+        return
+    if hasattr(repo, "refresh_view"):
+        repo.refresh_view(view_name, escaped_glob)
+        return
+    if db is None:
+        return
+    sql = (
+        f"CREATE OR REPLACE VIEW {db_safe.quote_ident(view_name)} AS "
+        f"SELECT * FROM read_parquet('{escaped_glob}', union_by_name=true)"
+    )
+    with contextlib.suppress(Exception):
+        db.execute(sql)
+
+
 def _refresh_views(request: Request) -> None:
     """重新注册 DuckDB 视图以包含新的扩展数据。"""
     repo = request.app.state.repo
     db = repo.store.db
-    d = repo.store.data_dir.as_posix()
+    data_dir = Path(repo.store.data_dir)
+    data_dir_resolved = data_dir.resolve()
 
     # 注册旧路径视图（兼容）
     for name, subdir in [("instruments_ext", "instruments_ext"), ("kline_ext", "kline_ext")]:
-        old_glob = f"{d}/{subdir}/**/*.parquet"
-        old_dir = Path(d) / subdir
-        if old_dir.exists():
-            sql = (
-                f"CREATE OR REPLACE VIEW {name} AS "
-                f"SELECT * FROM read_parquet('{old_glob}', union_by_name=true)"
-            )
-            try:
-                db.execute(sql)
-            except Exception:
-                pass
+        old_dir = (data_dir / subdir).resolve()
+        if old_dir.is_relative_to(data_dir_resolved) and old_dir.exists():
+            old_glob = f"{old_dir.as_posix()}/**/*.parquet"
+            _exec_refresh_view(repo, db, name, old_glob)
 
     # 注册新路径视图：每个扩展表一个视图 ext_{config_id}
-    ext_base = Path(d) / "ext_data"
-    if ext_base.exists():
+    ext_base = (data_dir / "ext_data").resolve()
+    if ext_base.exists() and ext_base.is_relative_to(data_dir_resolved):
         for cfg_dir in ext_base.iterdir():
             if not cfg_dir.is_dir():
+                continue
+            resolved_cfg_dir = cfg_dir.resolve()
+            if not resolved_cfg_dir.is_relative_to(ext_base):
                 continue
             cp = cfg_dir / "config.json"
             if not cp.exists():
                 continue
             try:
                 raw = json.loads(cp.read_text(encoding="utf-8"))
-                cfg_id = raw["id"]
+                cfg_id = raw.get("id")
+                if not isinstance(cfg_id, str) or not db_safe.is_valid_ext_ident(cfg_id) or cfg_id != cfg_dir.name:
+                    continue
                 # 检查是否有数据文件（snapshot: part.parquet, timeseries: timeseries/ 目录）
                 has_data = (cfg_dir / "part.parquet").exists() or (cfg_dir / "timeseries").exists()
                 if has_data:
                     view_name = f"ext_{cfg_id}"
+                    if not view_name.isidentifier():
+                        continue
                     # snapshot: part.parquet 在 cfg_dir/ 根下; timeseries: 在 timeseries/ 子目录
                     mode = raw.get("mode", "snapshot")
                     if mode == "snapshot":
-                        glob_pattern = f"{cfg_dir.as_posix()}/*.parquet"
+                        glob_pattern = f"{resolved_cfg_dir.as_posix()}/*.parquet"
                     else:
-                        glob_pattern = f"{cfg_dir.as_posix()}/timeseries/**/*.parquet"
-                    sql = (
-                        f"CREATE OR REPLACE VIEW {view_name} AS "
-                        f"SELECT * FROM read_parquet('{glob_pattern}', union_by_name=true)"
-                    )
-                    db.execute(sql)
+                        glob_pattern = f"{resolved_cfg_dir.as_posix()}/timeseries/**/*.parquet"
+                    _exec_refresh_view(repo, db, view_name, glob_pattern)
             except Exception:
                 pass
 

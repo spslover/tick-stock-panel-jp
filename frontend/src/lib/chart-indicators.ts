@@ -1,4 +1,5 @@
 import type { OHLC } from './chart-types'
+import { tx } from './i18n'
 
 export const SUB_CHART_META = [
   { key: 'vol', label: '成交量', height: 84 },
@@ -7,6 +8,11 @@ export const SUB_CHART_META = [
   { key: 'kdj', label: 'KDJ', height: 72 },
 ]
 export const OVERLAY_INDICATORS = [{ key: 'boll', label: 'BOLL' }]
+
+/** 副图标题按当前界面语言输出（词条走 tx 兜底）。 */
+export function subChartLabel(meta: { label: string }): string {
+  return tx(meta.label)
+}
 
 export function volMaN(data: OHLC[], n: number): (number | null)[] {
   const result: (number | null)[] = []

@@ -7,21 +7,23 @@
  * 删除助手扩展即整行消失, 核心零依赖。
  */
 import { cn } from '@/lib/cn'
+import { useI18n } from '@/lib/i18n'
 import { setFabVisible, useAssistantStore } from '../store'
 
 export function FabVisibilitySetting() {
+  const { tx } = useI18n()
   const { fabVisible } = useAssistantStore()
   return (
     <div className="flex items-center justify-between gap-4 py-2">
       <div className="min-w-0">
-        <div className="text-sm text-foreground">AI 助手悬浮球</div>
-        <div className="text-[11px] text-muted truncate">侧栏「AI 助手」行与 ⌘K 快捷键不受影响</div>
+        <div className="text-sm text-foreground">{tx('AI 助手悬浮球')}</div>
+        <div className="text-[11px] text-muted truncate">{tx('侧栏「AI 助手」行与 ⌘K 快捷键不受影响')}</div>
       </div>
       <button
         type="button"
         role="switch"
         aria-checked={fabVisible}
-        aria-label="显示 AI 助手悬浮球"
+        aria-label={tx('显示 AI 助手悬浮球')}
         onClick={() => setFabVisible(!fabVisible)}
         className={cn(
           'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors duration-200',

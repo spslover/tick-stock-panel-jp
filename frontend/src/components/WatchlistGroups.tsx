@@ -5,6 +5,7 @@ import { Check, ChevronDown, ChevronUp, FolderCog, FolderInput, Pencil, Plus, Tr
 import { WatchlistGroupTransfer } from '@/components/WatchlistGroupTransfer'
 import { Modal } from '@/components/Modal'
 import { api } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/useSharedQueries'
 import { fmtPct } from '@/lib/format'
@@ -53,11 +54,12 @@ export function WatchlistGroupBar({
   onClearGroup,
   onReorder,
 }: GroupBarProps) {
+  const { tx } = useI18n()
   const [managerOpen, setManagerOpen] = useState(false)
   const [confirmClear, setConfirmClear] = useState(false)
   const tabs = [
-    { id: 'all', name: '全部', count: total, color: null },
-    { id: 'ungrouped', name: '未分组', count: counts.ungrouped ?? 0, color: null },
+    { id: 'all', name: tx('全部'), count: total, color: null },
+    { id: 'ungrouped', name: tx('未分组'), count: counts.ungrouped ?? 0, color: null },
     ...groups.map(group => ({ id: group.id, name: group.name, count: counts[group.id] ?? 0, color: group.color })),
   ]
   // 拖拽排序状态: dragIndex = 拖动中的分组下标, dropIndex = 插入位置 (均相对 groups 数组)
@@ -97,7 +99,7 @@ export function WatchlistGroupBar({
         <div
           ref={tablistRef}
           role="tablist"
-          aria-label="自选分组"
+          aria-label={tx('自选分组')}
           onDragOver={dragIndex != null ? e => autoScroll(e.clientX) : undefined}
           className="flex min-w-0 flex-1 items-stretch gap-1 overflow-x-auto"
         >
@@ -130,7 +132,7 @@ export function WatchlistGroupBar({
                 onDrop={draggable ? e => { e.preventDefault(); handleDrop() } : undefined}
                 onDragEnd={draggable ? clearDrag : undefined}
                 onClick={() => onSelect(tab.id)}
-                title={draggable ? `${tab.name} — 可拖拽调整分组顺序` : undefined}
+                title={draggable ? `${tab.name} — ${tx('可拖拽调整分组顺序')}` : undefined}
                 className={`relative my-1.5 inline-flex shrink-0 items-center gap-1.5 rounded-btn border px-3 text-xs transition-colors ${
                   draggable ? 'cursor-grab active:cursor-grabbing' : ''
                 } ${
@@ -177,8 +179,8 @@ export function WatchlistGroupBar({
           type="button"
           onClick={() => setManagerOpen(true)}
           className="ml-2 inline-flex w-8 shrink-0 items-center justify-center text-muted hover:text-accent"
-          title="管理自选分组"
-          aria-label="管理自选分组"
+          title={tx('管理自选分组')}
+          aria-label={tx('管理自选分组')}
         >
           <FolderCog className="h-4 w-4" />
         </button>
@@ -188,8 +190,8 @@ export function WatchlistGroupBar({
             type="button"
             onClick={() => setConfirmClear(true)}
             className="inline-flex w-8 shrink-0 items-center justify-center text-muted hover:text-warning"
-            title="清空当前分组"
-            aria-label="清空当前分组"
+            title={tx('清空当前分组')}
+            aria-label={tx('清空当前分组')}
           >
             <Eraser className="h-4 w-4" />
           </button>
@@ -204,23 +206,20 @@ export function WatchlistGroupBar({
             onClick={() => setConfirmClear(false)}
           />
           <div className="relative w-[90vw] max-w-[380px] rounded-card border border-border bg-base shadow-2xl p-6">
-            <h3 className="text-sm font-medium text-foreground mb-2">清空分组</h3>
+            <h3 className="text-sm font-medium text-foreground mb-2">{tx('清空分组')}</h3>
             <p className="text-xs text-secondary mb-5">
-              确认清空「{tabs.find(t => t.id === selected)?.name}」分组? 分组内所有股票将转为未分组(不从自选中删除)。
-            </p>
+              {tx('确认清空「')}{tabs.find(t => t.id === selected)?.name}{tx('」分组? 分组内所有股票将转为未分组(不从自选中删除)。')}</p>
             <div className="flex items-center justify-end gap-2">
               <button
                 onClick={() => setConfirmClear(false)}
                 className="px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:bg-elevated/80 text-sm transition-colors"
               >
-                取消
-              </button>
+                {tx('取消')}</button>
               <button
                 onClick={() => { setConfirmClear(false); void onClearGroup?.(selected) }}
                 className="px-3 py-1.5 rounded-btn bg-warning/15 text-warning hover:bg-warning/25 text-sm font-medium transition-colors"
               >
-                确认清空
-              </button>
+                {tx('确认清空')}</button>
             </div>
           </div>
         </div>
@@ -248,8 +247,9 @@ function GroupColorPicker({
   value: WatchlistGroupColor
   onChange: (color: WatchlistGroupColor) => void
 }) {
+  const { tx } = useI18n()
   return (
-    <div role="radiogroup" aria-label="分组颜色" className="flex flex-wrap items-center gap-1.5">
+    <div role="radiogroup" aria-label={tx('分组颜色')} className="flex flex-wrap items-center gap-1.5">
       {WATCHLIST_GROUP_COLORS.map(option => {
         const selected = value === option.id
         return (
@@ -284,6 +284,7 @@ function GroupManagerDialog({
   onDelete,
   onReorder,
 }: Omit<GroupBarProps, 'entries' | 'selected' | 'total' | 'onSelect' | 'onClearGroup'> & { onClose: () => void }) {
+  const { tx } = useI18n()
   const inputRef = useRef<HTMLInputElement>(null)
   const [newName, setNewName] = useState('')
   const [newColor, setNewColor] = useState<WatchlistGroupColor>(DEFAULT_WATCHLIST_GROUP_COLOR)
@@ -311,8 +312,8 @@ function GroupManagerDialog({
 
   const validate = (name: string) => {
     const value = name.trim()
-    if (!value) return '请输入分组名称'
-    if (value.length > 24) return '分组名称不能超过 24 个字符'
+    if (!value) return tx('请输入分组名称')
+    if (value.length > 24) return tx('分组名称不能超过 24 个字符')
     return ''
   }
 
@@ -322,7 +323,7 @@ function GroupManagerDialog({
     try {
       await action()
     } catch (err) {
-      setError(err instanceof Error ? err.message : '操作失败')
+      setError(err instanceof Error ? err.message : tx('操作失败'))
     } finally {
       setPending(false)
     }
@@ -374,10 +375,10 @@ function GroupManagerDialog({
     >
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <div>
-          <h2 id="watchlist-groups-title" className="text-sm font-semibold text-foreground">管理自选分组</h2>
-          <p className="mt-0.5 text-[11px] text-muted">删除分组不会删除其中的股票</p>
+          <h2 id="watchlist-groups-title" className="text-sm font-semibold text-foreground">{tx('管理自选分组')}</h2>
+          <p className="mt-0.5 text-[11px] text-muted">{tx('删除分组不会删除其中的股票')}</p>
         </div>
-        <button type="button" onClick={onClose} className="h-8 w-8 inline-flex items-center justify-center text-muted hover:text-foreground" aria-label="关闭">
+        <button type="button" onClick={onClose} className="h-8 w-8 inline-flex items-center justify-center text-muted hover:text-foreground" aria-label={tx('关闭')}>
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -385,8 +386,8 @@ function GroupManagerDialog({
       {/* 显示在侧边栏 开关 */}
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
         <div className="min-w-0">
-          <div className="text-xs font-medium text-foreground">显示在侧边栏</div>
-          <div className="mt-0.5 text-[10px] text-muted">开启后可在左侧菜单展开分组子菜单</div>
+          <div className="text-xs font-medium text-foreground">{tx('显示在侧边栏')}</div>
+          <div className="mt-0.5 text-[10px] text-muted">{tx('开启后可在左侧菜单展开分组子菜单')}</div>
         </div>
         <button
           type="button"
@@ -395,7 +396,7 @@ function GroupManagerDialog({
           className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 disabled:opacity-50 ${
             groupsInNav ? 'bg-accent' : 'bg-elevated'
           }`}
-          title={groupsInNav ? '已开启 — 点击关闭' : '已关闭 — 点击开启'}
+          title={groupsInNav ? tx('已开启 — 点击关闭') : tx('已关闭 — 点击开启')}
         >
           <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
             groupsInNav ? 'translate-x-[18px]' : 'translate-x-0.5'
@@ -411,7 +412,7 @@ function GroupManagerDialog({
             maxLength={24}
             onChange={event => setNewName(event.target.value)}
             onKeyDown={event => { if (event.key === 'Enter') void create() }}
-            placeholder="新分组名称"
+            placeholder={tx('新分组名称')}
             className="h-8 min-w-0 flex-1 rounded-btn border border-border bg-elevated px-3 text-xs text-foreground outline-none focus:border-accent/50"
           />
           <button
@@ -421,11 +422,10 @@ function GroupManagerDialog({
             className="inline-flex h-8 items-center gap-1.5 rounded-btn bg-accent px-3 text-xs text-white disabled:opacity-50"
           >
             <Plus className="h-3.5 w-3.5" />
-            新建
-          </button>
+            {tx('新建')}</button>
         </div>
         <div className="mt-2 flex items-start gap-2">
-          <span className="mt-1 shrink-0 text-[11px] text-muted">分组颜色</span>
+          <span className="mt-1 shrink-0 text-[11px] text-muted">{tx('分组颜色')}</span>
           <GroupColorPicker value={newColor} onChange={setNewColor} />
         </div>
         {error && <p className="mt-2 text-xs text-danger">{error}</p>}
@@ -433,7 +433,7 @@ function GroupManagerDialog({
 
       <div className="max-h-[360px] overflow-y-auto border-t border-border px-4">
         {groups.length === 0 ? (
-          <div className="py-10 text-center text-xs text-muted">暂无自定义分组</div>
+          <div className="py-10 text-center text-xs text-muted">{tx('暂无自定义分组')}</div>
         ) : groups.map((group, index) => {
           const color = resolveWatchlistGroupColor(group.color)
           return (
@@ -450,10 +450,10 @@ function GroupManagerDialog({
                     className={`h-7 min-w-0 flex-1 rounded-btn border bg-elevated px-2 text-xs text-foreground outline-none ${resolveWatchlistGroupColor(editingColor).border}`}
                     autoFocus
                   />
-                  <button type="button" disabled={pending} onClick={() => void rename(group.id)} className={`p-1 ${resolveWatchlistGroupColor(editingColor).text}`} title="保存分组">
+                  <button type="button" disabled={pending} onClick={() => void rename(group.id)} className={`p-1 ${resolveWatchlistGroupColor(editingColor).text}`} title={tx('保存分组')}>
                     <Check className="h-3.5 w-3.5" />
                   </button>
-                  <button type="button" onClick={() => setEditingId(null)} className="p-1 text-muted hover:text-foreground" title="取消">
+                  <button type="button" onClick={() => setEditingId(null)} className="p-1 text-muted hover:text-foreground" title={tx('取消')}>
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -464,7 +464,7 @@ function GroupManagerDialog({
             ) : deletingId === group.id ? (
               <>
                 <span className="min-w-0 flex-1 text-xs text-secondary">
-                  删除“{group.name}”？{(counts[group.id] ?? 0) > 0 ? ` ${counts[group.id]} 只股票将回到未分组。` : ''}
+                  {tx('删除“')}{group.name}”？{(counts[group.id] ?? 0) > 0 ? tx('{n} 只股票将回到未分组。', { n: counts[group.id] }) : ''}
                 </span>
                 <button
                   type="button"
@@ -472,16 +472,15 @@ function GroupManagerDialog({
                   onClick={() => void run(async () => { await onDelete(group.id); setDeletingId(null) })}
                   className="rounded px-2 py-1 text-[11px] text-danger bg-danger/10 hover:bg-danger/20 disabled:opacity-50"
                 >
-                  确认
-                </button>
-                <button type="button" onClick={() => setDeletingId(null)} className="p-1 text-muted hover:text-foreground" aria-label="取消删除">
+                  {tx('确认')}</button>
+                <button type="button" onClick={() => setDeletingId(null)} className="p-1 text-muted hover:text-foreground" aria-label={tx('取消删除')}>
                   <X className="h-3.5 w-3.5" />
                 </button>
               </>
             ) : (
               <>
                 <span className={`min-w-0 flex-1 truncate text-xs ${color.text}`}>{group.name}</span>
-                <span className="font-mono text-[10px] text-muted tabular-nums">{counts[group.id] ?? 0} 只</span>
+                <span className="font-mono text-[10px] text-muted tabular-nums">{counts[group.id] ?? 0} {tx('只')}</span>
                 {onReorder && groups.length > 1 && (
                   <>
                     <button
@@ -489,8 +488,8 @@ function GroupManagerDialog({
                       disabled={pending || index === 0}
                       onClick={() => void move(group.id, -1)}
                       className="p-1 text-muted hover:text-accent disabled:opacity-30 disabled:hover:text-muted"
-                      title="上移"
-                      aria-label={`上移分组 ${group.name}`}
+                      title={tx('上移')}
+                      aria-label={tx('上移分组 {name}', { name: group.name })}
                     >
                       <ChevronUp className="h-3.5 w-3.5" />
                     </button>
@@ -499,8 +498,8 @@ function GroupManagerDialog({
                       disabled={pending || index === groups.length - 1}
                       onClick={() => void move(group.id, 1)}
                       className="p-1 text-muted hover:text-accent disabled:opacity-30 disabled:hover:text-muted"
-                      title="下移"
-                      aria-label={`下移分组 ${group.name}`}
+                      title={tx('下移')}
+                      aria-label={tx('下移分组 {name}', { name: group.name })}
                     >
                       <ChevronDown className="h-3.5 w-3.5" />
                     </button>
@@ -516,7 +515,7 @@ function GroupManagerDialog({
                     setError('')
                   }}
                   className="p-1 text-muted hover:text-accent"
-                  title="编辑分组"
+                  title={tx('编辑分组')}
                 >
                   <Pencil className="h-3.5 w-3.5" />
                 </button>
@@ -524,7 +523,7 @@ function GroupManagerDialog({
                   type="button"
                   onClick={() => { setDeletingId(group.id); setEditingId(null); setError('') }}
                   className="p-1 text-muted hover:text-danger"
-                  title="删除分组"
+                  title={tx('删除分组')}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -549,6 +548,7 @@ interface GroupPickerProps {
 }
 
 export function WatchlistGroupPicker({ groups, groupIds, symbol, disabled, onToggleMember }: GroupPickerProps) {
+  const { tx } = useI18n()
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState({ top: 0, left: 0, flipUp: false })
   const btnRef = useRef<HTMLButtonElement>(null)
@@ -606,8 +606,8 @@ export function WatchlistGroupPicker({ groups, groupIds, symbol, disabled, onTog
             ? 'hover:border-accent/30'
             : 'text-muted hover:border-accent/30 hover:text-accent'
         } ${disabled ? 'opacity-40' : ''}`}
-        title={memberGroups.length === 0 ? '未分组 — 点击设置分组' : `分组：${titleNames}`}
-        aria-label={`${symbol} 的分组`}
+        title={memberGroups.length === 0 ? tx('未分组 — 点击设置分组') : tx('分组：{names}', { names: titleNames })}
+        aria-label={tx('{symbol} 的分组', { symbol })}
         aria-haspopup="menu"
         aria-expanded={open}
       >
@@ -633,7 +633,7 @@ export function WatchlistGroupPicker({ groups, groupIds, symbol, disabled, onTog
         <div
           ref={popRef}
           role="menu"
-          aria-label={`${symbol} 的分组`}
+          aria-label={tx('{symbol} 的分组', { symbol })}
           data-watchlist-group-menu
           style={{
             position: 'fixed',
@@ -645,9 +645,9 @@ export function WatchlistGroupPicker({ groups, groupIds, symbol, disabled, onTog
           className="z-50 rounded-card border border-border bg-base p-1 shadow-xl"
           onClick={event => event.stopPropagation()}
         >
-          <div className="px-2 pb-1 pt-1.5 text-[10px] text-muted">加入分组（可多选）</div>
+          <div className="px-2 pb-1 pt-1.5 text-[10px] text-muted">{tx('加入分组（可多选）')}</div>
           {groups.length === 0 ? (
-            <div className="px-2 py-2 text-xs text-muted">暂无分组，请先新建</div>
+            <div className="px-2 py-2 text-xs text-muted">{tx('暂无分组，请先新建')}</div>
           ) : groups.map(group => {
             const color = resolveWatchlistGroupColor(group.color)
             const member = memberSet.has(group.id)
@@ -674,8 +674,7 @@ export function WatchlistGroupPicker({ groups, groupIds, symbol, disabled, onTog
           })}
           {groups.length > 0 && groupIds.length === 0 && (
             <div className="border-t border-border/60 px-2 pb-1 pt-1.5 text-[10px] text-muted">
-              未加入任何分组 — 标的仍在自选中
-            </div>
+              {tx('未加入任何分组 — 标的仍在自选中')}</div>
           )}
         </div>,
         document.body,

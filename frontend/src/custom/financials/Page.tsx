@@ -13,6 +13,7 @@ import { LastStockChip } from '@/components/LastStockChip'
 import { useLastStock } from '@/lib/useLastStock'
 import { fmtBigNum } from '@/lib/format'
 import { toast } from '@/components/Toast'
+import { useI18n } from '@/lib/i18n'
 
 const TABLE_LABELS: Record<string, string> = {
   metrics: '核心指标',
@@ -31,6 +32,7 @@ const TABLE_ICON: Record<string, typeof FileText> = {
 }
 
 export function Financials() {
+  const { tx } = useI18n()
   const { data: caps } = useCapabilities()
   const { data: matrix } = useCapabilityMatrix()
   const { data: status, isLoading } = useFinancialStatus()
@@ -68,30 +70,30 @@ export function Financials() {
   if (!hasFinancial) {
     return (
       <>
-        <PageHeader title="财务概况" subtitle="利润表 / 资负表 / 现金流 / 关键指标 / 股本 / AI分析" />
+        <PageHeader title={tx('财务概况')} subtitle={tx('利润表 / 资负表 / 现金流 / 关键指标 / 股本 / AI分析')} />
         <div className="px-8 py-10">
           <div className="mx-auto max-w-md rounded-card border border-warning/30 bg-warning/[0.04] p-8 text-center">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-warning/10">
               <Lock className="h-6 w-6 text-warning" />
             </div>
-            <h3 className="mt-4 text-[16px] leading-6 font-semibold text-foreground">财务数据不可用</h3>
+            <h3 className="mt-4 text-[16px] leading-6 font-semibold text-foreground">{tx('财务数据不可用')}</h3>
             <p className="mt-2 text-xs leading-relaxed text-secondary">
-              当前数据源未提供财务数据。配置提供财务数据的数据源后,此页自动显示财务数据面板。
+              {tx('当前数据源未提供财务数据。配置提供财务数据的数据源后,此页自动显示财务数据面板。')}
             </p>
             <Link
               to="/settings?tab=data-sources"
               className="mt-4 inline-flex items-center gap-1.5 rounded-btn bg-accent/90 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-accent transition-colors"
             >
-              前往数据源配置
+              {tx('前往数据源配置')}
             </Link>
             {/* 当前财务数据源(TickFlow)需付费,后续将接入免费数据源;期间欢迎在 issues 推荐免费源 */}
             <div className="mt-5 rounded-btn border border-accent/25 bg-accent/[0.05] px-3.5 py-3 text-left">
               <div className="flex items-center gap-1.5 text-xs font-medium text-accent">
                 <Lightbulb className="h-3.5 w-3.5 shrink-0" />
-                关于数据源
+                {tx('关于数据源')}
               </div>
               <p className="mt-1.5 text-[11px] leading-relaxed text-secondary">
-                当前财务数据源需付费,后续会接入免费数据源。如你常用某个免费财务数据源,欢迎在 Issues 中多多推荐哈 ~
+                {tx('当前财务数据源需付费,后续会接入免费数据源。如你常用某个免费财务数据源,欢迎在 Issues 中多多推荐哈 ~')}
               </p>
               <a
                 href="https://github.com/shy3130/tickflow-stock-panel/issues"
@@ -170,8 +172,8 @@ export function Financials() {
   return (
     <>
       <PageHeader
-        title="财务概况"
-        subtitle="利润表 / 资负表 / 现金流 / 关键指标 / 股本 / AI分析"
+        title={tx('财务概况')}
+        subtitle={tx('利润表 / 资负表 / 现金流 / 关键指标 / 股本 / AI分析')}
         right={
           <div className="flex items-center gap-2">
             <LastStockChip stock={lastStock} onSelect={pick} />
@@ -179,22 +181,22 @@ export function Financials() {
               <span className="text-xs text-accent/80 flex items-center gap-1.5">
                 <Loader2 className="w-3 h-3 animate-spin" />
                 {isFullSync
-                  ? `已同步 ${syncedCount}/${TABLE_ORDER.length} 张表…`
+                  ? tx('已同步 {done}/{total} 张表…', { done: syncedCount, total: TABLE_ORDER.length })
                   : isSingleSync
-                    ? `同步${TABLE_LABELS[syncSingleTable!] ?? syncSingleTable}…`
-                    : '同步中…'}
+                    ? tx('同步{table}…', { table: tx(TABLE_LABELS[syncSingleTable!] ?? syncSingleTable ?? '') })
+                    : tx('同步中…')}
               </span>
             )}
             <button
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-accent/25 to-accent/10 border border-accent/30 text-accent text-xs font-medium hover:from-accent/35 hover:to-accent/20 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
               onClick={() => handleSync('all')}
               disabled={syncing}
-              title={syncing ? '正在同步，请稍候…' : '同步全部财务表'}
+              title={syncing ? tx('正在同步，请稍候…') : tx('同步全部财务表')}
             >
               {syncing
                 ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 : <RefreshCw className="h-3.5 w-3.5" />}
-              {syncing ? '同步中…' : '全部同步'}
+              {syncing ? tx('同步中…') : tx('全部同步')}
             </button>
           </div>
         }
@@ -204,7 +206,7 @@ export function Financials() {
         {syncing && (
           <div className="flex items-center gap-2 rounded-card border border-accent/30 bg-accent/[0.06] px-3 py-2 text-xs text-accent">
             <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
-            正在从财务数据源拉取数据，请稍候…
+            {tx('正在从财务数据源拉取数据，请稍候…')}
           </div>
         )}
 

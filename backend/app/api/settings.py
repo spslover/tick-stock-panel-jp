@@ -4,7 +4,11 @@
 """
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
+import re
+import threading
 import time
 from pathlib import Path
 from typing import Literal
@@ -15,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app import secrets_store
 from app.data_providers.custom.config import MAX_TIMEOUT
+from app.services import safe_http
 from app.tickflow import client as tf_client
 from app.tickflow.policy import (
     detect_capabilities,
@@ -31,6 +36,56 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 # 默认端点 —— endpoints.json 列表第一项,UI"当前使用"始终对齐此项。
 # 注意:Free 模式 SDK 实际走 free-api(免费数据通道),但 UI 显示统一用默认节点。
 DEFAULT_PAID_ENDPOINT = "https://api.tickflow.org"
+
+_tickflow_key_lock = threading.Lock()
+
+_ALL_PROVIDER_PREFS: tuple[tuple[str, str], ...] = (
+    ("get_daily_data_provider", "daily_data_provider"),
+    ("get_adj_factor_provider", "adj_factor_provider"),
+    ("get_realtime_data_provider", "realtime_data_provider"),
+    ("get_minute_data_provider", "minute_data_provider"),
+    ("get_depth5_data_provider", "depth5_data_provider"),
+    ("get_financial_provider", "financial_data_provider"),
+    ("get_full_minute_data_provider", "full_minute_data_provider"),
+)
+
+_INTERNAL_LEAK_RE = re.compile(
+    r"(?:[A-Za-z]:[/\\]|\\\\|/(?:Users|home|app|tmp|var|etc|opt|usr|root|data|backend|srv|internal)/|"
+    r"secrets\.json|\.py\b|\.ini\b|\.ya?ml\b|\.parquet\b|traceback|\r|\n)",
+    re.IGNORECASE,
+)
+_SECRET_TEXT_RE = re.compile(
+    r"\b(?:secret|token|password|passwd|authorization|bearer|x-api-key|api_key)\b",
+    re.IGNORECASE,
+)
+_CJK_RE = re.compile(r"[\u4e00-\u9fff]")
+
+
+def _sanitize_ai_non_transport_error(exc: Exception, redacted: str) -> str:
+    if (
+        isinstance(exc, (ValueError, RuntimeError))
+        and not isinstance(exc, json.JSONDecodeError)
+        and redacted
+        and not _INTERNAL_LEAK_RE.search(redacted)
+        and not _SECRET_TEXT_RE.search(redacted)
+        and (redacted.startswith("Codex CLI") or _CJK_RE.search(redacted))
+    ):
+        return redacted
+    return "AI 服务测试失败，请检查配置或后端日志"
+
+
+def _reset_provider_preferences(preferences_mod, target: str) -> None:
+    raw_prefs = preferences_mod.load() or {}
+    updates = {
+        key: "tickflow"
+        for getter_name, key in _ALL_PROVIDER_PREFS
+        if target in {
+            str(raw_prefs.get(key) or "").strip().lower(),
+            str(getattr(preferences_mod, getter_name)() or "").strip().lower(),
+        }
+    }
+    if updates:
+        preferences_mod.save(updates)
 
 
 def _sync_financial_scheduler_caps(app_state, capset) -> None:
@@ -124,6 +179,10 @@ def switch_endpoint(req: SwitchEndpointIn, request: Request) -> dict:
     url = req.url.strip().rstrip("/")
     if not url.startswith("https://"):
         return {"ok": False, "error": "仅支持 HTTPS 端点"}
+    try:
+        safe_http.validate_url(url, allowed_schemes=("https",))
+    except safe_http.UnsafeURLError as exc:
+        return {"ok": False, "error": f"端点地址非法: {exc}"}
 
     # 持久化到 secrets.json
     secrets_store.save({"tickflow_base_url": url})
@@ -140,17 +199,15 @@ def switch_endpoint(req: SwitchEndpointIn, request: Request) -> dict:
 def save_tickflow_key(req: TickflowKeyIn, request: Request) -> dict:
     """保存 TickFlow API Key 并立即重新探测能力。
 
-    先探后存(关键改动,修复乱填 key 也会被持久化的问题):
-      1. 临时用新 key 探测(付费端点),判定档位
-      2. 判定为 none(连单只日K都拿不到)→ key 无效:不存,清除已存的,
-         返回 {ok: false, reason: "invalid"},前端提示「Key 无效」
+    先探后存(关键改动,修复乱填 key 也会持久化或误清已有有效 key 的问题):
+      1. 快照当前 key / endpoint / capabilities.json, 临时隔离旧缓存后探测候选 key
+      2. 判定为 none 或探测异常 → 恢复快照 (保留原有效 key 与能力), 返回 ok=False
       3. 判定为 free(免费有效 key)→ 存 key,客户端切到 free-api 服务器
       4. 判定为 starter+ → 存 key,切到付费端点(现有逻辑)
-
-    端点联动:从无 key 升级到付费 key 时,残留的 free-api 端点不可用,
-    故自动切到默认付费端点(api.tickflow.org);free 档则清除自定义端点。
     """
+    from app.config import settings as app_settings
     from app.tickflow.policy import (
+        _CAPSET_CACHE_FILE,
         base_tier_name,
         is_invalid_key,
     )
@@ -159,65 +216,116 @@ def save_tickflow_key(req: TickflowKeyIn, request: Request) -> dict:
     if not key:
         return {"ok": False, "error": "key empty"}
 
-    # ===== 1) 临时存 key + 重置客户端,让探测走付费端点 =====
-    secrets_store.save({"tickflow_api_key": key})
-    tf_client.reset_clients()
+    with _tickflow_key_lock:
+        prev_secrets = secrets_store.load()
+        had_key = "tickflow_api_key" in prev_secrets
+        prev_key = prev_secrets.get("tickflow_api_key")
+        had_base = "tickflow_base_url" in prev_secrets
+        prev_base = prev_secrets.get("tickflow_base_url")
+        cap_cache_path = app_settings.data_dir / _CAPSET_CACHE_FILE
+        prev_cap_bytes = cap_cache_path.read_bytes() if cap_cache_path.exists() else None
+        prev_app_caps = getattr(request.app.state, "capabilities", None)
 
-    # 立即重新探测(此时 client 已按档位判定,但首次探测必然走付费端点验证)
-    capset = detect_capabilities(force=True)
-    request.app.state.capabilities = capset
-    _sync_financial_scheduler_caps(request.app.state, capset)
+        def _restore_snapshot() -> None:
+            if had_key:
+                secrets_store.save({"tickflow_api_key": prev_key})
+            else:
+                secrets_store.clear("tickflow_api_key")
+            if had_base:
+                secrets_store.save({"tickflow_base_url": prev_base})
+            if prev_cap_bytes is not None:
+                cap_cache_path.parent.mkdir(parents=True, exist_ok=True)
+                cap_cache_path.write_bytes(prev_cap_bytes)
+            elif cap_cache_path.exists():
+                cap_cache_path.unlink()
+            tf_client.reset_clients()
+            if prev_app_caps is not None:
+                request.app.state.capabilities = prev_app_caps
+                _sync_financial_scheduler_caps(request.app.state, prev_app_caps)
+            else:
+                restored_caps = detect_capabilities(force=False)
+                request.app.state.capabilities = restored_caps
+                _sync_financial_scheduler_caps(request.app.state, restored_caps)
 
-    # ===== 2) 判定为无效 key(连单只日K都拿不到)→ 不存,清除 =====
-    if is_invalid_key() or base_tier_name() == "none":
-        # 无效 key:清除刚存的,避免乱填被持久化;退回 none 档
-        secrets_store.clear("tickflow_api_key", "tickflow_base_url")
+        # Isolate previous capabilities.json so prev_was_paid cannot mask a bad candidate key.
+        if cap_cache_path.exists():
+            cap_cache_path.unlink()
+
+        secrets_store.save({"tickflow_api_key": key})
         tf_client.reset_clients()
-        capset = detect_capabilities(force=True)
+
+        try:
+            capset = detect_capabilities(force=True)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("TickFlow key probe failed: %s", safe_http.redact_url_secrets(str(exc), secret_values=[key]))
+            _restore_snapshot()
+            restored = getattr(request.app.state, "capabilities", None)
+            return {
+                "ok": False,
+                "reason": "invalid",
+                "error": "Key 验证失败，已保留原配置",
+                "mode": tf_client.current_mode(),
+                "tier_label": tier_label(),
+                "current_endpoint": tf_client.current_endpoint(),
+                "probe_log": [],
+                "capabilities_count": len(restored.all()) if restored is not None else 0,
+            }
+
         request.app.state.capabilities = capset
         _sync_financial_scheduler_caps(request.app.state, capset)
-        return {
-            "ok": False,
-            "reason": "invalid",
-            "error": "Key 无效或已过期,请检查后重试",
-            "mode": "none",
-            "tier_label": tier_label(),
-            "current_endpoint": tf_client.current_endpoint(),
-            "probe_log": [],
-            "capabilities_count": len(capset.all()),
-        }
 
-    # ===== 3) free 档(免费有效 key)→ 存 key,切到 free-api 服务器 =====
-    if base_tier_name() == "free":
-        # 免费档运行时走 free-api 服务器,清除付费端点的自定义配置
-        secrets_store.clear("tickflow_base_url")
+        # ===== 2) 判定为无效 key 或探测失败(未落入有效档位)→ 恢复快照 =====
+        detected_tier = base_tier_name()
+        detected_label = tier_label().strip().lower()
+        if (
+            is_invalid_key()
+            or detected_tier not in {"free", "starter", "pro", "expert"}
+            or detected_label.startswith("none")
+        ):
+            _restore_snapshot()
+            restored = getattr(request.app.state, "capabilities", None)
+            return {
+                "ok": False,
+                "reason": "invalid",
+                "error": "Key 无效或已过期,请检查后重试",
+                "mode": tf_client.current_mode(),
+                "tier_label": tier_label(),
+                "current_endpoint": tf_client.current_endpoint(),
+                "probe_log": [],
+                "capabilities_count": len(restored.all()) if restored is not None else 0,
+            }
+
+        # ===== 3) free 档(免费有效 key)→ 存 key,切到 free-api 服务器 =====
+        if base_tier_name() == "free":
+            # 免费档运行时走 free-api 服务器,清除付费端点的自定义配置
+            secrets_store.clear("tickflow_base_url")
+            tf_client.reset_clients()
+            return {
+                "ok": True,
+                "tickflow_api_key_masked": secrets_store.mask(key),
+                "mode": "free",
+                "tier_label": tier_label(),
+                "current_endpoint": tf_client.current_endpoint(),
+                "probe_log": [],
+                "capabilities_count": len(capset.all()),
+            }
+
+        # ===== 4) starter+ 付费档 → 确保走付费端点(现有逻辑) =====
+        # 若之前是 none/free(无自定义付费端点),切到默认付费端点
+        base = secrets_store.load().get("tickflow_base_url")
+        if not base:
+            secrets_store.save({"tickflow_base_url": DEFAULT_PAID_ENDPOINT})
         tf_client.reset_clients()
+
         return {
             "ok": True,
             "tickflow_api_key_masked": secrets_store.mask(key),
-            "mode": "free",
+            "mode": "api_key",
             "tier_label": tier_label(),
             "current_endpoint": tf_client.current_endpoint(),
             "probe_log": [],
             "capabilities_count": len(capset.all()),
         }
-
-    # ===== 4) starter+ 付费档 → 确保走付费端点(现有逻辑) =====
-    # 若之前是 none/free(无自定义付费端点),切到默认付费端点
-    base = secrets_store.load().get("tickflow_base_url")
-    if not base:
-        secrets_store.save({"tickflow_base_url": DEFAULT_PAID_ENDPOINT})
-    tf_client.reset_clients()
-
-    return {
-        "ok": True,
-        "tickflow_api_key_masked": secrets_store.mask(key),
-        "mode": "api_key",
-        "tier_label": tier_label(),
-        "current_endpoint": tf_client.current_endpoint(),
-        "probe_log": [],
-        "capabilities_count": len(capset.all()),
-    }
 
 
 @router.delete("/tickflow-key")
@@ -296,20 +404,55 @@ async def test_ai_settings(req: AiTestIn) -> dict:
     )
 
     provider = req.provider or "openai_compat"
+    base_url = req.base_url.strip()
+    if provider != "codex_cli" and base_url:
+        try:
+            parsed = safe_http.validate_url(base_url, allow_private=safe_http.is_ai_local_allowed())
+        except safe_http.UnsafeURLError as exc:
+            return {"ok": False, "error": str(exc), "error_type": "UnsafeURLError"}
+        is_real_probe = (
+            getattr(probe_ai_config, "__module__", "") == "app.services.ai_provider"
+            and getattr(probe_ai_config, "__qualname__", "") == "probe_ai_config"
+        )
+        if is_real_probe and parsed.hostname:
+            port = parsed.port or (443 if parsed.scheme.lower() == "https" else 80)
+            try:
+                await asyncio.to_thread(
+                    safe_http.resolve_and_pin_host,
+                    parsed.hostname,
+                    port,
+                    allow_private=safe_http.is_ai_local_allowed(),
+                )
+            except safe_http.UnsafeURLError as exc:
+                return {"ok": False, "error": str(exc), "error_type": "UnsafeURLError"}
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("AI 配置测试 DNS 校验失败: %s", safe_http.redact_url_secrets(str(exc)))
+                return {
+                    "ok": False,
+                    "error": "AI 服务连接失败, 请检查 AI Base URL / 网络",
+                    "error_type": type(exc).__name__,
+                }
     api_key = (req.api_key or "").strip() or (secrets_store.get_ai_key() or "")
     protocol = req.protocol if req.protocol == RESPONSES_PROTOCOL else ""
     try:
         text = await probe_ai_config(
             provider=provider,
             api_key=api_key,
-            base_url=req.base_url.strip(),
+            base_url=base_url,
             model=req.model.strip(),
             protocol=protocol,
         )
     except Exception as exc:  # noqa: BLE001 — 连通性测试: 任何异常都转为结果回报
-        detail = str(exc) or repr(exc)
+        secret_vals = [api_key] if api_key else ()
         if _is_openai_transport_error(exc):
-            detail = _format_openai_error(exc)
+            detail = safe_http.redact_url_secrets(
+                _format_openai_error(exc),
+                secret_values=secret_vals,
+            )
+        else:
+            redacted = safe_http.redact_url_secrets(str(exc), secret_values=secret_vals)
+            logger.warning("AI 配置测试失败 (%s): %s", type(exc).__name__, redacted)
+            detail = _sanitize_ai_non_transport_error(exc, redacted)
         return {"ok": False, "error": detail, "error_type": type(exc).__name__}
     return {"ok": True, "model": req.model.strip() or provider, "response": text[:80]}
 
@@ -356,8 +499,14 @@ def save_ai_settings(req: AiSettingsIn) -> dict:
         settings.ai_codex_reasoning_effort = codex_reasoning_effort
     else:
         if req.base_url:
-            updates["ai_base_url"] = req.base_url
-            settings.ai_base_url = req.base_url
+            base_url = req.base_url.strip()
+            if base_url:
+                try:
+                    safe_http.validate_url(base_url, allow_private=safe_http.is_ai_local_allowed())
+                except safe_http.UnsafeURLError as exc:
+                    raise HTTPException(status_code=400, detail=str(exc)) from exc
+            updates["ai_base_url"] = base_url
+            settings.ai_base_url = base_url
         if req.protocol:
             # 协议仅对 openai/openai_compat 有意义; 非法值 fail-loud, 避免静默落错协议。
             if req.protocol not in (CHAT_COMPLETIONS_PROTOCOL, RESPONSES_PROTOCOL):
@@ -466,12 +615,18 @@ async def list_sponsor_models() -> dict:
     import httpx
 
     try:
-        async with httpx.AsyncClient(timeout=15) as client:
-            res = await client.get("https://llm.runninghub.ai/v1/models")
-            res.raise_for_status()
-            data = res.json()
+        res = await safe_http.async_request(
+            "GET",
+            "https://llm.runninghub.ai/v1/models",
+            timeout=15,
+            max_redirects=0,
+            client_cls=httpx.AsyncClient,
+        )
+        res.raise_for_status()
+        data = res.json()
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"获取模型列表失败: {exc}") from exc
+        logger.warning("获取赞助商模型列表失败: %s", safe_http.redact_url_secrets(str(exc)))
+        raise HTTPException(status_code=502, detail="获取模型列表失败，请稍后重试") from exc
 
     def _amount(pricing: dict, dim: str) -> float | None:
         value = (pricing.get(dim) or {}).get("amount")
@@ -845,7 +1000,7 @@ def install_plugin(name: str) -> dict:
 
 
 @router.delete("/plugins/{name}/install")
-def uninstall_plugin(name: str) -> dict:
+def uninstall_plugin(name: str, request: Request) -> dict:
     """卸载指定插件的依赖 (删除 node_modules / pip uninstall), 完成后重新扫描。
 
     如果该插件当前正被使用, 自动回退到 tickflow。
@@ -855,16 +1010,14 @@ def uninstall_plugin(name: str) -> dict:
     if not custom_sources.is_builtin(name):
         raise HTTPException(status_code=404, detail=f"插件 '{name}' 不存在")
     ok, message = custom_sources.uninstall_plugin(name)
-    # 卸载后若该插件正被使用, 回退 tickflow
-    for getter, key, default in [
-        (preferences.get_daily_data_provider, "daily_data_provider", "tickflow"),
-        (preferences.get_minute_data_provider, "minute_data_provider", "tickflow"),
-        (preferences.get_realtime_data_provider, "realtime_data_provider", "tickflow"),
-        (preferences.get_financial_provider, "financial_data_provider", "tickflow"),
-    ]:
-        if getter() == name:
-            preferences.save({key: default})
-    custom_sources.load_all()
+    # 卸载后若该插件正被使用, 回退 tickflow (覆盖全部 7 个能力路由字段)
+    target = name.strip().lower()
+    with preferences.mutation():
+        _reset_provider_preferences(preferences, target)
+        custom_sources.load_all()
+        capset = detect_capabilities()
+        request.app.state.capabilities = capset
+        _sync_financial_scheduler_caps(request.app.state, capset)
     result = list_data_sources()
     result["uninstall_ok"] = ok
     result["uninstall_message"] = message
@@ -920,22 +1073,16 @@ def delete_data_source(name: str, request: Request) -> dict:
     try:
         custom_sources.delete_config(name)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    custom_sources.load_all()
-    # 回退被删源的偏好
-    updates: dict = {}
-    if preferences.get_daily_data_provider() == name:
-        updates["daily_data_provider"] = "tickflow"
-    if preferences.get_realtime_data_provider() == name:
-        updates["realtime_data_provider"] = "tickflow"
-    if preferences.get_financial_provider() == name:
-        updates["financial_data_provider"] = "tickflow"
-    if preferences.get_adj_factor_provider() == name:
-        updates["adj_factor_provider"] = "tickflow"
-    if updates:
-        preferences.save(updates)
-    # 删除源可能触发偏好回退 tickflow, 同步刷新能力快照
-    request.app.state.capabilities = detect_capabilities()
+        raise HTTPException(status_code=400, detail=safe_http.redact_url_secrets(str(e))) from e
+    target = name.strip().lower()
+    with preferences.mutation():
+        # 回退被删源的偏好 (覆盖全部 7 个能力路由字段)
+        _reset_provider_preferences(preferences, target)
+        custom_sources.load_all()
+        # 删除源可能触发偏好回退 tickflow, 同步刷新能力快照
+        capset = detect_capabilities()
+        request.app.state.capabilities = capset
+        _sync_financial_scheduler_caps(request.app.state, capset)
     return list_data_sources()
 
 
@@ -957,8 +1104,26 @@ def test_data_source(req: CustomSourceTestIn) -> dict:
         else:
             provider = custom_sources.get_provider(req.provider)
         return provider.test_dataset(req.dataset, req.symbols)
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=400, detail=f"自定义数据源测试失败: {e}") from e
+    except json.JSONDecodeError as e:
+        logger.warning("自定义数据源测试 JSON 解析失败: %s", safe_http.redact_url_secrets(str(e)))
+        raise HTTPException(
+            status_code=400,
+            detail="自定义数据源测试失败，响应格式无效，请检查数据源配置或后端日志",
+        ) from e
+    except ValueError as e:
+        redacted = safe_http.redact_url_secrets(str(e))
+        logger.warning("自定义数据源测试校验失败: %s", redacted)
+        if _INTERNAL_LEAK_RE.search(redacted) or _SECRET_TEXT_RE.search(redacted):
+            detail = "自定义数据源测试失败，请检查数据源配置或后端日志"
+        else:
+            detail = f"自定义数据源测试失败: {redacted}"
+        raise HTTPException(status_code=400, detail=detail) from e
+    except Exception as e:
+        logger.warning("自定义数据源测试失败: %s", safe_http.redact_url_secrets(str(e)))
+        raise HTTPException(
+            status_code=400,
+            detail="自定义数据源测试失败，请检查数据源配置或后端日志",
+        ) from e
     finally:
         if temporary and provider is not None:
             provider.close()
@@ -1924,7 +2089,7 @@ def list_endpoints() -> dict:
     source = "remote"
     data: dict | None = None
     try:
-        resp = httpx.get(ENDPOINTS_URL, timeout=8.0, follow_redirects=True)
+        resp = safe_http.sync_request("GET", ENDPOINTS_URL, timeout=8.0, max_redirects=3)
         if resp.status_code == 200:
             parsed = resp.json()
             eps = parsed.get("endpoints")
@@ -1971,14 +2136,19 @@ async def _http_ping(url: str, timeout: float = 10.0) -> float | None:
 
     t0 = time.perf_counter()
     try:
-        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
-            resp = await client.get(url)
-            dt = (time.perf_counter() - t0) * 1000
-            # 只把 <400 视为成功;4xx/5xx 也算"不可达"
-            if resp.status_code < 400:
-                return round(dt, 2)
-            return None
-    except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPError, OSError):
+        resp = await safe_http.async_request(
+            "GET",
+            url,
+            timeout=timeout,
+            max_redirects=3,
+            client_cls=httpx.AsyncClient,
+        )
+        dt = (time.perf_counter() - t0) * 1000
+        # 只把 <400 视为成功;4xx/5xx 也算"不可达"
+        if resp.status_code < 400:
+            return round(dt, 2)
+        return None
+    except (httpx.TimeoutException, httpx.ConnectError, httpx.HTTPError, OSError, safe_http.UnsafeURLError):
         return None
 
 
@@ -1995,11 +2165,15 @@ async def test_endpoint(req: TestEndpointIn) -> dict:
     import asyncio
     import statistics
 
-    base = req.url.rstrip("/")
+    base = req.url.strip().rstrip("/")
     # 缓存初值的 "data" 是 None(键存在, get 的默认值不生效), 端点清单未预热时要兜底
     manifest = _endpoints_cache.get("data") or {}
     rounds = max(1, min(10, req.rounds or manifest.get("testRounds", 5)))
     health_url = base + "/health"
+    try:
+        safe_http.validate_url(health_url)
+    except safe_http.UnsafeURLError as exc:
+        raise HTTPException(status_code=400, detail=f"端点地址非法: {exc}") from exc
 
     latencies: list[float] = []
     for _ in range(rounds):
@@ -2083,7 +2257,7 @@ def update_instruments_schedule(req: PipelineScheduleIn, request: Request) -> di
                 timezone="Asia/Shanghai",
             ),
         )
-        return sched
+    return sched
 
 
 class EnrichedBatchSizeIn(BaseModel):

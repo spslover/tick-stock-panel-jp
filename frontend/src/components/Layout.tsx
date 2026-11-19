@@ -62,6 +62,8 @@ import { findDataSource } from '@/lib/dataSources'
 import { toggleTheme, useTheme } from '@/lib/theme'
 import { setCurrentTotal as setAlertTotal, useUnreadAlerts } from '@/lib/monitorBadge'
 import { ExtensionSlot } from '@/extensions/ExtensionSlot'
+import { useI18n } from '@/lib/i18n'
+import { LanguageSwitcher } from './LanguageSwitcher'
 
 // 品牌色 — 只用于 logo / brand 区域,不影响功能语义色
 const BRAND = '#8B5CF6'
@@ -76,15 +78,23 @@ export const CORE_INDEXES = [
 
 type CoreIndex = (typeof CORE_INDEXES)[number]
 
+const INDEX_I18N_KEY: Record<string, string> = {
+  '000001.SH': 'layout.indexSSE',
+  '399001.SZ': 'layout.indexSZSE',
+  '399006.SZ': 'layout.indexChiNext',
+  '000680.SH': 'layout.indexSTAR',
+}
+
 /** 亮/暗主题切换 — 状态存 localStorage, 生效见 lib/theme.ts */
 function ThemeToggle() {
+  const { t } = useI18n()
   const theme = useTheme()
   const dark = theme === 'dark'
   return (
     <button
       onClick={() => toggleTheme()}
       className="flex items-center justify-center rounded-btn p-2 text-foreground/80 transition-colors duration-150 ease-smooth hover:bg-elevated hover:text-foreground cursor-pointer"
-      title={dark ? '切换到亮色模式' : '切换到暗色模式'}
+      title={dark ? t('layout.toggleLight') : t('layout.toggleDark')}
     >
       {dark ? <Sun className="h-4 w-4 shrink-0" /> : <Moon className="h-4 w-4 shrink-0" />}
     </button>
@@ -124,6 +134,7 @@ function MonitorBadge({ active }: { active: boolean }) {
 }
 
 function SidebarIndexQuotes({ rows, items }: { rows: IndexQuote[] | undefined; items: readonly CoreIndex[] }) {
+  const { t } = useI18n()
   if (items.length === 0) return null
   const quoteBySymbol = new Map((rows ?? []).map(q => [q.symbol, q]))
   return (
@@ -132,18 +143,16 @@ function SidebarIndexQuotes({ rows, items }: { rows: IndexQuote[] | undefined; i
         const q = quoteBySymbol.get(item.symbol)
         const value = q?.last_price ?? q?.close
         const pct = q?.change_pct
+        const displayName = INDEX_I18N_KEY[item.symbol] ? t(INDEX_I18N_KEY[item.symbol]) : item.name
         return (
           <NavLink
             key={item.symbol}
             to={`/indices?symbol=${encodeURIComponent(item.symbol)}`}
             className="block rounded bg-elevated/60 px-1.5 py-1.5 transition-colors hover:bg-elevated"
-            title={`${item.name} ${item.symbol}`}
+            title={`${displayName} ${item.symbol}`}
           >
-            {/* 名称不换行 + 涨跌幅不压缩: 两列布局下单卡内容区仅 85px,
-                「上证指数」41px + 涨跌幅 36px 已接近占满, 任其收缩或换行会把
-                指数名折成两行 (曾出现「上证指/数」)。px-1.5 是为此留出的余量。 */}
             <div className="flex items-center justify-between gap-1">
-              <span className="min-w-0 truncate text-[10px] text-secondary">{item.name}</span>
+              <span className="min-w-0 truncate text-[10px] text-secondary">{displayName}</span>
               <span className={`shrink-0 text-[10px] font-mono ${indexPctClass(pct)}`}>{fmtIndexPct(pct)}</span>
             </div>
             <div className={`mt-0.5 truncate font-mono text-[10px] ${indexPctClass(pct)}`}>
@@ -159,10 +168,11 @@ function SidebarIndexQuotes({ rows, items }: { rows: IndexQuote[] | undefined; i
 // ===== 头部快捷行: 数据同步入口 (描边分段按钮, 与扩展快捷方式并排成组) =====
 // 点击直达 /data; 同步中转圈 / 刚完成绿勾, 空闲无角标保持安静。
 function QuickDataEntry({ syncing, justDone }: { syncing: boolean; justDone: boolean }) {
+  const { t } = useI18n()
   return (
     <NavLink
       to="/data"
-      title={syncing ? '数据同步中…' : '数据同步与画像'}
+      title={syncing ? t('layout.dataSyncing') : t('layout.dataSyncTip')}
       className={cn(
         'group flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md border transition-colors duration-150',
         syncing
@@ -174,7 +184,7 @@ function QuickDataEntry({ syncing, justDone }: { syncing: boolean; justDone: boo
       {syncing
         ? <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
         : <HardDriveDownload className="h-3 w-3 shrink-0 text-muted transition-colors group-hover:text-foreground" />}
-      <span className="text-[11px] leading-none">数据</span>
+      <span className="text-[11px] leading-none">{t('layout.dataChip')}</span>
       {!syncing && justDone && <CheckCircle2 className="h-3 w-3 shrink-0 text-bull" />}
     </NavLink>
   )
@@ -190,6 +200,7 @@ function capSquareCls(c: { id: string; usable: boolean }) {
 }
 
 function DataSourceHealthBadge({ matrix }: { matrix: CapabilityMatrix | undefined }) {
+  const { t } = useI18n()
   const caps = matrix?.capabilities ?? []
   const loading = caps.length === 0
   const usableCount = caps.filter(c => c.usable).length
@@ -232,12 +243,18 @@ function DataSourceHealthBadge({ matrix }: { matrix: CapabilityMatrix | undefine
     if (clamped !== popPos.top) setPopPos({ ...popPos, top: clamped })
   }, [popPos])
 
+  const capDisplayLabel = (c: { id: string; label: string }) => {
+    const key = `cap.${c.id}`
+    const translated = t(key)
+    return translated === key ? c.label : translated
+  }
+
   return (
     <>
       <NavLink
         ref={linkRef}
         to="/settings?tab=data-sources"
-        aria-label={`数据源能力 ${usableCount}/${caps.length || 5} 可用, 点击前往数据源配置`}
+        aria-label={t('layout.capAria', { usable: usableCount, total: caps.length || 5 })}
         onMouseEnter={openPop}
         onMouseLeave={closePop}
         onFocus={openPop}
@@ -279,19 +296,19 @@ function DataSourceHealthBadge({ matrix }: { matrix: CapabilityMatrix | undefine
             <div className="mb-2 flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-xs font-medium text-foreground">
                 <DatabaseZap className="h-3.5 w-3.5 text-accent" />
-                数据源能力
+                {t('layout.dataSourceCap')}
               </span>
               <span className={`text-[10px] font-mono font-bold ${countCls}`}>
-                {loading ? '获取中…' : `${usableCount}/${caps.length} 可用`}
+                {loading ? t('layout.capLoading') : t('layout.capAvailable', { usable: usableCount, total: caps.length })}
               </span>
             </div>
             <div className="space-y-1.5 border-t border-border/60 pt-2">
               {loading ? (
-                <div className="py-0.5 text-[11px] text-muted">正在获取能力路由状态…</div>
+                <div className="py-0.5 text-[11px] text-muted">{t('layout.capLoadingRoute')}</div>
               ) : caps.map(c => (
                 <div key={c.id} className="flex min-w-0 items-center gap-2">
                   <span className={`h-2 w-2 shrink-0 rounded-[2px] ${capSquareCls(c)}`} />
-                  <span className="shrink-0 text-xs font-medium text-secondary">{c.label}</span>
+                  <span className="shrink-0 text-xs font-medium text-secondary">{capDisplayLabel(c)}</span>
                   <span className="ml-auto flex min-w-0 shrink items-center gap-1.5">
                     {c.usable ? (
                       <>
@@ -299,7 +316,7 @@ function DataSourceHealthBadge({ matrix }: { matrix: CapabilityMatrix | undefine
                         <CheckCircle2 className="h-3 w-3 shrink-0 text-accent" />
                       </>
                     ) : (
-                      <span className="text-[11px] text-muted/70">未接入</span>
+                      <span className="text-[11px] text-muted/70">{t('layout.capNotConnected')}</span>
                     )}
                   </span>
                 </div>
@@ -307,10 +324,10 @@ function DataSourceHealthBadge({ matrix }: { matrix: CapabilityMatrix | undefine
             </div>
             {/* 分时有分钟K功能替身 (intraday_monitor_support 三路可达), 不单独占能力格, 在此备注 */}
             <div className="mt-1.5 text-[10px] leading-relaxed text-muted/70">
-              分时信号监控可由分钟 K 数据驱动，不单独设能力格
+              {t('layout.capIntradayNote')}
             </div>
             <div className="mt-2 flex items-center gap-1 border-t border-border/60 pt-1.5 text-[10px] text-muted">
-              点击前往数据源配置
+              {t('layout.capGoConfig')}
               <ChevronRight className="h-3 w-3" />
             </div>
           </motion.div>
@@ -321,22 +338,23 @@ function DataSourceHealthBadge({ matrix }: { matrix: CapabilityMatrix | undefine
 }
 
 function AIConfigBadge({ configured, model }: { configured?: boolean; model?: string }) {
-  const descText = configured ? (model || '已接入模型') : '接入策略生成模型'
+  const { t } = useI18n()
+  const descText = configured ? (model || t('layout.aiModelConnected')) : t('layout.aiConnectHint')
   return (
     <NavLink
       to="/settings?tab=ai"
       className="group relative flex items-center gap-2 overflow-hidden rounded-md py-1.5 pl-2.5 pr-2 transition-colors duration-150 hover:bg-elevated/70"
-      title={`AI 配置 — ${descText}`}
+      title={`${t('layout.aiConfig')} — ${descText}`}
     >
       <Sparkles className="h-3.5 w-3.5 shrink-0 text-muted group-hover:text-foreground transition-colors" />
       {configured ? (
         <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-secondary group-hover:text-foreground transition-colors">
-          {model || '已接入模型'}
+          {model || t('layout.aiModelConnected')}
         </span>
       ) : (
         <>
-          <span className="text-[11px] text-secondary group-hover:text-foreground transition-colors">AI 配置</span>
-          <span className="ml-auto text-[11px] font-mono leading-none text-muted">未配置</span>
+          <span className="text-[11px] text-secondary group-hover:text-foreground transition-colors">{t('layout.aiConfig')}</span>
+          <span className="ml-auto text-[11px] font-mono leading-none text-muted">{t('layout.aiNotConfigured')}</span>
         </>
       )}
       <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${configured ? 'bg-bear' : 'bg-warning'}`} />
@@ -349,6 +367,7 @@ function AIConfigBadge({ configured, model }: { configured?: boolean; model?: st
 type NavState = 'expanded' | 'rail' | 'hidden'
 
 export function Layout() {
+  const { locale, t } = useI18n()
   useStrategyLibrarySync()
   // ===== 共享 hooks (替代内联 useQuery) =====
   const { data: settingsState } = useSettings()
@@ -391,7 +410,7 @@ export function Layout() {
   // 自选二级菜单展开状态 — 默认当前在自选页时展开
   const [watchlistNavExpanded, setWatchlistNavExpanded] = useState(location.pathname === '/watchlist')
 
-  const allNav = getNavigationEntries(analysisMenus?.items ?? [])
+  const allNav = getNavigationEntries(analysisMenus?.items ?? [], locale)
   const navById = new Map(allNav.map(item => [item.id, item]))
   const layout = resolveNavLayout(prefs?.nav_layout, allNav, prefs?.nav_order)
   const visibleLayout = visibleNavLayout(layout, allNav, prefs?.nav_hidden ?? [])
@@ -568,7 +587,7 @@ export function Layout() {
   const quoteMode = quoteStatus?.mode ?? 'none'
   const realtimeUnavailable = quoteMode === 'none'
   const isWatchlistMode = quoteMode === 'watchlist'
-  const realtimeModeLabel = isWatchlistMode ? '自选' : '全市场'
+  const realtimeModeLabel = isWatchlistMode ? t('layout.realtimeWatchlist') : t('layout.realtimeFullMarket')
   // 当前实时行情数据源名称 (插件/自定义源显示源名, tickflow 不显示)
   const realtimeProvider = prefs?.realtime_data_provider
   const realtimeProviderName = realtimeProvider && realtimeProvider !== 'tickflow'
@@ -577,14 +596,14 @@ export function Layout() {
   const realtimeToggleDisabled = toggleQuote.isPending || isPaused
   const realtimeActive = realtimeEnabled && isRunning && isTrading
   const realtimeStatusLabel = toggleQuote.isPending
-    ? '正在更新'
+    ? t('layout.realtimeUpdating')
     : isPaused
-      ? '同步期间暂停'
+      ? t('layout.realtimePausedSync')
       : realtimeActive
-        ? '运行中'
+        ? t('layout.realtimeRunning')
         : realtimeEnabled
-          ? (isTrading ? '正在连接' : '等待交易时段')
-          : '已关闭'
+          ? (isTrading ? t('layout.realtimeConnecting') : t('layout.realtimeWaiting'))
+          : t('layout.realtimeStopped')
   const realtimeStatusClass = realtimeActive
     ? 'text-accent'
     : realtimeEnabled || isPaused
@@ -596,12 +615,12 @@ export function Layout() {
       ? 'bg-warning/70'
       : 'bg-muted'
   const realtimeToggleTitle = isPaused
-    ? '数据同步运行中，实时行情已临时暂停'
+    ? t('layout.realtimePausedTitle')
     : toggleQuote.isPending
-      ? '正在更新实时行情设置'
+      ? t('layout.realtimeUpdatingTitle')
       : realtimeEnabled
-        ? '关闭实时行情'
-        : '开启实时行情'
+        ? t('layout.realtimeDisableTitle')
+        : t('layout.realtimeEnableTitle')
 
   // 轮询触发记录总数 → 更新监控中心徽标 (每 15 秒; 后台标签页由 SSE 事件驱动, 不轮询)。
   // 非交易时段无新告警, 降为 2 分钟兜底
@@ -660,7 +679,7 @@ export function Layout() {
       staleTime: 0,
     })
     if (!fresh.realtime_allowed) {
-      toast('当前数据源无实时行情能力, 请先配置数据源', 'error')
+      toast(t('layout.realtimeNoAllowToast'), 'error')
       return
     }
     // 有排队中的挖掘任务时确认: 实时落盘会让排队任务开跑即失败
@@ -744,7 +763,7 @@ export function Layout() {
                     <span className="truncate">{label}</span>
                     {arch === 'ext' && (
                       <span
-                        title="扩展域页面 — 可整体替换/移除而不伤核心"
+                        title={t('layout.extArchTip')}
                         className="shrink-0 font-mono text-[8px] font-medium uppercase leading-none tracking-[0.08em] text-muted/70"
                       >
                         ext
@@ -784,7 +803,7 @@ export function Layout() {
               )}
             >
               <span className="flex h-4 w-4 shrink-0 items-center justify-center"><span className="h-1.5 w-1.5 rounded-full bg-muted" /></span>
-              <span>全部</span>
+              <span>{t('nav.allGroups')}</span>
               {(() => {
                 const info = navGroupPcts['all']
                 return info && info.pct != null ? (
@@ -859,7 +878,7 @@ export function Layout() {
             'hover:text-foreground hover:bg-elevated transition-colors duration-150 ease-smooth',
             isDesktop ? 'left-1.5 top-1/2 -translate-y-1/2 p-2' : 'left-3 top-3 p-2',
           )}
-          title={isDesktop ? '展开菜单' : '打开菜单'}
+          title={isDesktop ? t('nav.expandMenu') : t('nav.openMenu')}
         >
           {isDesktop
             ? <PanelLeftOpen className="h-4 w-4 shrink-0" />
@@ -901,7 +920,7 @@ export function Layout() {
                   'flex items-center rounded-btn text-muted hover:text-foreground hover:bg-elevated/60 transition-colors duration-150 ease-smooth',
                   railMode ? 'justify-center p-1.5' : 'ml-auto p-1.5',
                 )}
-                title={railMode ? '展开菜单' : '收起菜单'}
+                title={railMode ? t('nav.expandMenu') : t('nav.collapseMenu')}
               >
                 {railMode
                   ? <PanelLeft className="h-3.5 w-3.5 shrink-0" />
@@ -912,7 +931,7 @@ export function Layout() {
               <button
                 onClick={() => setDrawerOpen(false)}
                 className="ml-auto flex items-center rounded-btn p-1.5 text-muted hover:text-foreground hover:bg-elevated/60 transition-colors duration-150 ease-smooth"
-                title="关闭菜单"
+                title={t('nav.closeMenu')}
               >
                 <X className="h-4 w-4 shrink-0" />
               </button>
@@ -951,7 +970,7 @@ export function Layout() {
                 {ids.includes('/data') && isDataSyncing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 {ids.includes('/monitor') && <MonitorBadge active={location.pathname === '/monitor'} />}
               </>}>
-              {node.children.length === 0 && <p className="px-3 py-2 text-xs leading-5 text-muted">暂无子菜单，请在菜单管理中移入页面。</p>}
+              {node.children.length === 0 && <p className="px-3 py-2 text-xs leading-5 text-muted">{t('nav.noSubmenu')}</p>}
               {node.children.map(page => {
                 const entry = navById.get(page.id)
                 return entry ? renderNavItem(entry, true) : null
@@ -984,19 +1003,19 @@ export function Layout() {
           {realtimeUnavailable && !realtimeProviderName ? (
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-xs text-secondary truncate">实时行情</span>
+                <span className="text-xs text-secondary truncate">{t('layout.realtimeQuotes')}</span>
                 <span className="text-[10px] text-muted/80 bg-elevated px-1.5 py-0.5 rounded">
-                  不可用
+                  {t('common.unavailable')}
                 </span>
               </div>
               <div className="mt-1.5 text-[10px] leading-snug text-muted">
-                当前数据源无实时行情权限,
+                {t('layout.realtimeNoCap')}
                 <button
                   type="button"
                   onClick={() => navigate('/settings?tab=data-sources&highlight=data-sources')}
                   className="mx-0.5 text-accent/80 hover:text-accent hover:underline"
                 >
-                  去配置数据源
+                  {t('layout.realtimeGoConfig')}
                 </button>
               </div>
             </div>
@@ -1006,7 +1025,7 @@ export function Layout() {
               <div className="flex min-w-0 flex-1 items-center gap-2">
                 <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${realtimeIndicatorClass}`} />
                 <div className="min-w-0">
-                  <div className="text-xs font-medium leading-none text-foreground">实时行情</div>
+                  <div className="text-xs font-medium leading-none text-foreground">{t('layout.realtimeQuotes')}</div>
                   <div className="mt-1 flex min-w-0 items-center gap-1 text-[10px] leading-none">
                     <span className="truncate text-muted">{realtimeProviderName || realtimeModeLabel}</span>
                     <span className="shrink-0 text-border" aria-hidden="true">·</span>
@@ -1017,9 +1036,9 @@ export function Layout() {
               <div className="flex shrink-0 items-center gap-1">
                 <button
                   onClick={() => navigate('/settings?tab=monitoring&highlight=quotes')}
-                  aria-label="打开实时监控设置"
+                  aria-label={t('layout.realtimeOpenSettings')}
                   className="flex h-7 w-7 items-center justify-center rounded-btn text-muted transition-colors hover:bg-elevated hover:text-foreground"
-                  title="实时监控设置"
+                  title={t('layout.realtimeOpenSettings')}
                 >
                   <Settings className="h-3.5 w-3.5" />
                 </button>
@@ -1057,18 +1076,18 @@ export function Layout() {
               <div className="mt-1.5 text-[10px] leading-snug space-y-0.5">
                 {isWatchlistMode && !dismissFreeHint && !realtimeProviderName && (
                   <div className="flex items-start gap-1 text-amber-400/80">
-                    <span className="flex-1">自选实时模式监控前 5 只，全市场实时依赖数据源支持</span>
+                    <span className="flex-1">{t('layout.realtimeWatchlistHint')}</span>
                     <button
                       onClick={() => setDismissFreeHint(true)}
                       className="text-amber-400/50 hover:text-amber-400 shrink-0 transition-colors"
-                      title="关闭提示"
+                      title={t('layout.closeHint')}
                     >
                       <X className="h-2.5 w-2.5" />
                     </button>
                   </div>
                 )}
                 {isPaused && (
-                  <div className="text-warning/80">数据同步运行中，实时行情已临时暂停</div>
+                  <div className="text-warning/80">{t('layout.realtimePausedHint')}</div>
                 )}
               </div>
             )}
@@ -1081,9 +1100,10 @@ export function Layout() {
         <div className={cn('border-t border-border py-3 shrink-0', railMode ? 'px-2 flex flex-col items-center gap-1' : 'px-2')}>
           <div className={railMode ? 'flex flex-col items-center gap-1' : 'flex items-center gap-1'}>
             <ThemeToggle />
+            <LanguageSwitcher variant="compact" />
             <NavLink
               to="/settings"
-              title={railMode ? '设置' : undefined}
+              title={railMode ? t('nav.settings') : undefined}
               className={({ isActive }) =>
                 cn(
                   'group relative flex items-center rounded-btn text-sm transition-all duration-150 ease-smooth',
@@ -1103,7 +1123,7 @@ export function Layout() {
                     )}
                   />
                   <Settings className={cn('h-4 w-4 shrink-0 transition-colors', isActive ? 'text-accent' : 'text-foreground/60 group-hover:text-foreground/85')} />
-                  {!railMode && <span className="whitespace-nowrap">设置</span>}
+                  {!railMode && <span className="whitespace-nowrap">{t('nav.settings')}</span>}
                   {!railMode && version && (
                     <span className="ml-auto flex items-center gap-1.5 font-mono text-[10px] text-muted/50 select-none shrink-0">
                       {version}
@@ -1111,7 +1131,7 @@ export function Layout() {
                         <span
                           role="button"
                           tabIndex={0}
-                          title={`发现新版本 ${update.info.latest}，点击检查更新`}
+                          title={t('layout.newVersionTitle', { v: update.info.latest })}
                           onClick={(e) => {
                             e.preventDefault()
                             e.stopPropagation()
@@ -1134,7 +1154,7 @@ export function Layout() {
                   {railMode && hasUpdate && (
                     <span
                       className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_6px_rgba(59,130,246,0.8)]"
-                      title="发现新版本"
+                      title={t('layout.newVersionShort')}
                     />
                   )}
                 </>
@@ -1157,7 +1177,7 @@ export function Layout() {
             className="fixed bottom-4 left-1/2 z-[9998] flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-warning/30 bg-warning/10 px-2.5 py-1 text-[11px] font-medium text-warning shadow-lg backdrop-blur-md"
           >
             <WifiOff className="h-3 w-3 shrink-0 animate-pulse" />
-            与服务连接已断开 · 正在重连
+            {t('layout.reconnecting')}
           </div>
         )}
         <DailyDataHealthNotice />
@@ -1184,15 +1204,14 @@ export function Layout() {
         <div {...miningWarnBackdrop} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
           <div onClick={e => e.stopPropagation()} className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-2xl">
             <div className="text-sm font-semibold text-foreground">
-              有挖掘任务正在排队
+              {t('layout.miningQueuedTitle')}
             </div>
             <p className="mt-2 text-xs leading-5 text-secondary">
-              当前有 {miningQueuedWarning} 个挖掘任务排队等待执行。开启实时行情后盘中数据会持续落盘，
-              排队中的任务启动时可能因数据更新校验而失败（需重新开始挖掘）；已开始运行的任务不受影响。
+              {t('layout.miningQueuedDesc', { n: miningQueuedWarning })}
             </p>
             <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setMiningQueuedWarning(null)} className="h-8 rounded-btn border border-border px-3 text-xs text-secondary hover:bg-elevated">取消</button>
-              <button type="button" onClick={() => { setMiningQueuedWarning(null); void doEnableRealtime() }} className="h-8 rounded-btn bg-accent px-3 text-xs font-semibold text-white hover:opacity-90">仍要开启</button>
+              <button type="button" onClick={() => setMiningQueuedWarning(null)} className="h-8 rounded-btn border border-border px-3 text-xs text-secondary hover:bg-elevated">{t('common.cancel')}</button>
+              <button type="button" onClick={() => { setMiningQueuedWarning(null); void doEnableRealtime() }} className="h-8 rounded-btn bg-accent px-3 text-xs font-semibold text-white hover:opacity-90">{t('layout.keepEnabling')}</button>
             </div>
           </div>
         </div>

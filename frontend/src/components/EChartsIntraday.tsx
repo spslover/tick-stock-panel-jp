@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import * as echarts from 'echarts'
-import type { ECharts, EChartsOption } from 'echarts'
+import * as echarts from '@/lib/echarts'
+import { tx } from '@/lib/i18n'
+import type { ECharts, EChartsOption } from '@/lib/echarts'
 import type { MinuteKlineRow, PriceLimitInfo } from '@/lib/api'
 import { computeIntradayAverage, formatMinuteTime, FULL_DAY_TIMES, summarizeMinutes, getLimitPrices, type DailySummary } from '@/lib/intraday-chart'
 import { useChartTheme, type ChartTheme } from '@/lib/theme'
@@ -36,8 +37,8 @@ interface Props {
 
 function fmtAmt(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return '—'
-  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(2)}亿`
-  if (v >= 10_000) return `${(v / 10_000).toFixed(0)}万`
+  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(2)}${tx('亿')}`
+  if (v >= 10_000) return `${(v / 10_000).toFixed(0)}${tx('万')}`
   return v.toFixed(0)
 }
 
@@ -304,7 +305,7 @@ function buildOption(data: MinuteKlineRow[], prevClose: number | undefined, avgP
     ],
     series: [
       {
-        name: '价格',
+        name: tx('价格'),
         type: 'line',
         data: closes,
         smooth: false,
@@ -316,7 +317,7 @@ function buildOption(data: MinuteKlineRow[], prevClose: number | undefined, avgP
         markLine: markLineData.length > 0 ? { symbol: 'none', data: markLineData, animation: false, silent: true } : undefined,
       },
       ...(showAvgLine ? [{
-        name: '均价',
+        name: tx('均价'),
         type: 'line' as const,
         data: avgData,
         smooth: false,
@@ -511,7 +512,7 @@ export function EChartsIntraday({
                 : 'text-muted hover:text-secondary'
             }`}
           >
-            自适应
+            {tx('自适应')}
           </button>
           <div className="w-px h-3 bg-border/40" />
           <button
@@ -522,7 +523,7 @@ export function EChartsIntraday({
                 : 'text-muted hover:text-secondary'
             }`}
           >
-            涨跌停
+            {tx('涨跌停')}
           </button>
         </div>
       </div>}
@@ -533,14 +534,14 @@ export function EChartsIntraday({
           {ohlc && (
             <>
               {date && <span className="text-muted">{date}</span>}
-              <span className="text-muted">{hovered ? `${formatMinuteTime(hovered.datetime)} 分钟` : daily ? '日K（前复权）' : '分时汇总'}</span>
-              <span className="text-muted">开</span>
+              <span className="text-muted">{hovered ? tx('{v} 分钟', { v: formatMinuteTime(hovered.datetime) }) : daily ? tx('日K（前复权）') : tx('分时汇总')}</span>
+              <span className="text-muted">{tx('开')}</span>
               <span style={{ color: priceClr }}>{ohlc.open != null ? ohlc.open.toFixed(digits) : '—'}</span>
-              <span className="text-muted">高</span>
+              <span className="text-muted">{tx('高')}</span>
               <span style={{ color: priceClr }}>{ohlc.high.toFixed(digits)}</span>
-              <span className="text-muted">低</span>
+              <span className="text-muted">{tx('低')}</span>
               <span style={{ color: priceClr }}>{ohlc.low.toFixed(digits)}</span>
-              <span className="text-muted">收</span>
+              <span className="text-muted">{tx('收')}</span>
               <span style={{ color: priceClr }} className="font-semibold">{ohlc.close.toFixed(digits)}</span>
             </>
           )}
@@ -557,9 +558,9 @@ export function EChartsIntraday({
                 <span style={{ display: 'inline-block', width: 14, height: 2, background: THEME.avgLine }} />
                 <span style={{ color: THEME.avgLine }}>{avg != null ? avg.toFixed(digits) : '—'}</span>
               </span>}
-              <span className="text-muted">{hovered ? '量' : '累计量'}</span>
+              <span className="text-muted">{hovered ? tx('量') : tx('累计量')}</span>
               <span className="text-secondary">{d.volume.toFixed(0)}</span>
-              <span className="text-muted">{hovered ? '额' : '累计额'}</span>
+              <span className="text-muted">{hovered ? tx('额') : tx('累计额')}</span>
               <span className="text-secondary">{fmtAmt(d.amount)}</span>
             </>
           )}

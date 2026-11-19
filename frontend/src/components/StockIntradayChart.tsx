@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { api, type MinuteKlineRow } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { klineMinuteQueryOptions, minuteRefetchInterval } from '@/lib/kline'
 import type { DailySummary } from '@/lib/intraday-chart'
@@ -85,15 +86,15 @@ export function StockIntradayChart({
           {fetchMinute.isPending ? (
             <div className="flex items-center justify-center h-full gap-2 text-xs text-accent">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              <span>正在获取分钟K数据…</span>
+              <span>{tx('正在获取分钟K数据…')}</span>
             </div>
           ) : isIndex ? (
             // 指数: 分钟K仅支持实时读取, 无落库获取入口
-            <div className="flex items-center justify-center h-full text-xs text-muted">指数暂无分钟数据</div>
+            <div className="flex items-center justify-center h-full text-xs text-muted">{tx('指数暂无分钟数据')}</div>
           ) : sourceIsNone ? (
             // 数据源确认无此日分钟数据 (停牌/复牌延迟等): 静态提示 + 保留重试
             <div className="flex flex-col items-center justify-center h-full gap-3">
-              <div className="text-xs text-muted">该日暂无分钟数据（数据源未提供）</div>
+              <div className="text-xs text-muted">{tx('该日暂无分钟数据（数据源未提供）')}</div>
               <button
                 onClick={() => fetchMinute.mutate()}
                 className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs font-medium hover:bg-elevated/80 transition-colors duration-150"
@@ -103,7 +104,7 @@ export function StockIntradayChart({
             </div>
           ) : minuteDismissed ? (
             <div className="flex flex-col items-center justify-center h-full gap-3">
-              <div className="text-xs text-muted">暂无分钟数据</div>
+              <div className="text-xs text-muted">{tx('暂无分钟数据')}</div>
               <button
                 onClick={() => setMinuteDismissed(false)}
                 className="px-4 py-1.5 rounded-btn bg-accent/90 text-white text-xs font-medium hover:bg-accent transition-colors duration-150"
@@ -113,7 +114,7 @@ export function StockIntradayChart({
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-4">
-              <div className="text-sm text-foreground">是否立即获取最近5日分钟K？</div>
+              <div className="text-sm text-foreground">{tx('是否立即获取最近5日分钟K？')}</div>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => fetchMinute.mutate()}
@@ -137,7 +138,7 @@ export function StockIntradayChart({
           {minute.data?.source === 'local_partial' && (
             <div className="mb-1 flex items-center gap-2 rounded border border-warning/30 bg-warning/5 px-2 py-1 text-[10px] text-warning">
               <span>
-                该日分钟数据不完整：{minute.data.actual ?? minuteRows.length}/{minute.data.expected ?? 240} 根
+                {tx('该日分钟数据不完整：{a}/{b} 根', { a: minute.data.actual ?? minuteRows.length, b: minute.data.expected ?? 240 })}
               </span>
               <button
                 type="button"
@@ -145,11 +146,11 @@ export function StockIntradayChart({
                 disabled={fetchMinute.isPending}
                 className="ml-auto shrink-0 rounded border border-warning/40 px-1.5 py-0.5 hover:bg-warning/10 disabled:opacity-50"
               >
-                {fetchMinute.isPending ? '补齐中…' : '尝试补齐'}
+                {fetchMinute.isPending ? tx('补齐中…') : tx('尝试补齐')}
               </button>
             </div>
           )}
-          <Suspense fallback={<div className="text-xs text-muted py-4">正在加载图表…</div>}>
+          <Suspense fallback={<div className="text-xs text-muted py-4">{tx('正在加载图表…')}</div>}>
           <Chart
             assetType={minute.data?.asset_type}
             symbol={symbol}

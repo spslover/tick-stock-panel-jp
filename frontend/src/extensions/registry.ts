@@ -190,3 +190,12 @@ export function getFrontendSlotRegistrations<K extends FrontendSlotName>(name: K
 export function getFrontendExtensionLoadErrors() {
   return [...loadErrors]
 }
+
+export function resetFrontendExtensionsForTests() {
+  extensions.clear()
+  routes.clear()
+  navigation.clear()
+  slots.clear()
+  loadErrors.length = 0
+  frozen = false
+}

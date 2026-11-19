@@ -15,6 +15,7 @@ import { Activity, Building2, ChevronRight, Database, RefreshCw, Search, Tags, U
 import { Modal } from '@/components/Modal'
 import { boardTag } from '@/components/stock-table/primitives'
 import { toNavItems } from '@/lib/listNav'
+import { tx, useI18n } from '@/lib/i18n'
 import { api, type DimensionIntradayPoint, type MarketSnapshotRow } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { fmtBigNum, fmtPct, fmtPrice, priceColorClass } from '@/lib/format'
@@ -49,11 +50,11 @@ function finite(value: unknown): number | null {
 }
 
 function stockName(row: Record<string, any>): string {
-  return String(row.name ?? row['股票简称'] ?? row['名称'] ?? '')
+  return String(row.name ?? row[tx('股票简称')] ?? row[tx('名称')] ?? '')
 }
 
 function stockSymbol(row: Record<string, any>): string {
-  return String(row.symbol ?? row.code ?? row['股票代码'] ?? row['代码'] ?? '')
+  return String(row.symbol ?? row.code ?? row[tx('股票代码')] ?? row[tx('代码')] ?? '')
 }
 
 export function DimensionMembersDialog({ target, onClose, onStockClick }: Props) {
@@ -69,6 +70,7 @@ export function DimensionMembersDialog({ target, onClose, onStockClick }: Props)
 }
 
 export function DimensionMembersDialogContent({ target, onClose, onStockClick }: Omit<Props, 'target'> & { target: DimensionMembersTarget }) {
+  const { tx } = useI18n()
   const source = useMemo(() => resolveSource(target.sourceField), [target.sourceField])
   const [search, setSearch] = useState('')
   const [sortMode, setSortMode] = useState<SortMode>('change_desc')
@@ -156,8 +158,8 @@ export function DimensionMembersDialogContent({ target, onClose, onStockClick }:
   }, [search, sortMode])
 
   const accent = target.kind === 'concept'
-    ? { icon: Tags, badge: '概念', iconCls: 'text-orange-700 dark:text-orange-300', badgeCls: 'bg-orange-500/10 text-orange-700 dark:text-orange-300' }
-    : { icon: Building2, badge: '行业', iconCls: 'text-sky-700 dark:text-sky-300', badgeCls: 'bg-sky-500/10 text-sky-700 dark:text-sky-300' }
+    ? { icon: Tags, badge: tx('概念'), iconCls: 'text-orange-700 dark:text-orange-300', badgeCls: 'bg-orange-500/10 text-orange-700 dark:text-orange-300' }
+    : { icon: Building2, badge: tx('行业'), iconCls: 'text-sky-700 dark:text-sky-300', badgeCls: 'bg-sky-500/10 text-sky-700 dark:text-sky-300' }
   const AccentIcon = accent.icon
   const titleId = 'dimension-members-title'
   const total = membersQuery.data?.total ?? 0
@@ -178,7 +180,7 @@ export function DimensionMembersDialogContent({ target, onClose, onStockClick }:
             <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${accent.badgeCls}`}>{accent.badge}</span>
           </div>
           <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted">
-            <span>{membersQuery.data?.label ?? source?.configId ?? '扩展数据'}</span>
+            <span>{membersQuery.data?.label ?? source?.configId ?? tx('扩展数据')}</span>
             {membersQuery.data?.date && <span>{membersQuery.data.date}</span>}
           </div>
         </div>
@@ -187,14 +189,14 @@ export function DimensionMembersDialogContent({ target, onClose, onStockClick }:
             <Users className="h-3.5 w-3.5 text-muted" />
             {membersQuery.isLoading ? '—' : total}
           </span>
-          <button onClick={onClose} className="inline-flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-elevated hover:text-foreground" title="关闭">
+          <button onClick={onClose} className="inline-flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-elevated hover:text-foreground" title={tx('关闭')}>
             <X className="h-4 w-4" />
           </button>
         </div>
       </div>
 
       {!source ? (
-        <div className="grid min-h-64 place-items-center px-6 text-sm text-danger">扩展字段格式无效</div>
+        <div className="grid min-h-64 place-items-center px-6 text-sm text-danger">{tx('扩展字段格式无效')}</div>
       ) : membersQuery.isLoading ? (
         <div className="grid min-h-64 place-items-center text-muted"><RefreshCw className="h-5 w-5 animate-spin" /></div>
       ) : membersQuery.isError ? (
@@ -202,10 +204,10 @@ export function DimensionMembersDialogContent({ target, onClose, onStockClick }:
       ) : (
         <>
           <div className="grid shrink-0 grid-cols-4 divide-x divide-border border-b border-border bg-surface/50">
-            <Summary label="上涨" value={stats.up} className="text-bull" />
-            <Summary label="下跌" value={stats.down} className="text-bear" />
-            <Summary label="平盘/待更新" value={stats.flat} className="text-secondary" />
-            <Summary label="平均涨跌" value={fmtPct(stats.average)} className={priceColorClass(stats.average)} />
+            <Summary label={tx('上涨')} value={stats.up} className="text-bull" />
+            <Summary label={tx('下跌')} value={stats.down} className="text-bear" />
+            <Summary label={tx('平盘/待更新')} value={stats.flat} className="text-secondary" />
+            <Summary label={tx('平均涨跌')} value={fmtPct(stats.average)} className={priceColorClass(stats.average)} />
           </div>
 
           {source && (
@@ -224,7 +226,7 @@ export function DimensionMembersDialogContent({ target, onClose, onStockClick }:
               <input
                 value={search}
                 onChange={event => setSearch(event.target.value)}
-                placeholder="搜索代码或名称"
+                placeholder={tx('搜索代码或名称')}
                 className="h-8 w-full rounded-input border border-border bg-surface pl-8 pr-3 text-xs text-foreground placeholder:text-muted focus:border-accent/60 focus:outline-none"
               />
             </div>
@@ -232,22 +234,22 @@ export function DimensionMembersDialogContent({ target, onClose, onStockClick }:
               value={sortMode}
               onChange={event => setSortMode(event.target.value as SortMode)}
               className="h-8 rounded-input border border-border bg-surface px-2 text-xs text-secondary focus:border-accent/60 focus:outline-none"
-              aria-label="排序方式"
+              aria-label={tx('排序方式')}
             >
-              <option value="change_desc">涨幅从高到低</option>
-              <option value="change_asc">涨幅从低到高</option>
-              <option value="amount_desc">成交额从高到低</option>
-              <option value="name">名称排序</option>
+              <option value="change_desc">{tx('涨幅从高到低')}</option>
+              <option value="change_asc">{tx('涨幅从低到高')}</option>
+              <option value="amount_desc">{tx('成交额从高到低')}</option>
+              <option value="name">{tx('名称排序')}</option>
             </select>
           </div>
 
           <div className="grid shrink-0 grid-cols-[minmax(132px,1fr)_74px_74px_18px] border-b border-border bg-elevated/60 px-4 py-2 text-[10px] font-medium text-muted md:grid-cols-[minmax(180px,1fr)_90px_84px_88px_100px_18px]">
-            <span>股票</span><span className="text-right">现价</span><span className="text-right">涨跌幅</span>
-            <span className="hidden text-right md:block">换手率</span><span className="hidden text-right md:block">成交额</span><span />
+            <span>{tx('股票')}</span><span className="text-right">{tx('现价')}</span><span className="text-right">{tx('涨跌幅')}</span>
+            <span className="hidden text-right md:block">{tx('换手率')}</span><span className="hidden text-right md:block">{tx('成交额')}</span><span />
           </div>
 
           {visibleRows.length === 0 ? (
-            <div className="grid min-h-56 place-items-center text-sm text-muted">{search ? '没有匹配的股票' : '暂无成分股'}</div>
+            <div className="grid min-h-56 place-items-center text-sm text-muted">{search ? tx('没有匹配的股票') : tx('暂无成分股')}</div>
           ) : (
             <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto">
               <div className="relative w-full" style={{ height: rowVirtualizer.getTotalSize() }}>
@@ -284,7 +286,7 @@ export function DimensionMembersDialogContent({ target, onClose, onStockClick }:
           )}
 
           {total > rows.length && (
-            <div className="shrink-0 border-t border-border px-4 py-2 text-center text-[10px] text-muted">显示前 {rows.length} / {total} 只</div>
+            <div className="shrink-0 border-t border-border px-4 py-2 text-center text-[10px] text-muted">{tx('显示前')} {rows.length} / {total} {tx('只')}</div>
           )}
         </>
       )}
@@ -328,6 +330,7 @@ function DimensionIntradaySection({ configId, field, value, date, kind }: {
   date?: string
   kind: DimensionKind
 }) {
+  const { tx } = useI18n()
   const query = useQuery({
     queryKey: QK.dimensionIntraday(configId, field, value, date),
     queryFn: () => api.dimensionIntraday(configId, { field, value, date }),
@@ -340,32 +343,30 @@ function DimensionIntradaySection({ configId, field, value, date, kind }: {
     <section className="shrink-0 border-b border-border bg-surface/30">
       <div className="flex items-center gap-2 px-4 pt-2">
         <Activity className="h-3 w-3 text-muted" />
-        <span className="text-[10px] font-medium text-muted">分时走势 · 等权</span>
+        <span className="text-[10px] font-medium text-muted">{tx('分时走势 · 等权')}</span>
         {data?.member_count != null && data.members_with_minute != null && (
-          <span className="rounded bg-elevated px-1 py-px font-mono text-[9px] text-muted" title="有当日分钟数据的成分股数">
-            {data.members_with_minute}/{data.member_count}只
-          </span>
+          <span className="rounded bg-elevated px-1 py-px font-mono text-[9px] text-muted" title={tx('有当日分钟数据的成分股数')}>
+            {data.members_with_minute}/{data.member_count}{tx('只')}</span>
         )}
         {data?.basis && data.basis !== 'prev_close' && (
           <span
             className="rounded bg-amber-500/10 px-1 py-px text-[9px] text-amber-600 dark:text-amber-400"
-            title="前一交易日收盘缺失, 部分标的以当日首根分钟价为基准, 曲线起点约为 0"
+            title={tx('前一交易日收盘缺失, 部分标的以当日首根分钟价为基准, 曲线起点约为 0')}
           >
-            基准:当日首价
-          </span>
+            {tx('基准:当日首价')}</span>
         )}
         {data?.status === 'ok' && (
           <div className="ml-auto flex items-center gap-2.5 font-mono text-[10px]">
             <span className="inline-flex items-center gap-1">
               <span className="h-[3px] w-3 rounded-full" style={{ background: INTRADAY_SECTOR_COLOR[kind] }} />
-              <span className="text-muted">板块</span>
+              <span className="text-muted">{tx('板块')}</span>
               <span className={priceColorClass(lastNonNull(data.points, 'sector'))}>
                 {fmtPct(lastNonNull(data.points, 'sector'))}
               </span>
             </span>
             <span className="inline-flex items-center gap-1">
               <span className="h-[3px] w-3 rounded-full" style={{ background: INTRADAY_MARKET_COLOR }} />
-              <span className="text-muted">全市场</span>
+              <span className="text-muted">{tx('全市场')}</span>
               <span className={priceColorClass(lastNonNull(data.points, 'market'))}>
                 {fmtPct(lastNonNull(data.points, 'market'))}
               </span>
@@ -379,18 +380,18 @@ function DimensionIntradaySection({ configId, field, value, date, kind }: {
         <div className="mx-4 mb-2 mt-1.5 h-[132px] animate-pulse rounded-md bg-elevated/50" />
       ) : query.isError ? (
         <div className="mx-4 mb-2 mt-1 grid h-[72px] place-items-center rounded-md border border-dashed border-border px-4 text-center text-[11px] text-muted">
-          分时加载失败:{String((query.error as Error).message)}
+          {tx('分时加载失败:')}{String((query.error as Error).message)}
         </div>
       ) : data?.status === 'no_data' ? (
         <div className="mx-4 mb-2 mt-1 flex h-[96px] flex-col items-center justify-center gap-1 rounded-md border border-dashed border-border">
           <Database className="h-4 w-4 text-muted" />
-          <p className="text-[11px] text-muted">分钟数据未落盘, 暂无分时走势</p>
-          <p className="text-[10px] text-muted/70">需 TickFlow Pro+ 盘后分钟同步 / Expert 盘中增量, 或自定义分钟源</p>
-          <Link to="/data" className="text-[10px] text-accent hover:text-accent/80">前往数据页 →</Link>
+          <p className="text-[11px] text-muted">{tx('分钟数据未落盘, 暂无分时走势')}</p>
+          <p className="text-[10px] text-muted/70">{tx('需 TickFlow Pro+ 盘后分钟同步 / Expert 盘中增量, 或自定义分钟源')}</p>
+          <Link to="/data" className="text-[10px] text-accent hover:text-accent/80">{tx('前往数据页 →')}</Link>
         </div>
       ) : !data || data.status === 'empty' || data.points.length < 2 ? (
         <div className="grid h-[44px] place-items-center text-[11px] text-muted">
-          {data?.reason === 'no_member_bars' ? '成分股当日无分钟数据 (ETF 等标的无分钟落盘)' : '暂无成分股分时数据'}
+          {data?.reason === 'no_member_bars' ? tx('成分股当日无分钟数据 (ETF 等标的无分钟落盘)') : tx('暂无成分股分时数据')}
         </div>
       ) : (
         <IntradayChart points={data.points} kind={kind} />

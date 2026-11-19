@@ -26,6 +26,7 @@ import { useQuoteClock } from '@/lib/useQuoteClock'
 import { ExtensionSlot } from '@/extensions/ExtensionSlot'
 import { ExtensionBoundary } from '@/extensions/ExtensionBoundary'
 import { getFrontendSlotRegistrations } from '@/extensions/registry'
+import { useI18n } from '@/lib/i18n'
 
 export interface Props {
   symbol: string | null
@@ -96,6 +97,7 @@ function fmtAbnormalCalcTime(asofSec: number): string {
 
 
 export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, navList: navListSource, onNavigate }: Props) {
+  const { tx } = useI18n()
   const [view, setView] = useState<PreviewView>('daily')
   const panelId = useId()
   const extensionTabs = getFrontendSlotRegistrations('stock-preview.tabs')
@@ -312,7 +314,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
 
               {/* 视图/区间控件: 原第二行并入顶行, 紧邻操作按钮 (原「自选于」标注位置) */}
               <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2.5">
-                <div role="tablist" aria-label="图表视图" className="inline-flex max-w-full flex-wrap items-center rounded border border-border/60 bg-base/60 p-0.5">
+                <div role="tablist" aria-label={tx('图表视图')} className="inline-flex max-w-full flex-wrap items-center rounded border border-border/60 bg-base/60 p-0.5">
                   {tabs.map(({ key, label, icon: Icon }) => (
                     <button
                       key={key}
@@ -327,7 +329,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                       }`}
                     >
                       {Icon && <Icon className="h-3 w-3" />}
-                      <span className="truncate">{label}</span>
+                      <span className="truncate">{tx(label)}</span>
                     </button>
                   ))}
                 </div>
@@ -352,7 +354,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                               : 'text-muted hover:text-secondary hover:bg-elevated/60'
                             }`}
                         >
-                          {p.label}
+                          {tx(p.label)}
                         </button>
                       )
                     })}
@@ -373,7 +375,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                   </div>
                 ) : view === 'intraday' && (
                   <div className="inline-flex items-center gap-2">
-                    <div className="inline-flex shrink-0 items-center rounded border border-border/60 bg-base/60 p-0.5" aria-label="分时周期">
+                    <div className="inline-flex shrink-0 items-center rounded border border-border/60 bg-base/60 p-0.5" aria-label={tx('分时周期')}>
                       {dayOptions.map(days => (
                         <button
                           key={days}
@@ -386,7 +388,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                               : 'text-muted hover:text-secondary hover:bg-elevated/60'
                           }`}
                         >
-                          {days}日
+                          {tx('{n}日', { n: days })}
                         </button>
                       ))}
                     </div>

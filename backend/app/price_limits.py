@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from datetime import date, datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 import numpy as np
 import polars as pl
@@ -17,6 +19,71 @@ LEGACY_MAIN_BOARD_ST_LIMIT = 0.05
 GROWTH_BOARD_LIMIT = 0.20
 BEIJING_BOARD_LIMIT = 0.30
 
+_BSE_CODE_PREFIXES = ("43", "83", "87", "92")
+
+
+def _to_decimal(value: float | Decimal | int, *, name: str = "value") -> Decimal:
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must not be bool")
+    if isinstance(value, Decimal):
+        if not value.is_finite():
+            raise ValueError(f"{name} must be finite")
+        return value
+    if not isinstance(value, (int, float)):
+        raise TypeError(f"{name} must be int, float, or Decimal")
+    fval = float(value)
+    if not math.isfinite(fval):
+        raise ValueError(f"{name} must be finite")
+    try:
+        return Decimal(str(value))
+    except InvalidOperation as exc:
+        raise ValueError(f"invalid decimal {name}: {value!r}") from exc
+
+
+def round_price(value: float | Decimal | int, decimals: int = 2) -> float:
+    """交易所口径四舍五入 (Decimal ROUND_HALF_UP, 消除浮点表示截断与银行家舍入)。"""
+    if decimals < 0:
+        raise ValueError("decimals must be >= 0")
+    d_val = _to_decimal(value, name="value")
+    quant = Decimal("1") if decimals == 0 else Decimal("10") ** (-decimals)
+    rounded = d_val.quantize(quant, rounding=ROUND_HALF_UP)
+    return 0.0 if rounded == 0 else float(rounded)
+
+
+def calc_limit_price(
+    prev_close: float | Decimal | int,
+    limit_pct: float | Decimal | int,
+    *,
+    up: bool,
+    decimals: int = 2,
+) -> float:
+    """单步 Decimal ROUND_HALF_UP 计算涨/跌停价 (无中间截断/二次舍入)。"""
+    if decimals < 0:
+        raise ValueError("decimals must be >= 0")
+    d_prev = _to_decimal(prev_close, name="prev_close")
+    d_pct = _to_decimal(limit_pct, name="limit_pct")
+    if d_prev < 0:
+        raise ValueError("prev_close must be >= 0")
+    rate = (Decimal("1") + d_pct) if up else (Decimal("1") - d_pct)
+    if rate < 0:
+        raise ValueError("effective limit rate must be >= 0")
+    quant = Decimal("1") if decimals == 0 else Decimal("10") ** (-decimals)
+    rounded = (d_prev * rate).quantize(quant, rounding=ROUND_HALF_UP)
+    return 0.0 if rounded == 0 else float(rounded)
+
+
+def calc_limit_prices(
+    prev_close: float | Decimal | int,
+    limit_pct: float | Decimal | int,
+    *,
+    decimals: int = 2,
+) -> tuple[float, float]:
+    """返回 (涨停价, 跌停价), 单步 Decimal ROUND_HALF_UP。"""
+    return (
+        calc_limit_price(prev_close, limit_pct, up=True, decimals=decimals),
+        calc_limit_price(prev_close, limit_pct, up=False, decimals=decimals),
+    )
+
 
 def is_risk_warning_name(name: str | None) -> bool:
     return "ST" in str(name or "").upper()
@@ -25,8 +92,13 @@ def is_risk_warning_name(name: str | None) -> bool:
 _GEM_PREFIXES = ("300", "301", "302")
 
 
+def _is_beijing_symbol(symbol: str) -> bool:
+    sym = symbol.strip().upper()
+    return sym.endswith(".BJ") or ("." not in sym and sym.startswith(_BSE_CODE_PREFIXES))
+
+
 def board_limit_pct(symbol: str) -> float:
-    if symbol.endswith(".BJ"):
+    if _is_beijing_symbol(symbol):
         return BEIJING_BOARD_LIMIT
     if symbol.startswith((*_GEM_PREFIXES, "688", "689")):
         return GROWTH_BOARD_LIMIT
@@ -34,7 +106,7 @@ def board_limit_pct(symbol: str) -> float:
 
 
 def _is_gem(symbol: str) -> bool:
-    return not symbol.endswith(".BJ") and symbol.startswith(_GEM_PREFIXES)
+    return not _is_beijing_symbol(symbol) and symbol.startswith(_GEM_PREFIXES)
 
 
 def price_limit_pct(
@@ -42,7 +114,10 @@ def price_limit_pct(
     trade_date: date,
     *,
     is_risk_warning: bool = False,
+    asset_type: str = "stock",
 ) -> float:
+    if asset_type == "etf":
+        return MAIN_BOARD_LIMIT
     base = board_limit_pct(symbol)
     if _is_gem(symbol) and trade_date < GEM_20PCT_LIMIT_START_DATE:
         base = MAIN_BOARD_LIMIT
@@ -177,12 +252,40 @@ def polars_is_risk_warning_name(name: pl.Expr) -> pl.Expr:
     return name.fill_null("").str.to_uppercase().str.contains("ST", literal=True)
 
 
-def polars_limit_price(previous: pl.Expr, limit_pct: pl.Expr, *, up: bool) -> pl.Expr:
-    """Calculate exchange half-up prices with integer-cent arithmetic."""
+def polars_limit_price(
+    previous: pl.Expr,
+    limit_pct: pl.Expr,
+    *,
+    up: bool,
+    decimals: int = 2,
+) -> pl.Expr:
+    """Calculate exchange half-up prices with single-step scaled Int64 arithmetic."""
+    if decimals < 0 or decimals > 10:
+        raise ValueError("decimals must be between 0 and 10")
     sign = 1 if up else -1
-    numerator = ((1 + sign * limit_pct) * 100).round(0).cast(pl.Int64)
-    cents = (previous * 100 + 0.5).floor().cast(pl.Int64)
-    return ((cents * numerator + 50) // 100) / 100
+    p = previous.cast(pl.Float64)
+    r = limit_pct.cast(pl.Float64)
+    valid = (
+        p.is_finite()
+        & (p >= 0.0)
+        & (p < 1e8)
+        & r.is_finite()
+        & ((1.0 + sign * r) >= 0.0)
+    )
+    prev_scaled = (
+        pl.when(valid)
+        .then((p * 1_000_000.0).round(0).cast(pl.Int64))
+        .otherwise(None)
+    )
+    rate_bp = (
+        pl.when(valid)
+        .then(((1.0 + sign * r) * 10_000.0).round(0).cast(pl.Int64))
+        .otherwise(None)
+    )
+    divisor = 10 ** (10 - decimals)
+    half = divisor // 2
+    scale = float(10**decimals)
+    return (((prev_scaled * rate_bp + half) // divisor) / scale).round(decimals)
 
 
 def numpy_limit_pct_vectors(
@@ -283,14 +386,29 @@ def numpy_limit_price(
     limit_pct: np.ndarray,
     *,
     up: bool,
+    decimals: int = 2,
 ) -> np.ndarray:
     """NumPy counterpart of :func:`polars_limit_price`."""
+    if decimals < 0 or decimals > 10:
+        raise ValueError("decimals must be between 0 and 10")
     sign = 1 if up else -1
-    numerator = np.rint((1.0 + sign * limit_pct) * 100.0).astype(np.int64)
-    result = np.full(previous.shape, np.nan, dtype=np.float64)
-    finite = np.isfinite(previous)
-    cents = np.floor(previous[finite] * 100.0 + 0.5).astype(np.int64)
-    result[finite] = (
-        ((cents * numerator[finite] + 50) // 100).astype(np.float64) / 100.0
+    prev_f64 = np.asarray(previous, dtype=np.float64)
+    pct_b = np.broadcast_to(np.asarray(limit_pct, dtype=np.float64), prev_f64.shape)
+    result = np.full(prev_f64.shape, np.nan, dtype=np.float64)
+    finite = (
+        np.isfinite(prev_f64)
+        & (prev_f64 >= 0.0)
+        & (prev_f64 < 1e8)
+        & np.isfinite(pct_b)
+        & ((1.0 + sign * pct_b) >= 0.0)
     )
+    if finite.any():
+        prev_scaled = np.rint(prev_f64[finite] * 1_000_000.0).astype(np.int64)
+        rate_bp = np.rint((1.0 + sign * pct_b[finite]) * 10_000.0).astype(np.int64)
+        divisor = 10 ** (10 - decimals)
+        half = divisor // 2
+        result[finite] = (
+            ((prev_scaled * rate_bp + half) // divisor).astype(np.float64)
+            / float(10**decimals)
+        )
     return result

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { ScanSearch, Clock, TrendingUp, Star, Filter, Layers, Network, Sparkles, RefreshCw, Settings2, Store, RotateCcw, X, SlidersHorizontal } from 'lucide-react'
 import { api, genRuleId, type ScreenerStrategy, type ScreenerResult } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { useMinuteBatchQuery } from '@/lib/useMinuteBatchQuery'
 import { fetchDailyBatchChunked } from '@/lib/klineBatchChunked'
 import { DEFAULT_STRATEGY_NOTIFY_EVENTS } from '@/lib/strategyMonitorEvents'
@@ -49,6 +50,7 @@ import {
 const SHOW_STRATEGY_STORE = false
 
 export function Screener() {
+  const { tx, locale } = useI18n()
   const [assetType, setAssetType] = useState<'stock' | 'etf'>('stock')
   // 周期显示筛选: 全部 / 日线 / 分钟 — 只过滤卡片显示, 不影响池和执行;
   // 执行按每个策略自己声明的 timeframes 路由 (日线走盘后缓存, 分钟走本地分钟K分区)
@@ -303,9 +305,9 @@ export function Screener() {
       const g = metaMap.get(id)?.group
       return !g || !groupIdSet.has(g)
     })
-    if (ungrouped.length > 0) tabs.unshift({ key: 'none', name: '未分组', ids: ungrouped })
+    if (ungrouped.length > 0) tabs.unshift({ key: 'none', name: tx('未分组'), ids: ungrouped })
     return tabs
-  }, [groups, displayPool, metaMap])
+  }, [groups, displayPool, metaMap, locale])
   // tab 失效 (分组删除/当前无成员) 时回退全部
   const activePoolTab = poolGroupTabs?.some(tab => tab.key === poolGroupTab) ? poolGroupTab : 'all'
   const activePoolIds = poolGroupTabs
@@ -349,15 +351,15 @@ export function Screener() {
     } catch { /* 隐私模式等存储不可用: 退化为每次提示 */ }
     const parts: string[] = []
     if (legacyMigration.seeded_strategies) {
-      parts.push(`已补回 ${legacyMigration.seeded_strategies} 个原内置策略为自定义策略(可在策略页编辑或删除)`)
+      parts.push(tx('已补回 {n} 个原内置策略为自定义策略(可在策略页编辑或删除)', { n: legacyMigration.seeded_strategies }))
     }
     if (legacyMigration.seeded_signals) {
-      parts.push(`已将 ${legacyMigration.seeded_signals} 个原内置信号转为自定义信号(可在信号库编辑)`)
+      parts.push(tx('已将 {n} 个原内置信号转为自定义信号(可在信号库编辑)', { n: legacyMigration.seeded_signals }))
     }
     if (legacyMigration.archived_files?.length) {
-      parts.push(`已归档 ${legacyMigration.archived_files.length} 个无法加载的旧策略文件(位于 data/strategies/*/_archive_unloadable/)`)
+      parts.push(tx('已归档 {n} 个无法加载的旧策略文件(位于 data/strategies/*/_archive_unloadable/)', { n: legacyMigration.archived_files.length }))
     }
-    if (parts.length) toast(`旧版数据自动迁移完成：${parts.join('；')}`, 'success')
+    if (parts.length) toast(tx('旧版数据自动迁移完成：{parts}', { parts: parts.join(tx('；')) }), 'success')
   }, [legacyMigration])
 
   // 策略文件加载失败时提示用户(避免"策略静默消失"被误判为正常)。
@@ -366,15 +368,15 @@ export function Screener() {
   useEffect(() => {
     if (loadErrors.length === 0) return
     if (loadErrors.length === 1) {
-      toast(`策略「${loadErrors[0].file}」加载失败：${loadErrors[0].error}`, 'error')
+      toast(tx('策略「{file}」加载失败：{error}', { file: loadErrors[0].file, error: loadErrors[0].error }), 'error')
       return
     }
     const files = loadErrors.slice(0, 3)
       .map(e => String(e.file).split('/').pop())
       .join('、')
     toast(
-      `${loadErrors.length} 个策略文件加载失败（${files}${loadErrors.length > 3 ? ' 等' : ''}）。` +
-      '常见原因：文件引用了已移除的内置模块、或叠加策略的子策略不存在 —— 请在 data/strategies/ 下更新或删除这些文件',
+      tx('{n} 个策略文件加载失败（{files}{extra}）。', { n: loadErrors.length, files, extra: loadErrors.length > 3 ? tx('等') : '' }) +
+      tx('常见原因：文件引用了已移除的内置模块、或叠加策略的子策略不存在 —— 请在 data/strategies/ 下更新或删除这些文件'),
       'error',
     )
   }, [loadErrors])
@@ -403,13 +405,13 @@ export function Screener() {
           ? { ids: [...data.pending], startedAt: data.started_at ?? 0, taskId: data.task_id }
           : null,
       )
-      if (data.error) toast(`策略计算失败：${data.error}`, 'error')
-      if (Object.keys(data.errors ?? {}).length) toast('部分策略计算失败，请检查后重新运行', 'error')
+      if (data.error) toast(tx('策略计算失败：{msg}', { msg: data.error }), 'error')
+      if (Object.keys(data.errors ?? {}).length) toast(tx('部分策略计算失败，请检查后重新运行'), 'error')
       // 策略池残留的失效 ID (如内置策略移除后的旧数据目录): 后端已跳过,
       // 这里从池中清掉并提示一次, 空库场景 prune(按有效列表) 清不掉的兜底。
       if (data.skipped_unknown?.length) {
         for (const id of data.skipped_unknown) removeFromPool(id)
-        toast(`已跳过 ${data.skipped_unknown.length} 个不存在的策略，并从策略池移除`, 'success')
+        toast(tx('已跳过 {n} 个不存在的策略，并从策略池移除', { n: data.skipped_unknown.length }), 'success')
       }
       qc.invalidateQueries({ queryKey: ['screener-cached'] })
     },
@@ -428,14 +430,14 @@ export function Screener() {
         counts[id] = item.total
       }
       if (Object.keys(counts).length) setHitCounts(prev => ({ ...prev, ...counts }))
-      if (data.error || Object.keys(data.errors ?? {}).length) toast('部分策略计算失败，请检查后重新运行', 'error')
+      if (data.error || Object.keys(data.errors ?? {}).length) toast(tx('部分策略计算失败，请检查后重新运行'), 'error')
       setPendingRun(
         data.pending?.length
           ? { ids: [...data.pending], startedAt: data.started_at ?? 0, taskId: data.task_id }
           : null,
       )
     },
-    onError: (e) => toast(`分钟策略计算失败：${String((e as any).message ?? e)}`, 'error'),
+    onError: (e) => toast(tx('分钟策略计算失败：{msg}', { msg: String((e as any).message ?? e) }), 'error'),
   })
   const minuteMutate = runAllMinute.mutate
 
@@ -493,15 +495,15 @@ export function Screener() {
     if (pendingRun) {
       const rest = pendingStrategyIds(pendingRun, summaryQuery.data, asOf)
       if (rest === null) {
-        toast('计算状态已过期，请重新运行', 'error')
+        toast(tx('计算状态已过期，请重新运行'), 'error')
         setPendingRun(null)
         return
       }
       const task = summaryQuery.data.task
       if (task && task.id === pendingRun.taskId) {
         if (task.complete || task.pending.length < pendingRun.ids.length) {
-          if (task.error) toast(`策略计算失败：${task.error}`, 'error')
-          if (Object.keys(task.errors).length) toast('部分策略计算失败，请检查策略后重新运行', 'error')
+          if (task.error) toast(tx('策略计算失败：{msg}', { msg: task.error }), 'error')
+          if (Object.keys(task.errors).length) toast(tx('部分策略计算失败，请检查策略后重新运行'), 'error')
           setPendingRun(task.complete || !task.pending.length ? null : { ...pendingRun, ids: task.pending })
         }
         return
@@ -881,7 +883,7 @@ export function Screener() {
       // 否则 ETF 页点监控会默认 stock, 引擎在股票轮评估, ETF 命中永不告警。
       api.monitorRuleSave({
         id: genRuleId(),
-        name: `策略监控 · ${strategyName}`,
+        name: tx('策略监控 · {name}', { name: strategyName }),
         enabled: true,
         type: 'strategy',
         asset_type: assetType,
@@ -905,11 +907,11 @@ export function Screener() {
     const symbols = displayRows.map((r: any) => r.symbol)
     batchAdd.mutate({ symbols, groupId }, {
       onSuccess: (data) => {
-        setBatchMsg(`已添加 ${data.added} 只到自选`)
+        setBatchMsg(tx('已添加 {n} 只到自选', { n: data.added }))
         setTimeout(() => setBatchMsg(''), 3000)
       },
       onError: () => {
-        setBatchMsg('添加失败')
+        setBatchMsg(tx('添加失败'))
         setTimeout(() => setBatchMsg(''), 3000)
       },
     })
@@ -941,7 +943,7 @@ export function Screener() {
         onSettings={() => setSettingsStrategyId(s.id)}
         monitored={strategyMonitorMap.has(`${assetType}:${s.id}`)}
         onToggleMonitor={() => toggleStrategyMonitor(s.id, s.name)}
-        timeframeBadge={isMinute ? '分钟' : undefined}
+        timeframeBadge={isMinute ? tx('分钟') : undefined}
       />
     )
   })
@@ -949,8 +951,8 @@ export function Screener() {
   return (
     <>
       <PageHeader
-        title="策略"
-        subtitle="基于本地 enriched 表 · 毫秒级 SQL"
+        title={tx('选股策略')}
+        subtitle={tx('基于本地 enriched 表 · 毫秒级 SQL')}
         right={
           /* 工具栏 10 组控件总宽会超过标题栏 (窄屏实测溢出 148px)。
              不能靠 overflow-x-auto + 隐藏滚动条 —— 那样右侧按钮被静默裁掉,
@@ -971,7 +973,7 @@ export function Screener() {
                       : 'text-muted hover:text-secondary hover:bg-elevated'
                     }`}
                 >
-                  {t === 'stock' ? '股票' : 'ETF'}
+                  {t === 'stock' ? tx('股票') : 'ETF'}
                 </button>
               ))}
             </div>
@@ -991,7 +993,7 @@ export function Screener() {
                       : 'text-muted hover:text-secondary hover:bg-elevated'
                     }`}
                 >
-                  {tf === 'all' ? '全部' : tf === '1d' ? '日线' : '分钟'}
+                  {tf === 'all' ? tx('全部') : tf === '1d' ? tx('日线') : tx('分钟')}
                 </button>
               ))}
             </div>
@@ -999,15 +1001,14 @@ export function Screener() {
             <button
               onClick={() => reloadStrategies.mutate()}
               disabled={reloadStrategies.isPending}
-              title="重新加载策略并运行全部策略，刷新当前符合条件的个股"
+              title={tx('重新加载策略并运行全部策略，刷新当前符合条件的个股')}
               className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-btn
                 border border-border bg-surface text-xs font-medium text-muted
                 hover:text-accent hover:border-accent/50 transition-colors cursor-pointer
                 disabled:opacity-50 disabled:cursor-wait"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${reloadStrategies.isPending ? 'animate-spin' : ''}`} />
-              重载
-            </button>
+              {tx('重载')}</button>
             {asOf && (
               <DatePicker
                 value={asOf}
@@ -1019,7 +1020,7 @@ export function Screener() {
             {/* 全部切换 */}
             <button
               onClick={() => setShowAll(v => { if (!v) setActiveStrategy(null); return !v })}
-              title="显示全部策略个股"
+              title={tx('显示全部策略个股')}
               className={`inline-flex items-center justify-center h-7 w-7 rounded-btn border transition-colors cursor-pointer
                 ${showAll
                   ? 'border-accent/50 bg-accent/10 text-accent'
@@ -1040,7 +1041,7 @@ export function Screener() {
                       : 'text-muted hover:text-secondary hover:bg-elevated'
                     }`}
                 >
-                  {sz === 'hidden' ? '隐藏' : sz === 'mini' ? '紧凑' : sz === 'normal' ? '标准' : '详细'}
+                  {sz === 'hidden' ? tx('隐藏') : sz === 'mini' ? tx('紧凑') : sz === 'normal' ? tx('标准') : tx('详细')}
                 </button>
               ))}
             </div>
@@ -1052,8 +1053,7 @@ export function Screener() {
                 hover:text-accent hover:border-accent/50 transition-colors cursor-pointer"
             >
               <Layers className="h-3.5 w-3.5" />
-              策略库
-              <span className="ml-0.5 min-w-[28px] h-4 flex items-center justify-center rounded-full bg-accent/15 text-accent text-[10px] font-bold">
+              {tx('策略库')}<span className="ml-0.5 min-w-[28px] h-4 flex items-center justify-center rounded-full bg-accent/15 text-accent text-[10px] font-bold">
                 {visiblePool.length}/{strategyPresets.length}
               </span>
             </button>
@@ -1065,8 +1065,7 @@ export function Screener() {
                 hover:bg-teal-500/15 transition-colors cursor-pointer"
             >
               <Layers className="h-3.5 w-3.5" />
-              叠加策略
-            </button>
+              {tx('叠加策略')}</button>
             {/* 创建策略 */}
             <button
               onClick={() => { setBuilderMode('create'); setShowBuilder(true) }}
@@ -1075,8 +1074,7 @@ export function Screener() {
                 hover:bg-amber-400/15 transition-colors cursor-pointer"
             >
               <Sparkles className="h-3.5 w-3.5" />
-              创建策略 · AI
-            </button>
+              {tx('创建策略 · AI')}</button>
             {/* 获取策略（占位，敬请期待）— 暂时隐藏 */}
             {SHOW_STRATEGY_STORE && (
               <button
@@ -1086,15 +1084,14 @@ export function Screener() {
                   hover:text-accent hover:border-accent/50 transition-colors cursor-pointer"
               >
                 <Store className="h-3.5 w-3.5" />
-                获取策略
-              </button>
+                {tx('获取策略')}</button>
             )}
             {/* 默认基础参数: 之后新建策略默认使用的基础过滤配置 */}
             <div className="flex shrink-0 items-center gap-1.5">
               <ResourceTransferButton kind="strategy" />
               <button
                 onClick={() => setShowDefaultParams(true)}
-                title="默认基础参数 — 新建策略默认使用的基础过滤配置"
+                title={tx('默认基础参数 — 新建策略默认使用的基础过滤配置')}
                 className="inline-flex items-center justify-center h-7 w-7 rounded-btn
                   border border-border bg-surface text-muted
                   hover:text-accent hover:border-accent/50 transition-colors cursor-pointer"
@@ -1110,47 +1107,46 @@ export function Screener() {
         {/* 策略卡片 */}
         {cardSize !== 'hidden' && (
         <section>
-          {strategies.isLoading && <div className="text-sm text-muted">加载中…</div>}
+          {strategies.isLoading && <div className="text-sm text-muted">{tx('加载中…')}</div>}
           {!strategies.isLoading && strategies.isError && (
             <div className="flex flex-col items-center gap-2 py-4 text-center border border-dashed border-danger/40 rounded-btn">
-              <span className="text-sm text-secondary">策略列表加载失败，请重试；策略池配置本身不受影响。</span>
+              <span className="text-sm text-secondary">{tx('策略列表加载失败，请重试；策略池配置本身不受影响。')}</span>
               <button
                 type="button"
                 onClick={() => strategies.refetch()}
                 disabled={strategies.isFetching}
                 className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-accent transition-colors hover:bg-elevated disabled:opacity-50"
               >
-                重试
-              </button>
+                {tx('重试')}</button>
             </div>
           )}
           {!strategies.isLoading && !strategies.isError && displayPool.length === 0 && (
             <div className="py-4 text-center border border-dashed border-border rounded-btn">
               <div className="text-sm text-muted">
                 {pool.length === 0
-                  ? '策略池为空，点击右上角「策略库」按钮添加策略'
-                  : '当前周期筛选下无策略，切换周期筛选或编辑策略库'}
+                  ? tx('策略池为空，点击右上角「策略库」按钮添加策略')
+                  : tx('当前周期筛选下无策略，切换周期筛选或编辑策略库')}
               </div>
               {/* 池空时补文档入口: 用户此刻最需要的是「怎么造一个策略」, 而文档路径
                   在界面上不可发现 —— 补上下文提到的三份指南, 与其它页引用 docs 同款
                   (等宽文本而非链接: 这些是仓库内文件, 浏览器里点不开)。 */}
               {pool.length === 0 && (
                 <div className="mt-2 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-[11px] leading-relaxed text-muted/80">
-                  <span>自己写策略看</span>
+                  <span>{tx('自己写策略看')}</span>
                   <code className="rounded bg-elevated/70 px-1 py-px font-mono text-[10px] text-secondary">docs/strategy.md</code>
-                  <span>（三种扩展方式：自定义信号 / AI 生成 / 手写代码）</span>
+                  <span>{tx('（三种扩展方式：自定义信号 / AI 生成 / 手写代码）')}</span>
                   <span className="text-border" aria-hidden="true">·</span>
-                  <span>用 AI 迭代已有策略看</span>
+                  <span>{tx('用 AI 迭代已有策略看')}</span>
                   <code className="rounded bg-elevated/70 px-1 py-px font-mono text-[10px] text-secondary">docs/strategy-iteration.md</code>
                 </div>
               )}
             </div>
           )}
           {poolGroupTabs && (
-            <div className="mb-2 flex flex-wrap items-center gap-1 border-b border-border/60 pb-2" role="tablist" aria-label="策略分组">
+            <div className="mb-2 flex flex-wrap items-center gap-1 border-b border-border/60 pb-2" role="tablist" aria-label={tx('策略分组')}>
               <button type="button" role="tab" aria-selected={activePoolTab === 'all'} onClick={() => changePoolGroupTab('all')}
                 className={cn('rounded-btn px-2.5 py-1 text-[11px] transition-colors', activePoolTab === 'all' ? 'bg-accent/10 font-medium text-accent' : 'text-secondary hover:bg-elevated hover:text-foreground')}>
-                全部<span className="ml-1 tabular-nums text-muted">{displayPool.length}</span>
+                {tx('全部')}<span className="ml-1 tabular-nums text-muted">{displayPool.length}</span>
               </button>
               {poolGroupTabs.map(tab => (
                 <button key={tab.key} type="button" role="tab" aria-selected={activePoolTab === tab.key} onClick={() => changePoolGroupTab(tab.key)}
@@ -1186,18 +1182,16 @@ export function Screener() {
                     <span className="text-secondary">{strategyIdToName[activeStrategy] ?? ''}</span>
                   )}
                   <TrendingUp className="h-4 w-4 text-accent" />
-                  {showAll ? '全部' : ''}命中 <span className="text-accent num">{displayRows.length}</span> 只
-                  {filterActive(filter) && displayRows.length !== (showAll ? allRows.length : result!.total) && (
+                  {showAll ? tx('全部') : ''}{tx('命中')} <span className="text-accent num">{displayRows.length}</span> {tx('只')}{filterActive(filter) && displayRows.length !== (showAll ? allRows.length : result!.total) && (
                     <span className="text-muted text-xs">/ {showAll ? allRows.length : result!.total}</span>
                   )}
                   <span className="text-[11px] text-muted font-normal">
-                    · {displayPool.length} 策略
-                    {!showAll && displayPool.length > 0 && (
-                      <> · 共 {displayPool.reduce((sum, id) => sum + (hitCounts[id] ?? 0), 0)} 只</>
+                    · {displayPool.length} {tx('策略')}{!showAll && displayPool.length > 0 && (
+                      <> {tx('· 共')} {displayPool.reduce((sum, id) => sum + (hitCounts[id] ?? 0), 0)} {tx('只')}</>
                     )}
                   </span>
                   {runAll.isPending && (
-                    <span className="text-[11px] text-muted animate-pulse">扫描中…</span>
+                    <span className="text-[11px] text-muted animate-pulse">{tx('扫描中…')}</span>
                   )}
                 </h2>
                 <div className="flex items-center gap-3">
@@ -1214,8 +1208,7 @@ export function Screener() {
                           }`}
                       >
                         <Filter className="h-3 w-3" />
-                        筛选
-                        {filterActive(filter) && (
+                        {tx('筛选')}{filterActive(filter) && (
                           <span className="bg-accent text-white rounded-full min-w-4 h-4 px-1 flex items-center justify-center text-[10px] font-bold leading-none">
                             {countActiveFilters(filter)}
                           </span>
@@ -1229,7 +1222,7 @@ export function Screener() {
                               setFilter(defaultFilter)
                               if (activeStrategy) filterMap.current.delete(activeStrategy)
                             }}
-                            title="清空筛选条件"
+                            title={tx('清空筛选条件')}
                             className="inline-flex items-center gap-1 px-2 text-muted
                               hover:bg-danger/10 hover:text-danger transition-colors duration-150 cursor-pointer"
                           >
@@ -1244,19 +1237,19 @@ export function Screener() {
                       onSelect={handleBatchAdd}
                       disabled={batchAdd.isPending}
                       align="right"
-                      title="批量加自选"
-                      ariaLabel="批量加入自选"
+                      title={tx('批量加自选')}
+                      ariaLabel={tx('批量加入自选')}
                       triggerClassName="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-btn
                         border border-accent/40 bg-accent/10 text-accent text-xs font-medium
                         hover:bg-accent/20 disabled:opacity-50 transition-colors duration-150 cursor-pointer"
                     >
                       <Star className="h-3 w-3" />
-                      {batchAdd.isPending ? '添加中…' : '批量加自选'}
+                      {batchAdd.isPending ? tx('添加中…') : tx('批量加自选')}
                     </WatchlistAddMenu>
                   )}
                   <button
                     onClick={() => setCustomizerOpen(true)}
-                    title="列表配置"
+                    title={tx('列表配置')}
                     className={`inline-flex items-center justify-center h-7 w-7 rounded-btn border text-xs font-medium transition-colors cursor-pointer
                       ${customizerOpen
                         ? 'border-accent/50 bg-accent/10 text-accent'
@@ -1277,12 +1270,11 @@ export function Screener() {
                   {/* 分时截断提示: 超数据源批量上限时在工具栏内联显示, 可关闭 */}
                   {intradayTruncated && !intradayCapDismissed && (
                     <span className="inline-flex items-center gap-1 text-xs text-warning/90">
-                      分时仅前 {minuteBatchCap}/{allIntradaySymbols.length} · 受数据源批量上限限制
-                      <button
+                      {tx('分时仅前')} {minuteBatchCap}/{allIntradaySymbols.length} {tx('· 受数据源批量上限限制')}<button
                         type="button"
                         onClick={() => setIntradayCapDismissed(true)}
                         className="text-warning/50 hover:text-warning transition-colors"
-                        title="关闭提示"
+                        title={tx('关闭提示')}
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -1307,10 +1299,10 @@ export function Screener() {
               {displayRows.length === 0 ? (
                 <EmptyState
                   icon={ScanSearch}
-                  title={filterActive(filter) ? '筛选后无命中' : '今日无命中'}
+                  title={filterActive(filter) ? tx('筛选后无命中') : tx('今日无命中')}
                   hint={filterActive(filter)
-                    ? '当前筛选条件过严, 试试放宽或重置筛选。'
-                    : '可能数据未跑盘后管道,或策略条件过于严苛。试试 POST /api/pipeline/run。'}
+                    ? tx('当前筛选条件过严, 试试放宽或重置筛选。')
+                    : tx('可能数据未跑盘后管道,或策略条件过于严苛。试试 POST /api/pipeline/run。')}
                 />
               ) : (
                 <>
@@ -1359,13 +1351,13 @@ export function Screener() {
                 {/* 池空时没有卡片可点, 原文案「点击策略卡片」会指向不存在的操作 */}
                 {pool.length === 0 ? (
                   <>
-                    <span className="text-sm text-secondary">还没有策略，先添加或创建一个</span>
-                    <span className="text-[11px] text-muted">用右上角「创建策略 · AI」生成，或按上方文档手写</span>
+                    <span className="text-sm text-secondary">{tx('还没有策略，先添加或创建一个')}</span>
+                    <span className="text-[11px] text-muted">{tx('用右上角「创建策略 · AI」生成，或按上方文档手写')}</span>
                   </>
                 ) : (
                   <>
-                    <span className="text-sm text-secondary">点击策略卡片查看策略结果</span>
-                    <span className="text-[11px] text-muted">若提示 enriched 表无数据，请先运行盘后管道</span>
+                    <span className="text-sm text-secondary">{tx('点击策略卡片查看策略结果')}</span>
+                    <span className="text-[11px] text-muted">{tx('若提示 enriched 表无数据，请先运行盘后管道')}</span>
                   </>
                 )}
               </div>
@@ -1380,8 +1372,8 @@ export function Screener() {
         onChange={handleColumnsChange}
         open={customizerOpen}
         onClose={() => setCustomizerOpen(false)}
-        title="自定义策略结果列"
-        builtinSectionLabel="策略内置列"
+        title={tx('自定义策略结果列')}
+        builtinSectionLabel={tx('策略内置列')}
         extColumnAlign="center"
         baselineStore={{
           get: () => storage.screenerResultColumnsBaseline.get(null) as ColumnConfig[] | null,
@@ -1466,12 +1458,12 @@ export function Screener() {
         onSavedId={async (id, researchOnly) => {
           if (researchOnly) {
             // AI 策略保存为 research_only 草稿, 不进入策略池, 提示用户去策略池发布
-            toast('AI 策略已保存为草稿，请在策略池「AI」标签发布后使用', 'success')
+            toast(tx('AI 策略已保存为草稿，请在策略池「AI」标签发布后使用'), 'success')
             return
           }
           const data = await qc.fetchQuery({ queryKey: [...QK.screenerStrategies('all'), 'all'], queryFn: () => api.screenerStrategies(undefined, 'all'), staleTime: 0 })
           if (!data.presets.some(s => s.id === id)) {
-            throw new Error(`策略 ${id} 已保存但未加载，请检查策略代码`)
+            throw new Error(tx('策略 {id} 已保存但未加载，请检查策略代码', { id }))
           }
           addToPool(id)
           // 新建策略为日线时立即扫描, 免去手动点刷新 (分钟策略仍手动单跑)

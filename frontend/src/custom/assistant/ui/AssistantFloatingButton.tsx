@@ -11,6 +11,7 @@ import { motion } from 'framer-motion'
 import { Sparkles } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { getPageScale } from '@/lib/pageZoom'
+import { useI18n } from '@/lib/i18n'
 import { toggleAssistant, useAssistantStore } from '../store'
 
 const POS_STORAGE_KEY = 'assistant.fab.pos.v1'
@@ -59,6 +60,7 @@ function savePos(pos: BallPos) {
 }
 
 export function AssistantFloatingButton() {
+  const { tx } = useI18n()
   const { open, sending, fabVisible } = useAssistantStore()
   const [pos, setPos] = useState<BallPos>(() => loadPos())
   const ballRef = useRef<HTMLButtonElement>(null)
@@ -141,8 +143,8 @@ export function AssistantFloatingButton() {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onLostPointerCapture={onPointerUp}
-      title="AI 助手 (⌘K / Ctrl+K · 可拖动)"
-      aria-label="AI 助手"
+      title={tx('AI 助手 (⌘K / Ctrl+K · 可拖动)')}
+      aria-label={tx('AI 助手')}
       style={{ left: pos.x, top: pos.y, width: SIZE, height: SIZE }}
       className={cn(
         // z-30 = 常驻入口层: 在页面内容之上, 但低于 z-40 遮罩与 z-50 弹窗 —
@@ -158,7 +160,7 @@ export function AssistantFloatingButton() {
       {sending && (
         <span
           className="absolute -right-0.5 -top-0.5 h-3 w-3 animate-pulse rounded-full border-2 border-surface bg-warning"
-          title="生成中"
+          title={tx('生成中')}
         />
       )}
     </motion.button>,

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { DailyResultStaleNotice } from '@/components/data/DailyDataHealthNotice'
 import { Play, Square, TrendingDown, GitBranch, CheckCircle2 } from 'lucide-react'
 import { api, type StrategyDetail } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { fmtPct } from '@/lib/format'
 import { EmptyState } from '@/components/EmptyState'
@@ -46,6 +47,7 @@ function fin(v: number | null | undefined): number | null {
 
 /** OOS 拼接净值曲线 (逐折复利) — walk-forward 核心产出的极简 SVG 折线。 */
 function OosEquityChart({ curve }: { curve: { fold: number; date: string; value: number }[] }) {
+  const { tx } = useI18n()
   // 过滤非有限值: 零成交折等边界可能产出 NaN/Infinity, 混入会让坐标全 NaN → SVG 空白。
   const vals = curve.map(p => p.value).filter(v => Number.isFinite(v))
   if (!vals.length) return null
@@ -61,17 +63,18 @@ function OosEquityChart({ curve }: { curve: { fold: number; date: string; value:
   const up = last >= 1
   return (
     <div>
-      <div className="mb-1 text-xs font-medium text-secondary">OOS 拼接净值 (逐折复利)</div>
+      <div className="mb-1 text-xs font-medium text-secondary">{tx('OOS 拼接净值 (逐折复利)')}</div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none" style={{ height: 120 }}>
         <line x1={pad} y1={y(1)} x2={W - pad} y2={y(1)} stroke="currentColor" strokeWidth="0.5" className="text-border" strokeDasharray="3 3" />
         <path d={d} fill="none" stroke={up ? '#34d399' : '#f87171'} strokeWidth="1.5" />
       </svg>
-      <div className="mt-0.5 text-[10px] text-secondary">终值 {last.toFixed(4)} · {curve.length} 折</div>
+      <div className="mt-0.5 text-[10px] text-secondary">{tx('终值')} {last.toFixed(4)} · {curve.length} {tx('折')}</div>
     </div>
   )
 }
 
 export function StrategyWalkForward() {
+  const { tx } = useI18n()
   const task = useWalkForwardTask()
   const { data: stratData } = useQuery({ queryKey: QK.strategyList(), queryFn: () => api.strategyList() })
   const strategies: StrategyDetail[] = stratData?.strategies ?? []
@@ -132,13 +135,13 @@ export function StrategyWalkForward() {
   const onApplyLatestFold = async () => {
     const fold = result?.folds[result.folds.length - 1]
     if (!fold?.best_params || !sweep.selected || applying) return
-    if (!window.confirm(`将第 ${fold.index + 1} 折训练参数应用到策略「${sweep.selected.name}」?\n来源折测试期: ${fold.test_start} ~ ${fold.test_end}\n(写入策略配置, 可在策略页查看/还原)`)) return
+    if (!window.confirm(tx('将第 {n} 折训练参数应用到策略「{name}」?\n来源折测试期: {start} ~ {end}\n(写入策略配置, 可在策略页查看/还原)', { n: fold.index + 1, name: sweep.selected.name, start: fold.test_start, end: fold.test_end }))) return
     setApplying(true)
     try {
       await applyStrategyParams(sweep.selected, fold.best_params)
-      toast('已应用到策略配置 (策略页可还原)', 'success')
+      toast(tx('已应用到策略配置 (策略页可还原)'), 'success')
     } catch (e) {
-      toast(`应用失败 · ${String((e as Error)?.message || e)}`, 'error')
+      toast(tx('应用失败 · {msg}', { msg: String((e as Error)?.message || e) }), 'error')
     } finally {
       setApplying(false)
     }
@@ -159,12 +162,12 @@ export function StrategyWalkForward() {
       {/* ── 配置面板 ── */}
       <div className="space-y-3 rounded-card border border-border bg-surface p-4">
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-secondary">策略</label>
+          <label className="mb-1.5 block text-xs font-medium text-secondary">{tx('策略')}</label>
           <StrategySelect strategies={strategies} value={sweep.strategyId} onChange={sweep.selectStrategy} />
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-secondary">优化目标</label>
+          <label className="mb-1.5 block text-xs font-medium text-secondary">{tx('优化目标')}</label>
           <select value={objective} onChange={e => setObjective(e.target.value)} className={INPUT_CLS}>
             {PRIMARY_OBJECTIVES.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select>
@@ -172,11 +175,11 @@ export function StrategyWalkForward() {
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-secondary">起始</label>
+            <label className="mb-1.5 block text-xs font-medium text-secondary">{tx('起始')}</label>
             <DatePicker value={start} onChange={setStart} />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-secondary">结束</label>
+            <label className="mb-1.5 block text-xs font-medium text-secondary">{tx('结束')}</label>
             <DatePicker value={end} onChange={setEnd} />
           </div>
         </div>
@@ -184,27 +187,27 @@ export function StrategyWalkForward() {
         {/* 滚动窗口 */}
         <div className="grid grid-cols-3 gap-1.5">
           <div>
-            <label className="mb-1 block text-[11px] text-secondary">训练(天)</label>
+            <label className="mb-1 block text-[11px] text-secondary">{tx('训练(天)')}</label>
             <input type="number" min={1} value={trainDays} onChange={e => setTrainDays(e.target.value)} className={INPUT_CLS} />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-secondary">测试(天)</label>
+            <label className="mb-1 block text-[11px] text-secondary">{tx('测试(天)')}</label>
             <input type="number" min={1} value={testDays} onChange={e => setTestDays(e.target.value)} className={INPUT_CLS} />
           </div>
           <div>
-            <label className="mb-1 block text-[11px] text-secondary">步进(天)</label>
+            <label className="mb-1 block text-[11px] text-secondary">{tx('步进(天)')}</label>
             <input type="number" min={1} value={stepDays} onChange={e => setStepDays(e.target.value)} className={INPUT_CLS} />
           </div>
         </div>
 
         {foldPreview.data && foldPreview.data.folds.length > 0 && (
           <div className="rounded-input border border-border/60 bg-elevated/30 p-2">
-            <div className="mb-1 text-[11px] font-medium text-secondary">折预览 (共 {foldPreview.data.n_folds} 折)</div>
+            <div className="mb-1 text-[11px] font-medium text-secondary">{tx('折预览 (共')} {foldPreview.data.n_folds} {tx('折)')}</div>
             <div className="max-h-28 space-y-0.5 overflow-y-auto">
               {foldPreview.data.folds.map(f => (
                 <div key={f.index} className="flex justify-between text-[10px] text-muted">
-                  <span>#{f.index + 1} 训 {f.train_start}~{f.train_end}</span>
-                  <span>测 {f.test_start}~{f.test_end}</span>
+                  <span>#{f.index + 1} {tx('训')} {f.train_start}~{f.train_end}</span>
+                  <span>{tx('测')} {f.test_start}~{f.test_end}</span>
                 </div>
               ))}
             </div>
@@ -214,29 +217,27 @@ export function StrategyWalkForward() {
           </div>
         )}
         {foldPreview.error && (
-          <div className="text-[11px] text-red-400">折切分无效: {(foldPreview.error as Error)?.message ?? '请检查区间与窗口参数'}</div>
+          <div className="text-[11px] text-red-400">{tx('折切分无效:')} {(foldPreview.error as Error)?.message ?? tx('请检查区间与窗口参数')}</div>
         )}
 
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-secondary">模式</label>
+          <label className="mb-1.5 block text-xs font-medium text-secondary">{tx('模式')}</label>
           <select value={mode} onChange={e => setMode(e.target.value as any)} className={INPUT_CLS}>
-            <option value="position">组合仓位</option>
-            <option value="full">全量独立</option>
+            <option value="position">{tx('组合仓位')}</option>
+            <option value="full">{tx('全量独立')}</option>
           </select>
         </div>
 
         <SweepParamList params={sweep.params} sweeps={sweep.sweeps} updateSweep={sweep.updateSweep} hiddenLabels={sweep.hiddenParamLabels} />
         <CombosHint show={!!sweep.strategyId} combos={sweep.combos} gridError={sweep.gridError} />
-        <div className="text-[11px] text-secondary">每折跑 {sweep.combos || 0} 组优化 × N 折，耗时较长</div>
+        <div className="text-[11px] text-secondary">{tx('每折跑')} {sweep.combos || 0} {tx('组优化 × N 折，耗时较长')}</div>
 
         {task?.isPending ? (
           <button onClick={stopWalkForward} className="inline-flex w-full items-center justify-center gap-1.5 rounded-btn bg-red-500/90 px-3 py-2 text-xs font-medium text-white hover:bg-red-500">
-            <Square className="h-3.5 w-3.5" /> 停止
-          </button>
+            <Square className="h-3.5 w-3.5" /> {tx('停止')}</button>
         ) : (
           <button onClick={onRun} disabled={!canRun} className="inline-flex w-full items-center justify-center gap-1.5 rounded-btn bg-accent px-3 py-2 text-xs font-medium text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">
-            <Play className="h-3.5 w-3.5" /> 开始滚动样本外检验
-          </button>
+            <Play className="h-3.5 w-3.5" /> {tx('开始滚动样本外检验')}</button>
         )}
       </div>
 
@@ -249,7 +250,7 @@ export function StrategyWalkForward() {
         {task?.isPending && progress && (
           <div className="mb-4">
             <div className="mb-1 flex justify-between text-xs text-secondary">
-              <span>第 {progress.done}/{progress.total} 折</span>
+              <span>{tx('第')} {progress.done}/{progress.total} {tx('折')}</span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-elevated">
               <div className="h-full bg-accent transition-all" style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} />
@@ -260,32 +261,32 @@ export function StrategyWalkForward() {
         <DailyResultStaleNotice result={result} />
         {!result && !task?.isPending && (
           <EmptyState
-            title="滚动样本外检验"
-            hint="每折在训练区间网格优化选最优参数，再在紧邻的测试区间做样本外(OOS)验证。样本内漂亮、样本外崩溃即过拟合。"
+            title={tx('滚动样本外检验')}
+            hint={tx('每折在训练区间网格优化选最优参数，再在紧邻的测试区间做样本外(OOS)验证。样本内漂亮、样本外崩溃即过拟合。')}
           />
         )}
 
         {result && result.n_folds === 0 && (
-          <EmptyState title="未产生有效折"
-            hint={`计划 ${result.n_planned_folds} 折, 但 ${result.n_skipped} 折因训练区间未优化出参数或 OOS 回测失败被跳过。请检查数据范围或放宽参数网格。`} />
+          <EmptyState title={tx('未产生有效折')}
+            hint={tx('计划 {planned} 折, 但 {skipped} 折因训练区间未优化出参数或 OOS 回测失败被跳过。请检查数据范围或放宽参数网格。', { planned: result.n_planned_folds, skipped: result.n_skipped })} />
         )}
 
         {result && summary && result.n_folds > 0 && (
           <div className="space-y-4">
             {/* 汇总卡 — 可空数值已在上游用 fin() 归一, NaN/Infinity 走 '—' 而非渲染 "NaN" */}
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Stat label="OOS 复利收益" value={fmtPct(compounded)}
+              <Stat label={tx('OOS 复利收益')} value={fmtPct(compounded)}
                 color={compounded != null && compounded >= 0 ? '#34d399' : '#f87171'} />
-              <Stat label="IS→OOS 退化"
+              <Stat label={tx('IS→OOS 退化')}
                 value={degradation != null ? degradation.toFixed(3) : '—'}
-                hint={degradation != null && degradation > 0 ? '样本外退化=过拟合' : '样本外未退化'}
+                hint={degradation != null && degradation > 0 ? tx('样本外退化=过拟合') : tx('样本外未退化')}
                 color={degradation != null && degradation > 0 ? '#f87171' : '#34d399'} />
-              <Stat label="一致性" value={fmtPct(summary.consistency)} hint="OOS 盈利折占比" />
-              <Stat label="有效折" value={result.n_skipped > 0 ? `${result.n_folds} (跳过${result.n_skipped})` : String(result.n_folds)} />
+              <Stat label={tx('一致性')} value={fmtPct(summary.consistency)} hint={tx('OOS 盈利折占比')} />
+              <Stat label={tx('有效折')} value={result.n_skipped > 0 ? tx('{n} (跳过{s})', { n: result.n_folds, s: result.n_skipped }) : String(result.n_folds)} />
             </div>
 
             <div className="text-xs text-secondary">
-              IS 目标均值 {avgIs != null ? avgIs.toFixed(3) : '—'} · OOS 目标均值 {avgOos != null ? avgOos.toFixed(3) : '—'} · 耗时 {(result.elapsed_ms / 1000).toFixed(1)}s
+              {tx('IS 目标均值')} {avgIs != null ? avgIs.toFixed(3) : '—'} {tx('· OOS 目标均值')} {avgOos != null ? avgOos.toFixed(3) : '—'} {tx('· 耗时')} {(result.elapsed_ms / 1000).toFixed(1)}s
             </div>
 
             {/* OOS 拼接净值曲线 (walk-forward 核心产出) */}
@@ -298,10 +299,9 @@ export function StrategyWalkForward() {
             {result.folds.length > 0 && result.folds[result.folds.length - 1].best_params && (
               <div className="flex items-center justify-between gap-3 rounded-card border border-border/60 bg-elevated/30 p-3">
                 <div className="min-w-0 text-[11px] text-secondary">
-                  <div className="font-medium text-foreground">采用最新折参数</div>
+                  <div className="font-medium text-foreground">{tx('采用最新折参数')}</div>
                   <div className="mt-0.5 truncate">
-                    第 {result.folds[result.folds.length - 1].index + 1} 折 (测试期 {result.folds[result.folds.length - 1].test_start} ~ {result.folds[result.folds.length - 1].test_end}) 训练所得:
-                    {' '}{Object.entries(result.folds[result.folds.length - 1].best_params!).map(([k, v]) => `${k}=${String(v)}`).join(', ')}
+                    {tx('第')} {result.folds[result.folds.length - 1].index + 1} {tx('折 (测试期')} {result.folds[result.folds.length - 1].test_start} ~ {result.folds[result.folds.length - 1].test_end}{tx(') 训练所得:')}{' '}{Object.entries(result.folds[result.folds.length - 1].best_params!).map(([k, v]) => `${k}=${String(v)}`).join(', ')}
                   </div>
                 </div>
                 <button
@@ -309,7 +309,7 @@ export function StrategyWalkForward() {
                   disabled={applying}
                   className="shrink-0 inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-[11px] font-medium text-white hover:opacity-90 disabled:opacity-40"
                 >
-                  <CheckCircle2 className="h-3.5 w-3.5" /> {applying ? '应用中…' : '应用到策略'}
+                  <CheckCircle2 className="h-3.5 w-3.5" /> {applying ? tx('应用中…') : tx('应用到策略')}
                 </button>
               </div>
             )}
@@ -317,11 +317,11 @@ export function StrategyWalkForward() {
             {/* 跳过折透明展示: 无效折不进聚合但不静默消失 */}
             {result.skipped?.length > 0 && (
               <div className="rounded-card border border-border/60 p-3">
-                <div className="mb-1.5 text-xs font-medium text-secondary">跳过的折 ({result.skipped.length})</div>
+                <div className="mb-1.5 text-xs font-medium text-secondary">{tx('跳过的折 (')}{result.skipped.length})</div>
                 <div className="max-h-32 space-y-0.5 overflow-y-auto">
                   {result.skipped.map((s, i) => (
                     <div key={i} className="flex justify-between gap-2 text-[10px] text-muted">
-                      <span>#{s.index + 1} 测试 {s.test_start}~{s.test_end}</span>
+                      <span>#{s.index + 1} {tx('测试')} {s.test_start}~{s.test_end}</span>
                       <span className="text-amber-400/80">{s.reason}</span>
                     </div>
                   ))}
@@ -334,12 +334,12 @@ export function StrategyWalkForward() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-border text-secondary">
-                    <th className="px-2 py-1.5 text-left">折</th>
-                    <th className="px-2 py-1.5 text-left">测试区间</th>
-                    <th className="px-2 py-1.5 text-left">最优参数</th>
-                    <th className="px-2 py-1.5 text-right">IS 目标</th>
-                    <th className="px-2 py-1.5 text-right">OOS 目标</th>
-                    <th className="px-2 py-1.5 text-right">OOS 收益</th>
+                    <th className="px-2 py-1.5 text-left">{tx('折')}</th>
+                    <th className="px-2 py-1.5 text-left">{tx('测试区间')}</th>
+                    <th className="px-2 py-1.5 text-left">{tx('最优参数')}</th>
+                    <th className="px-2 py-1.5 text-right">{tx('IS 目标')}</th>
+                    <th className="px-2 py-1.5 text-right">{tx('OOS 目标')}</th>
+                    <th className="px-2 py-1.5 text-right">{tx('OOS 收益')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -372,8 +372,7 @@ export function StrategyWalkForward() {
             {degradation != null && degradation > 0 && (
               <div className="flex items-center gap-1.5 rounded-input border border-red-500/30 bg-red-500/5 px-3 py-2 text-[11px] text-red-400">
                 <TrendingDown className="h-3.5 w-3.5" />
-                样本外目标较样本内退化 {degradation.toFixed(3)}，提示参数可能过拟合训练区间。
-              </div>
+                {tx('样本外目标较样本内退化')} {degradation.toFixed(3)}{tx('，提示参数可能过拟合训练区间。')}</div>
             )}
           </div>
         )}
@@ -387,6 +386,7 @@ export function StrategyWalkForward() {
  *  与稳健优化的"各段冠军收敛度"同一诊断的滚动版: 各折最优值稳定 → 参数可信;
  *  逐折大幅摆动 → 策略对参数敏感, 任何单折"最优"都别全信。 */
 function ParamDrift({ folds }: { folds: { index: number; best_params: Record<string, any> | null }[] }) {
+  const { tx } = useI18n()
   const withParams = folds.filter(f => f.best_params)
   if (withParams.length < 2) return null
   const keys = Object.keys(withParams[0].best_params!)
@@ -394,8 +394,7 @@ function ParamDrift({ folds }: { folds: { index: number; best_params: Record<str
   return (
     <div className="rounded-card border border-border/60 p-3">
       <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-secondary">
-        <GitBranch className="h-3.5 w-3.5" /> 参数漂移轨迹 (逐折最优值)
-      </div>
+        <GitBranch className="h-3.5 w-3.5" /> {tx('参数漂移轨迹 (逐折最优值)')}</div>
       <div className="space-y-1">
         {keys.map(k => {
           const seq = withParams.map(f => String(f.best_params![k]))
@@ -405,7 +404,7 @@ function ParamDrift({ folds }: { folds: { index: number; best_params: Record<str
               <span className="w-32 shrink-0 truncate text-muted" title={k}>{k}</span>
               <span className="min-w-0 flex-1 truncate text-foreground">{seq.join(' → ')}</span>
               <span className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] ${stable ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400' : 'border-amber-500/40 bg-amber-500/10 text-amber-400'}`}>
-                {stable ? '稳定' : '漂移'}
+                {stable ? tx('稳定') : tx('漂移')}
               </span>
             </div>
           )

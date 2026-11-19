@@ -5,6 +5,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Trash2, RefreshCw, Star, X, Search, LayoutGrid, List, Rows3, BarChart3, Settings2, Plus, Check, Filter, Eye, EyeOff, Minus, ChevronsUp, Clock, RotateCcw, FileUp, FolderOpen, FolderMinus, FolderPlus } from 'lucide-react'
 import { api, type KlineRow, type MinuteKlineRow, type WatchlistGroup, type WatchlistGroupColor } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 import { ExtSparkChart } from '@/components/screener/ExtSparkChart'
 import { MINUTE_SEED_MAX } from '@/lib/minuteBatchIncremental'
 import { useMinuteBatchQuery } from '@/lib/useMinuteBatchQuery'
@@ -66,7 +67,7 @@ import {
 // ===== 板块标识（筛选/卡片用） =====
 // 注: boardTag（创/科/北 标签）已移至共享 @/components/stock-table/primitives
 
-const BOARDS = ['沪主板', '深主板', '创业板', '科创板', '北交所'] as const
+const BOARDS = ['沪主板', '深主板', '创业板', '科创板', '北交所'] as const // i18n-exempt: 板块标识不翻译
 type BoardType = typeof BOARDS[number]
 
 // 板块筛选选项 = 股票板块 + ETF（ETF 无 symbol 板块语义，按 asset_type 匹配）
@@ -74,11 +75,11 @@ const ETF_BOARD = 'ETF'
 const BOARD_OPTIONS = [...BOARDS, ETF_BOARD]
 
 function getBoardType(symbol: string): BoardType | null {
-  if (/^(300|301)/.test(symbol)) return '创业板'
-  if (/^688/.test(symbol))       return '科创板'
-  if (/\.BJ$/.test(symbol))      return '北交所'
-  if (/^60[0135]/.test(symbol))  return '沪主板'
-  if (/^00[012]/.test(symbol))   return '深主板'
+  if (/^(300|301)/.test(symbol)) return '创业板' // i18n-exempt: 板块标识不翻译
+  if (/^688/.test(symbol))       return '科创板' // i18n-exempt: 板块标识不翻译
+  if (/\.BJ$/.test(symbol))      return '北交所' // i18n-exempt: 板块标识不翻译
+  if (/^60[0135]/.test(symbol))  return '沪主板' // i18n-exempt: 板块标识不翻译
+  if (/^00[012]/.test(symbol))   return '深主板' // i18n-exempt: 板块标识不翻译
   return null
 }
 
@@ -118,7 +119,7 @@ function renderExtValue(
     return <span className="tabular-nums">{displayVal}</span>
   }
   if (typeof val === 'boolean') {
-    return <span className={val ? 'text-bull' : 'text-muted'}>{val ? '是' : '否'}</span>
+    return <span className={val ? 'text-bull' : 'text-muted'}>{val ? tx('是') : tx('否')}</span>
   }
 
   // String — 按 extDisplay 配置渲染
@@ -179,8 +180,7 @@ function renderExtValue(
           onClick={onToggle}
           className="inline-block px-1.5 py-px rounded text-[10px] font-medium leading-tight text-muted hover:text-foreground transition-colors"
         >
-          收起
-        </button>
+          {tx('收起')}</button>
       )}
     </>
   )
@@ -334,7 +334,7 @@ function StockSearchBox({
         <input
           ref={inputRef}
           type="text"
-          placeholder="搜索…"
+          placeholder={tx('搜索…')}
           value={query}
           onChange={(e) => { setQuery(e.target.value); setOpen(true); setActiveIdx(-1) }}
           onFocus={() => { if (query.trim()) setOpen(true) }}
@@ -375,7 +375,7 @@ function StockSearchBox({
                         <span className="shrink-0 px-1 py-0.5 rounded text-[10px] leading-none bg-accent/10 text-accent">ETF</span>
                       )}
                       {r.asset_type === 'index' && (
-                        <span className="shrink-0 px-1 py-0.5 rounded text-[10px] leading-none bg-sky-500/10 text-sky-400">指数</span>
+                        <span className="shrink-0 px-1 py-0.5 rounded text-[10px] leading-none bg-sky-500/10 text-sky-400">{tx('指数')}</span>
                       )}
                       {(() => {
                         const b = boardTag(r.symbol)
@@ -391,8 +391,8 @@ function StockSearchBox({
                     <span className="flex shrink-0 items-center gap-1">
                       <span
                         className="inline-flex p-1 text-accent/70"
-                        title="已加自选"
-                        aria-label="已加自选"
+                        title={tx('已加自选')}
+                        aria-label={tx('已加自选')}
                       >
                         <Check className="h-3.5 w-3.5" />
                       </span>
@@ -415,10 +415,10 @@ function StockSearchBox({
                         className="shrink-0 rounded p-1 text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50 cursor-pointer"
                         title={
                           preferredGroupId
-                            ? `加入自选 · 当前分组「${groups.find(g => g.id === preferredGroupId)?.name ?? ''}」`
-                            : '加入自选 (未分组)'
+                            ? tx('加入自选 · 当前分组「{name}」', { name: groups.find(g => g.id === preferredGroupId)?.name ?? '' })
+                            : tx('加入自选 (未分组)')
                         }
-                        aria-label={`快速加入自选 ${r.symbol}`}
+                        aria-label={tx('快速加入自选 {symbol}', { symbol: r.symbol })}
                       >
                         <Plus className="h-3.5 w-3.5" />
                       </button>
@@ -427,7 +427,7 @@ function StockSearchBox({
                         preferredGroupId={preferredGroupId}
                         disabled={addPending}
                         triggerClassName="shrink-0 rounded p-1 text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-50"
-                        title="展开分组, 选择要加入的自选分组"
+                        title={tx('展开分组, 选择要加入的自选分组')}
                       >
                         <FolderPlus className="h-3.5 w-3.5" />
                       </WatchlistAddMenu>
@@ -449,7 +449,7 @@ function StockSearchBox({
 // 配色用 accent (电光蓝) 而非绿/红: 项目设计规范规定红绿仅用于价格/K线,
 // UI 状态用 accent, 避免与 A 股涨跌色混淆。
 // 全市场模式不显示 —— 全部都在监控, 标记无信息量。
-function RealtimeDot({ title = '实时监控中' }: { title?: string }) {
+function RealtimeDot({ title = tx('实时监控中') }: { title?: string }) {
   return (
     <span
       title={title}
@@ -565,8 +565,7 @@ const StockCard = React.memo(function StockCard({
               onClick={() => onConfirmRemove(r.symbol)}
               className="px-1.5 py-0.5 rounded text-[10px] text-danger bg-danger/10 hover:bg-danger/20 transition-colors"
             >
-              确认
-            </button>
+              {tx('确认')}</button>
             <button onClick={() => onCancelRemove()} className="p-0.5 text-muted hover:text-foreground transition-colors">
               <X className="h-3 w-3" />
             </button>
@@ -583,7 +582,7 @@ const StockCard = React.memo(function StockCard({
             <button
               onClick={() => onRequestRemove(r.symbol)}
               className="opacity-0 group-hover:opacity-100 text-muted hover:text-danger transition-all duration-150 p-0.5 rounded hover:bg-elevated"
-              aria-label="移除"
+              aria-label={tx('移除')}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -609,7 +608,7 @@ const StockCard = React.memo(function StockCard({
           )}
           {r.consecutive_limit_ups > 0 && (
             <span className="shrink-0 inline-flex items-center justify-center px-1 h-[16px] rounded bg-danger/15 text-danger text-[9px] font-bold tabular-nums">
-              {r.consecutive_limit_ups === 1 ? '首板' : `${r.consecutive_limit_ups}连`}
+              {r.consecutive_limit_ups === 1 ? tx('首板') : tx('{n}连', { n: r.consecutive_limit_ups })}
             </span>
           )}
           {isMonitored && <span className="ml-auto"><RealtimeDot /></span>}
@@ -629,8 +628,8 @@ const StockCard = React.memo(function StockCard({
 
         {/* 第三行: 指标 */}
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10px] text-muted leading-relaxed">
-          <span title="换手率">换手<span className={`font-mono ml-0.5 ${turnoverColor(r.turnover_rate)}`}>{r.turnover_rate != null ? `${r.turnover_rate.toFixed(2)}%` : '—'}</span></span>
-          <span title="量比">量比<span className="font-mono ml-0.5">{fmtPrice(r.vol_ratio_5d)}</span></span>
+          <span title={tx('换手率')}>{tx('换手')}<span className={`font-mono ml-0.5 ${turnoverColor(r.turnover_rate)}`}>{r.turnover_rate != null ? `${r.turnover_rate.toFixed(2)}%` : '—'}</span></span>
+          <span title={tx('量比')}>{tx('量比')}<span className="font-mono ml-0.5">{fmtPrice(r.vol_ratio_5d)}</span></span>
           <span title="RSI14">RSI<span className="font-mono ml-0.5">{r.rsi_14 != null ? r.rsi_14.toFixed(1) : '—'}</span></span>
           {/* 扩展数据列展示在卡片中 */}
           {extCols.map(col => {
@@ -1436,7 +1435,7 @@ export function Watchlist() {
   return (
     <div className="flex flex-col h-full">
       <PageHeader
-        title="自选"
+        title={tx('自选')}
         titleExtra={
           <span className="inline-flex items-center gap-1.5">
             {/* 计数胶囊: 显示数/总数, mono 字体突出数字 */}
@@ -1444,7 +1443,7 @@ export function Watchlist() {
               <span className="font-mono font-semibold text-secondary tabular-nums">{sortedRows.length}</span>
               <span className="text-muted/50">/</span>
               <span className="font-mono text-muted tabular-nums">{rowsInSelectedGroup.length}</span>
-              <span className="text-muted/60 ml-0.5">只</span>
+              <span className="text-muted/60 ml-0.5">{tx('只')}</span>
             </span>
             {/* 数据未就绪提示: 自选了但 enriched 缓存未覆盖 (新股/冷门/新用户未同步), 指标全为 null */}
             {pendingCount > 0 && (
@@ -1453,21 +1452,21 @@ export function Watchlist() {
                 disabled={preparation.isFetching}
                 onClick={() => { void preparation.refetch() }}
                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-muted/15 text-muted border border-border/50 whitespace-nowrap disabled:cursor-wait"
-                title={preparation.isFetching ? '正在按需补齐自选日K，已有数据仍可查看' :
-                  `${preparation.data?.filter(r => r.status !== 'ready').map(r => `${r.symbol}：${r.message}`).join('\n') || '日K暂未就绪，请检查数据源配置'}\n点击重试补齐`}
+                title={preparation.isFetching ? tx('正在按需补齐自选日K，已有数据仍可查看') :
+                  `${preparation.data?.filter(r => r.status !== 'ready').map(r => `${r.symbol}：${r.message}`).join('\n') || tx('日K暂未就绪，请检查数据源配置')}\n${tx('点击重试补齐')}`}
               >
                 <Clock className="h-2.5 w-2.5" />
-                {preparation.isFetching ? '补齐中' : preparation.data?.some(r => r.status === 'unsupported') ? '待配置' : '待数据'} {pendingCount}
+                {preparation.isFetching ? tx('补齐中') : preparation.data?.some(r => r.status === 'unsupported') ? tx('待配置') : tx('待数据')} {pendingCount}
               </button>
             )}
             {/* 过滤提示: 仅在有筛选隐藏时出现, 柔和橙色融入整体 */}
             {hiddenCount > 0 && (
               <span
                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-warning/12 text-warning/90 border border-warning/25 whitespace-nowrap"
-                title={`当前有 ${hiddenCount} 只被筛选条件隐藏,清除筛选可查看全部`}
+                title={tx('当前有 {n} 只被筛选条件隐藏,清除筛选可查看全部', { n: hiddenCount })}
               >
                 <Filter className="h-2.5 w-2.5" />
-                已过滤 {hiddenCount}
+                {tx('已过滤')} {hiddenCount}
               </span>
             )}
           </span>
@@ -1482,7 +1481,7 @@ export function Watchlist() {
                   ? 'bg-accent/15 text-accent hover:bg-accent/25'
                   : 'bg-elevated text-secondary hover:bg-elevated/80'
               }`}
-              title={`筛选${activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}`}
+              title={tx('筛选 {n}', { n: activeFilterCount > 0 ? `(${activeFilterCount})` : '' })}
             >
               <Filter className="h-4 w-4" />
             </button>
@@ -1490,8 +1489,8 @@ export function Watchlist() {
               <button
                 onClick={resetAllFilters}
                 className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated text-secondary hover:bg-danger/10 hover:text-danger transition-colors duration-150 ease-smooth"
-                title="重置全部筛选"
-                aria-label="重置全部筛选"
+                title={tx('重置全部筛选')}
+                aria-label={tx('重置全部筛选')}
               >
                 <RotateCcw className="h-4 w-4" />
               </button>
@@ -1509,8 +1508,8 @@ export function Watchlist() {
             <button
               onClick={() => setImportOpen(true)}
               className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-150 ease-smooth"
-              title="批量导入自选（截图 / CSV / 粘贴代码）"
-              aria-label="批量导入自选"
+              title={tx('批量导入自选（截图 / CSV / 粘贴代码）')}
+              aria-label={tx('批量导入自选')}
             >
               <FileUp className="h-4 w-4" />
             </button>
@@ -1519,7 +1518,7 @@ export function Watchlist() {
             <button
               onClick={toggleView}
               className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-150 ease-smooth"
-              title={viewMode === 'table' ? '卡片视图' : '列表视图'}
+              title={viewMode === 'table' ? tx('卡片视图') : tx('列表视图')}
             >
               {viewMode === 'table' ? <LayoutGrid className="h-4 w-4" /> : <List className="h-4 w-4" />}
             </button>
@@ -1532,8 +1531,8 @@ export function Watchlist() {
                   ? 'bg-accent/15 text-accent hover:bg-accent/25'
                   : 'bg-elevated text-secondary hover:bg-elevated/80 hover:text-foreground'
               }`}
-              title={groupCardsOpen ? '退出分组卡片' : '分组卡片视图'}
-              aria-label={groupCardsOpen ? '退出分组卡片' : '分组卡片视图'}
+              title={groupCardsOpen ? tx('退出分组卡片') : tx('分组卡片视图')}
+              aria-label={groupCardsOpen ? tx('退出分组卡片') : tx('分组卡片视图')}
             >
               <Rows3 className="h-4 w-4" />
             </button>
@@ -1546,8 +1545,8 @@ export function Watchlist() {
                   ? 'bg-accent/15 text-accent hover:bg-accent/25'
                   : 'bg-elevated text-secondary hover:bg-elevated/80 hover:text-foreground'
               }`}
-              title={groupStatsOpen ? '收起分组统计' : '分组统计'}
-              aria-label={groupStatsOpen ? '收起分组统计' : '分组统计'}
+              title={groupStatsOpen ? tx('收起分组统计') : tx('分组统计')}
+              aria-label={groupStatsOpen ? tx('收起分组统计') : tx('分组统计')}
             >
               <BarChart3 className="h-4 w-4" />
             </button>
@@ -1556,7 +1555,7 @@ export function Watchlist() {
             <button
               onClick={() => setCustomizerOpen(true)}
               className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-150 ease-smooth"
-              title="自定义列"
+              title={tx('自定义列')}
             >
               <Settings2 className="h-4 w-4" />
             </button>
@@ -1564,7 +1563,7 @@ export function Watchlist() {
               onClick={() => enriched.refetch()}
               disabled={enriched.isFetching}
               className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-elevated hover:bg-elevated/80 text-secondary hover:text-foreground transition-colors duration-150 ease-smooth disabled:opacity-50"
-              title="刷新"
+              title={tx('刷新')}
             >
               <RefreshCw className={`h-4 w-4 ${enriched.isFetching ? 'animate-spin' : ''}`} />
             </button>
@@ -1574,7 +1573,7 @@ export function Watchlist() {
                 <button
                   onClick={() => setConfirmClear(true)}
                   className="inline-flex items-center justify-center h-8 w-8 rounded-btn bg-danger/10 text-danger hover:bg-danger/20 transition-colors duration-150 ease-smooth"
-                  title="清空自选"
+                  title={tx('清空自选')}
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -1626,7 +1625,7 @@ export function Watchlist() {
         <div className="px-5 py-2 border-b border-border bg-surface/50 max-h-[184px] overflow-y-auto">
           {/* 板块筛选 */}
           <div className="mb-2">
-            <div className="text-[10px] text-muted uppercase tracking-wider mb-0.5">板块</div>
+            <div className="text-[10px] text-muted uppercase tracking-wider mb-0.5">{tx('板块')}</div>
             <div className="flex flex-wrap gap-1">
               {BOARD_OPTIONS.map(board => {
                 const active = boardFilter.has(board)
@@ -1648,7 +1647,7 @@ export function Watchlist() {
           </div>
           {/* 排除 ST */}
           <div className="mb-2">
-            <div className="text-[10px] text-muted uppercase tracking-wider mb-0.5">风险警示</div>
+            <div className="text-[10px] text-muted uppercase tracking-wider mb-0.5">{tx('风险警示')}</div>
             <div className="flex flex-wrap gap-1">
               <button
                 onClick={toggleExcludeST}
@@ -1657,10 +1656,9 @@ export function Watchlist() {
                     ? 'bg-accent/15 text-accent'
                     : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
                 }`}
-                title="勾选后隐藏简称含 ST 标记的标的 (ST/*ST/S*ST)"
+                title={tx('勾选后隐藏简称含 ST 标记的标的 (ST/*ST/S*ST)')}
               >
-                排除ST
-              </button>
+                {tx('排除ST')}</button>
             </div>
           </div>
           {COLUMN_GROUPS.map(cat => {
@@ -1704,8 +1702,7 @@ export function Watchlist() {
           })}
           {hasActiveFilters && (
             <button onClick={resetAllFilters} className="mt-1 text-[10px] text-danger hover:text-danger/80 transition-colors">
-              重置全部筛选
-            </button>
+              {tx('重置全部筛选')}</button>
           )}
         </div>
       )}
@@ -1715,22 +1712,22 @@ export function Watchlist() {
         <div className="px-5 py-3">
           {/* 列表 */}
           {watchlistContentLoading ? (
-            <div className="text-sm text-muted">加载中…</div>
+            <div className="text-sm text-muted">{tx('加载中…')}</div>
           ) : list.isError ? (
-            <div className="text-sm text-danger">读取自选失败</div>
+            <div className="text-sm text-danger">{tx('读取自选失败')}</div>
           ) : enriched.isError ? (
-            <div className="text-sm text-danger">读取自选行情失败</div>
+            <div className="text-sm text-danger">{tx('读取自选行情失败')}</div>
           ) : allSymbols.length === 0 ? (
             <EmptyState
               icon={Star}
-              title="自选为空"
-              hint="点击右上角搜索添加标的，或用导入按钮从券商自选 CSV / 截图批量导入、粘贴代码。"
+              title={tx('自选为空')}
+              hint={tx('点击右上角搜索添加标的，或用导入按钮从券商自选 CSV / 截图批量导入、粘贴代码。')}
             />
           ) : rowsInSelectedGroup.length === 0 ? (
             <EmptyState
               icon={FolderOpen}
-              title="该分组暂无标的"
-              hint="使用右上角搜索添加、通过股票旁的分组按钮移入，或用导入弹窗把整批标的并入本组。"
+              title={tx('该分组暂无标的')}
+              hint={tx('使用右上角搜索添加、通过股票旁的分组按钮移入，或用导入弹窗把整批标的并入本组。')}
             />
           ) : groupCardsOpen ? (
             <WatchlistGroupCards
@@ -1768,8 +1765,8 @@ export function Watchlist() {
                             ? 'text-accent bg-accent/10 hover:bg-accent/20'
                             : 'text-muted hover:text-foreground hover:bg-elevated'
                         }`}
-                        title={dailyKChartVisible ? '隐藏日k蜡烛' : '显示日k蜡烛'}
-                        aria-label={dailyKChartVisible ? '隐藏日k蜡烛' : '显示日k蜡烛'}
+                        title={dailyKChartVisible ? tx('隐藏日k蜡烛') : tx('显示日k蜡烛')}
+                        aria-label={dailyKChartVisible ? tx('隐藏日k蜡烛') : tx('显示日k蜡烛')}
                       >
                         {dailyKChartVisible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                       </button>
@@ -1789,8 +1786,8 @@ export function Watchlist() {
                             ? 'text-accent bg-accent/10 hover:bg-accent/20'
                             : 'text-muted hover:text-foreground hover:bg-elevated'
                         }`}
-                        title={intradayChartVisible ? '隐藏分时图' : '显示分时图'}
-                        aria-label={intradayChartVisible ? '隐藏分时图' : '显示分时图'}
+                        title={intradayChartVisible ? tx('隐藏分时图') : tx('显示分时图')}
+                        aria-label={intradayChartVisible ? tx('隐藏分时图') : tx('显示分时图')}
                       >
                         {intradayChartVisible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
                       </button>
@@ -1801,15 +1798,15 @@ export function Watchlist() {
                           onClick={(event) => { event.stopPropagation(); minuteBatch.refetch() }}
                           disabled={minuteBatch.isFetching}
                           className="inline-flex items-center justify-center w-5 h-5 rounded text-muted hover:text-accent hover:bg-accent/10 transition-colors disabled:opacity-40"
-                          title="刷新分时数据"
-                          aria-label="刷新分时数据"
+                          title={tx('刷新分时数据')}
+                          aria-label={tx('刷新分时数据')}
                         >
                           <RefreshCw className={`h-3.5 w-3.5 ${minuteBatch.isFetching ? 'animate-spin' : ''}`} />
                         </button>
                       )}
                       {/* 自动轮询中: 显示旋转图标提示正在实时刷新 */}
                       {intradayChartVisible && intradayAutoRefresh && (
-                        <RefreshCw className="h-3 w-3 text-accent/60 animate-spin" aria-label="实时刷新中" />
+                        <RefreshCw className="h-3 w-3 text-accent/60 animate-spin" aria-label={tx('实时刷新中')} />
                       )}
                       {/* 纵轴模式切换: 自适应区间 ⇄ 涨跌停带 */}
                       {intradayChartVisible && (
@@ -1821,10 +1818,10 @@ export function Watchlist() {
                               ? 'text-accent bg-accent/10 hover:bg-accent/20'
                               : 'text-muted hover:text-foreground hover:bg-elevated'
                           }`}
-                          title={intradayYMode === 'limit' ? '纵轴按涨跌停显示 (点击切回自适应)' : '纵轴自适应 (点击按涨跌停显示)'}
-                          aria-label={intradayYMode === 'limit' ? '纵轴按涨跌停' : '纵轴自适应'}
+                          title={intradayYMode === 'limit' ? tx('纵轴按涨跌停显示 (点击切回自适应)') : tx('纵轴自适应 (点击按涨跌停显示)')}
+                          aria-label={intradayYMode === 'limit' ? tx('纵轴按涨跌停') : tx('纵轴自适应')}
                         >
-                          {intradayYMode === 'limit' ? '涨跌停' : '自适应'}
+                          {intradayYMode === 'limit' ? tx('涨跌停') : tx('自适应')}
                         </button>
                       )}
                     </span>
@@ -1876,8 +1873,7 @@ export function Watchlist() {
                                 onClick={() => { remove.mutate(r.symbol); setConfirmRemove(null) }}
                                 className="px-1.5 py-0.5 rounded text-[10px] text-danger bg-danger/10 hover:bg-danger/20 transition-colors"
                               >
-                                确认
-                              </button>
+                                {tx('确认')}</button>
                               <button
                                 onClick={() => setConfirmRemove(null)}
                                 className="p-0.5 text-muted hover:text-foreground transition-colors"
@@ -1899,8 +1895,8 @@ export function Watchlist() {
                                   onClick={() => handleToggleMember(r.symbol, selectedGroup, false)}
                                   disabled={addGroupMember.isPending || removeGroupMember.isPending}
                                   className="p-0.5 text-muted hover:text-warning transition-colors duration-150 ease-smooth disabled:opacity-50"
-                                  aria-label="移出当前分组"
-                                  title="移出当前分组（仍保留在自选中）"
+                                  aria-label={tx('移出当前分组')}
+                                  title={tx('移出当前分组（仍保留在自选中）')}
                                 >
                                   <FolderMinus className="h-3.5 w-3.5" />
                                 </button>
@@ -1908,8 +1904,8 @@ export function Watchlist() {
                               <button
                                 onClick={() => setConfirmRemove(r.symbol)}
                                 className="p-0.5 text-muted hover:text-danger transition-colors duration-150 ease-smooth"
-                                aria-label="移除"
-                                title="从自选移除"
+                                aria-label={tx('移除')}
+                                title={tx('从自选移除')}
                               >
                                 <Minus className="h-3.5 w-3.5" />
                               </button>
@@ -1917,8 +1913,8 @@ export function Watchlist() {
                                 onClick={() => moveToTop.mutate(r.symbol)}
                                 disabled={moveToTop.isPending || allSymbols[0] === r.symbol}
                                 className="p-0.5 text-muted hover:text-accent transition-colors duration-150 ease-smooth disabled:opacity-30 disabled:hover:text-muted"
-                                aria-label="移到顶部"
-                                title="移到顶部"
+                                aria-label={tx('移到顶部')}
+                                title={tx('移到顶部')}
                               >
                                 <ChevronsUp className="h-3.5 w-3.5" />
                               </button>
@@ -2008,7 +2004,7 @@ export function Watchlist() {
                               volume={intradayResolved.volume}
                               auctionWidth={intradayResolved.auctionWidth}
                             />
-                          : <span className="text-[10px] text-muted">分时</span>}
+                          : <span className="text-[10px] text-muted">{tx('分时')}</span>}
                       </div>
                     </td>
                   )
@@ -2067,23 +2063,21 @@ export function Watchlist() {
               transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
               className="relative w-[90vw] max-w-[380px] rounded-card border border-border bg-base shadow-2xl p-6"
             >
-              <h3 className="text-sm font-medium text-foreground mb-2">确认清空自选</h3>
+              <h3 className="text-sm font-medium text-foreground mb-2">{tx('确认清空自选')}</h3>
               <p className="text-xs text-secondary mb-5">
-                将移除全部 {allSymbols.length} 只自选，此操作不可恢复。
-              </p>
+                {tx('将移除全部')} {allSymbols.length} {tx('只自选，此操作不可恢复。')}</p>
               <div className="flex items-center justify-end gap-2">
                 <button
                   onClick={() => setConfirmClear(false)}
                   className="px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:bg-elevated/80 text-sm transition-colors"
                 >
-                  取消
-                </button>
+                  {tx('取消')}</button>
                 <button
                   onClick={() => clearAll.mutate()}
                   disabled={clearAll.isPending}
                   className="px-3 py-1.5 rounded-btn bg-danger/15 text-danger hover:bg-danger/25 text-sm font-medium transition-colors disabled:opacity-50"
                 >
-                  {clearAll.isPending ? '清除中...' : '确认清空'}
+                  {clearAll.isPending ? tx('清除中...') : tx('确认清空')}
                 </button>
               </div>
             </motion.div>

@@ -15,6 +15,7 @@ from typing import Any
 import httpx
 
 from app.market_time import CN_TZ, cn_now, cn_today
+from app.services import safe_http
 from app.services.ext_data import (
     ExtConfig,
     ExtConfigStore,
@@ -27,6 +28,16 @@ logger = logging.getLogger(__name__)
 
 _pull_client: ContextVar[httpx.AsyncClient | None] = ContextVar("ext_pull_client", default=None)
 
+_POST_INGEST_HOOKS: list[Any] = []
+_POST_INGEST_HOOKS_LOCK = threading.Lock()
+
+
+def register_post_ingest_hook(callback) -> None:
+    """Register an idempotent callback invoked after scheduled ext_data ingestion."""
+    with _POST_INGEST_HOOKS_LOCK:
+        if callback not in _POST_INGEST_HOOKS:
+            _POST_INGEST_HOOKS.append(callback)
+
 
 @asynccontextmanager
 async def _pull_client_scope():
@@ -34,12 +45,54 @@ async def _pull_client_scope():
     if client is not None:
         yield client
         return
-    async with httpx.AsyncClient() as client:
+    async with safe_http.create_safe_async_client(client_cls=httpx.AsyncClient) as client:
         token = _pull_client.set(client)
         try:
             yield client
         finally:
             _pull_client.reset(token)
+
+
+def redact_pull_error(
+    err: BaseException | str,
+    pull: PullConfig | None = None,
+    config_id: str | None = None,
+    *,
+    max_len: int | None = None,
+) -> str:
+    """Redact query-string API keys and secret tokens from pull error messages."""
+    extra_params: list[str] = []
+    secret_values: list[str] = []
+    auth = getattr(pull, "auth", None) if pull is not None else None
+    if isinstance(auth, dict):
+        param = auth.get("param")
+        if param:
+            extra_params.append(str(param))
+        key_ref = str(auth.get("key_ref") or "").strip()
+        if key_ref:
+            try:
+                from app import secrets_store
+
+                ref_secret = secrets_store.get_env_backed_secret(key_ref, key_ref.upper())
+                if ref_secret:
+                    secret_values.append(ref_secret)
+            except Exception:  # noqa: BLE001
+                pass
+    if config_id:
+        try:
+            from app.services import ext_data as _ext_data_svc
+
+            ext_secret = _ext_data_svc.get_ext_api_key(config_id)
+            if ext_secret:
+                secret_values.append(ext_secret)
+        except Exception:  # noqa: BLE001
+            pass
+    return safe_http.sanitize_error(
+        err,
+        extra_params=extra_params,
+        secret_values=secret_values,
+        max_len=max_len,
+    )
 
 
 def outbound_headers(user_headers: dict[str, str] | None = None) -> dict[str, str]:
@@ -337,6 +390,7 @@ async def _request_json(
     async with _pull_client_scope() as client:
         headers = outbound_headers(pull.headers)
         url = _apply_auth(config_id, pull.auth, url, headers)
+        safe_http.validate_url(url)
         kwargs: dict[str, Any] = {"headers": headers, "timeout": timeout}
 
         if pull.method.upper() == "POST" and pull.body:
@@ -344,20 +398,51 @@ async def _request_json(
             if "content-type" not in {k.lower() for k in headers}:
                 kwargs["headers"]["Content-Type"] = "application/json"
 
-        resp = await client.request(pull.method.upper(), url, **kwargs)
-        status_code = getattr(resp, "status_code", None)
-        if status_code in (401, 403):
-            # 鉴权失败几乎都是凭据类型/权限不对, 给出可执行提示而不是裸 HTTP 错误。
-            detail = (getattr(resp, "text", "") or "").strip()[:160]
-            raise ValueError(
-                f"鉴权被拒绝 (HTTP {status_code}): {detail or '无响应体'} — "
-                "请确认使用服务方签发的 API Key, 且该 Key 已被授权访问此接口"
+        try:
+            resp = await client.request(pull.method.upper(), url, **kwargs)
+            status_code = getattr(resp, "status_code", None)
+            if status_code in (401, 403):
+                # 鉴权失败几乎都是凭据类型/权限不对, 给出可执行提示而不是裸 HTTP 错误。
+                detail = redact_pull_error(
+                    (getattr(resp, "text", "") or "").strip()[:160],
+                    pull,
+                    config_id,
+                )
+                raise ValueError(
+                    f"鉴权被拒绝 (HTTP {status_code}): {detail or '无响应体'} — "
+                    "请确认使用服务方签发的 API Key, 且该 Key 已被授权访问此接口"
+                )
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            safe_msg = redact_pull_error(exc, pull, config_id)
+            safe_req = (
+                httpx.Request(
+                    exc.request.method,
+                    redact_pull_error(str(exc.request.url), pull, config_id),
+                )
+                if getattr(exc, "request", None) is not None
+                else None
             )
-        resp.raise_for_status()
+            raise httpx.HTTPStatusError(
+                safe_msg,
+                request=safe_req,
+                response=exc.response,
+            ) from None
+        except httpx.RequestError as exc:
+            safe_msg = redact_pull_error(exc, pull, config_id)
+            safe_req = (
+                httpx.Request(
+                    exc.request.method,
+                    redact_pull_error(str(exc.request.url), pull, config_id),
+                )
+                if getattr(exc, "request", None) is not None
+                else None
+            )
+            raise type(exc)(safe_msg, request=safe_req) from None
         try:
             return resp.json()
         except Exception as e:
-            raise ValueError(f"响应不是有效 JSON: {e}") from e
+            raise ValueError(f"响应不是有效 JSON: {redact_pull_error(e, pull, config_id)}") from e
 
 
 def _append_query_params(url: str, params: dict[str, str]) -> str:
@@ -558,7 +643,7 @@ async def _backfill_history(
                 # 返回 404 —— 视为该日无数据跳过, 不计入失败
                 empty += 1
             elif _status_code(e) != 429:
-                failed.append({"date": d.isoformat(), "reason": str(e)[:200]})
+                failed.append({"date": d.isoformat(), "reason": redact_pull_error(e, pull, config.id, max_len=200)})
             else:
                 # 服务端按分钟配额限流: 退避后原地重试一次; 连续多日 429
                 # 说明配额窗口已耗尽, 中止剩余天数 (幂等, 重跑即可续补)。
@@ -581,9 +666,9 @@ async def _backfill_history(
                     if _status_code(e2) == 404:  # 退避重试后无该日快照 → 同样视为无数据
                         empty += 1
                     else:
-                        failed.append({"date": d.isoformat(), "reason": str(e2)[:200]})
+                        failed.append({"date": d.isoformat(), "reason": redact_pull_error(e2, pull, config.id, max_len=200)})
         except Exception as e:
-            failed.append({"date": d.isoformat(), "reason": str(e)[:200]})
+            failed.append({"date": d.isoformat(), "reason": redact_pull_error(e, pull, config.id, max_len=200)})
         if i + 1 < len(days):
             await asyncio.sleep(_BACKFILL_DAY_INTERVAL_S)  # 限速, 对数据源礼貌
     return {
@@ -712,17 +797,36 @@ class PullScheduler:
             )
         loop.call_soon_threadsafe(fn, *args)
 
-    def stop(self) -> None:
-        """停止所有任务 (从 shutdown 调用)。"""
-        self._running = False
-        for task in self._tasks.values():
+    def _cancel_all(self) -> None:
+        for task in list(self._tasks.values()):
             task.cancel()
         self._tasks.clear()
+
+    def stop(self) -> None:
+        """停止所有任务 (从 shutdown 调用, 线程安全)。"""
+        self._running = False
+        loop = self._loop
+        if loop is None or loop.is_closed():
+            self._tasks.clear()
+            logger.info("PullScheduler stopped")
+            return
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+        if running_loop is loop:
+            self._cancel_all()
+        elif loop.is_running():
+            loop.call_soon_threadsafe(self._cancel_all)
+        else:
+            self._cancel_all()
         logger.info("PullScheduler stopped")
 
     def refresh(self, data_dir) -> None:
         """重新加载配置，更新调度任务（增/删/改）。线程安全。"""
         self._data_dir = data_dir
+        if not self._running:
+            return
         store = ExtConfigStore(data_dir)
         configs = store.load_all()
 
@@ -740,11 +844,19 @@ class PullScheduler:
         # 提交回主循环, 两步之间主循环可能已改动字典 (TOCTOU, #203)。
         # 此处只携带与 _tasks 无关的 config 数据跨线程。
         def _apply() -> None:
+            if not self._running:
+                return
             for config in enabled_configs:
-                if config.id not in self._tasks:
-                    self._tasks[config.id] = self._loop.create_task(
-                        self._run_loop(config)
-                    )
+                existing = self._tasks.get(config.id)
+                if existing is None or existing.done():
+                    task = self._loop.create_task(self._run_loop(config))
+                    self._tasks[config.id] = task
+
+                    def _cleanup(done_task: asyncio.Task, cid: str = config.id) -> None:
+                        if self._tasks.get(cid) is done_task:
+                            self._tasks.pop(cid, None)
+
+                    task.add_done_callback(_cleanup)
                     logger.info(
                         "PullScheduler: scheduled %s (every %d min)",
                         config.id, config.pull.schedule_minutes,
@@ -764,6 +876,13 @@ class PullScheduler:
             n, d = await fetch_and_ingest(
                 fresh, self._data_dir, keep_strategy_cache=True
             )
+            with _POST_INGEST_HOOKS_LOCK:
+                hooks = list(_POST_INGEST_HOOKS)
+            for hook in hooks:
+                try:
+                    hook(fresh.id, self._data_dir)
+                except Exception:  # noqa: BLE001
+                    logger.debug("ext_pull post-ingest hook failed for %s", fresh.id, exc_info=True)
             fresh.pull.last_run = datetime.now(timezone.utc).isoformat()
             fresh.pull.last_status = "success"
             fresh.pull.last_message = f"{n} rows @ {d}"
@@ -771,13 +890,14 @@ class PullScheduler:
             await run_ext_data_io(store.upsert, fresh, keep_strategy_cache=True)
             logger.info("PullScheduler: %s success, %d rows", fresh.id, n)
         except Exception as e:
+            safe_err = redact_pull_error(e, fresh.pull, fresh.id)
             fresh2 = await run_ext_data_io(store.get, fresh.id)
             if fresh2 and fresh2.pull:
                 fresh2.pull.last_run = datetime.now(timezone.utc).isoformat()
                 fresh2.pull.last_status = "error"
-                fresh2.pull.last_message = str(e)[:200]
+                fresh2.pull.last_message = safe_err[:200]
                 await run_ext_data_io(store.upsert, fresh2, keep_strategy_cache=True)
-            logger.warning("PullScheduler: %s error: %s", fresh.id, e)
+            logger.warning("PullScheduler: %s error: %s", fresh.id, safe_err)
 
     async def _run_daily_at(self, config_id: str, store: ExtConfigStore, hhmm: str) -> None:
         """固定时刻 (北京时间) 周期性拉取: 每天 / 每周 / 每月 / 仅交易日。

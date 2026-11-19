@@ -5,6 +5,7 @@
  * 自选页 13 个，缺一个均线金叉/死叉变体）。
  */
 import type { ColumnConfig } from '@/lib/list-columns'
+import { tx } from '@/lib/i18n'
 import type { MinuteKlineRow } from '@/lib/api'
 import { cnDateTimeFromUtc } from '@/lib/format'
 
@@ -37,7 +38,7 @@ export const SIGNAL_FIELDS: [string, string, SignalType][] = [
 
 /** 从一行数据中提取已命中的信号列表 */
 export function getSignals(r: Record<string, any>): Signal[] {
-  return SIGNAL_FIELDS.filter(([key]) => r[key]).map(([, label, type]) => ({ label, type }))
+  return SIGNAL_FIELDS.filter(([key]) => r[key]).map(([, label, type]) => ({ label: tx(label), type }))
 }
 
 /** 信号类型 → tailwind 颜色类 */

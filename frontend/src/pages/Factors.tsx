@@ -15,6 +15,7 @@ import { FactorComposite } from './factors/FactorComposite'
 import { FactorEditor } from './factors/FactorEditor'
 import { FactorLibrary } from './factors/FactorLibrary'
 import { ResearchCandidatesDialog } from './backtest/ResearchCandidatesDialog'
+import { useI18n } from '@/lib/i18n'
 
 type Tab = 'discover' | 'create' | 'library'
 type CreateMode = 'editor' | 'composite'
@@ -40,6 +41,7 @@ const CREATE_MODES: { id: CreateMode; label: string }[] = [
 ]
 
 export function Factors() {
+  const { t, tx } = useI18n()
   const [searchParams, setSearchParams] = useSearchParams()
   const [candidatesOpen, setCandidatesOpen] = useState(false)
   const navigate = useNavigate()
@@ -72,23 +74,23 @@ export function Factors() {
   return (
     <div className="flex min-h-full flex-col bg-base xl:h-full">
       <PageHeader
-        title="因子"
-        subtitle={<span className="hidden md:inline">{TABS[activeTab].subtitle}</span>}
+        title={t('nav.factors')}
+        subtitle={<span className="hidden md:inline">{tx(TABS[activeTab].subtitle)}</span>}
         className="shrink-0 flex-wrap gap-x-4 gap-y-2 bg-base/95 px-3 lg:flex-nowrap lg:px-5"
         right={(
           <div className="flex w-full min-w-0 flex-wrap items-center gap-1.5 sm:gap-2 lg:w-auto lg:flex-nowrap">
             <button
               type="button"
               onClick={() => setCandidatesOpen(true)}
-              aria-label="打开候选方案"
-              title="候选方案"
+              aria-label={tx('打开候选方案')}
+              title={tx('候选方案')}
               className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-btn border border-border bg-surface px-2 text-[11px] font-medium text-secondary transition-colors hover:border-accent/40 hover:text-accent sm:px-2.5 sm:text-xs"
             >
               <BookmarkCheck className="h-3.5 w-3.5" />
-              <span>候选方案</span>
+              <span>{tx('候选方案')}</span>
             </button>
             <span className="hidden h-5 w-px shrink-0 bg-border sm:block" aria-hidden="true" />
-            <nav className="order-last min-w-0 flex-1 basis-full overflow-x-auto sm:order-none sm:basis-auto lg:flex-none" aria-label="因子视图">
+            <nav className="order-last min-w-0 flex-1 basis-full overflow-x-auto sm:order-none sm:basis-auto lg:flex-none" aria-label={tx('因子视图')}>
               <div className="inline-flex min-w-max items-center gap-0.5 rounded-btn border border-border bg-surface/80 p-0.5">
                 {(Object.keys(TABS) as Tab[]).map(tab => {
                   const mode = TABS[tab]
@@ -106,7 +108,7 @@ export function Factors() {
                       }`}
                     >
                       <Icon className="h-3.5 w-3.5" />
-                      {mode.title}
+                      {tx(mode.title)}
                     </button>
                   )
                 })}
@@ -136,7 +138,7 @@ export function Factors() {
                       : 'text-secondary hover:bg-elevated hover:text-foreground'
                     }`}
                   >
-                    {label}
+                    {tx(label)}
                   </button>
                 ))}
               </div>
@@ -145,9 +147,9 @@ export function Factors() {
                   type="button"
                   onClick={() => patchParams({ edit: null })}
                   className="ml-2 inline-flex items-center gap-1 rounded-btn px-2 py-1 text-[11px] text-muted transition-colors hover:bg-elevated hover:text-foreground"
-                  title="退出编辑, 回到新建"
+                  title={tx('退出编辑, 回到新建')}
                 >
-                  ← 新建因子
+                  ← {tx('新建因子')}
                 </button>
               )}
             </div>

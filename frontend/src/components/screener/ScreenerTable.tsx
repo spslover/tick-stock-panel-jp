@@ -8,6 +8,7 @@
 import { useState, type CSSProperties, type ReactNode } from 'react'
 import { Check, Plus, Eye, EyeOff, RefreshCw, ListCollapse, ListTree } from 'lucide-react'
 import type { KlineRow, MinuteKlineRow } from '@/lib/api'
+import { tx, useI18n } from '@/lib/i18n'
 import { fmtPrice, formatExtNumber } from '@/lib/format'
 import type { ColumnConfig } from '@/lib/screener-columns'
 import { getSignals, signalCls } from '@/lib/stock-table'
@@ -16,6 +17,7 @@ import { resolveCandleConfig, resolveIntradayConfig, resolveChartLink } from '@/
 import { MiniCandlestick } from '@/components/stock-table/MiniCandlestick'
 import { MiniIntraday, type MiniIntradayYMode, type MiniIntradayAuctionSeries } from '@/components/stock-table/MiniIntraday'
 import { boardLimitRate } from '@/lib/price-limit'
+import { columnLabel } from '@/lib/column-i18n'
 import { EMPTY_ROWS } from '@/lib/series-identity'
 import { StockDataTable, type SortState } from '@/components/stock-table/StockDataTable'
 import { WatchlistAddMenu } from '@/components/WatchlistAddMenu'
@@ -128,8 +130,7 @@ function renderTagList(
           onClick={onToggle}
           className="inline-block px-1.5 py-px rounded text-[10px] font-medium leading-tight text-muted hover:text-foreground transition-colors"
         >
-          收起
-        </button>
+          {tx('收起')}</button>
       )}
     </div>
   )
@@ -156,7 +157,7 @@ function renderExtValue(
     return <span className="tabular-nums">{displayVal}</span>
   }
   if (typeof val === 'boolean') {
-    return <span className={val ? 'text-bull' : 'text-muted'}>{val ? '是' : '否'}</span>
+    return <span className={val ? 'text-bull' : 'text-muted'}>{val ? tx('是') : tx('否')}</span>
   }
 
   const cfg = col.extDisplay
@@ -166,7 +167,7 @@ function renderExtValue(
   const separator = cfg?.separator?.trim() || null
   const tags = separator
     ? str.split(separator).map(s => s.trim()).filter(Boolean)
-    : str.split(/[、,，;；\-]/).map(s => s.trim()).filter(Boolean)
+    : str.split(/[、,，;；-]/).map(s => s.trim()).filter(Boolean)
 
   return renderTagList(tags, col, expanded, onToggle, EXT_TAG_CLS, onTagClick)
 }
@@ -181,6 +182,7 @@ export function ScreenerTable({
   strategyTagsExpanded = false, onToggleStrategyTags,
   sort, onSortToggle, activeSymbol, extSeriesData = {}, auctionData = {},
 }: ScreenerTableProps) {
+  const { tx } = useI18n()
   const [expandedCells, setExpandedCells] = useState<Set<string>>(new Set())
   const [dimensionTarget, setDimensionTarget] = useState<DimensionMembersTarget | null>(null)
 
@@ -301,8 +303,7 @@ export function ScreenerTable({
               </button>
               {isExpired ? (
                 <span className="shrink-0 inline-flex items-center px-1.5 py-px rounded text-[9px] font-medium leading-tight bg-red-500/10 text-red-400/60 border border-red-500/15">
-                  失效
-                </span>
+                  {tx('失效')}</span>
               ) : (
                 inWatchlist ? (
                   <button
@@ -310,8 +311,8 @@ export function ScreenerTable({
                     onClick={() => onRemoveFromWatchlist(r.symbol)}
                     disabled={watchlistPending}
                     className="shrink-0 inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-accent/40 bg-accent/10 text-accent transition-colors disabled:opacity-50"
-                    title="移出自选"
-                    aria-label={`将 ${r.symbol} 移出自选`}
+                    title={tx('移出自选')}
+                    aria-label={tx('将 {symbol} 移出自选', { symbol: r.symbol })}
                   >
                     <Check className="h-3 w-3" />
                   </button>
@@ -320,7 +321,7 @@ export function ScreenerTable({
                     onSelect={groupId => onAddToWatchlist(r.symbol, groupId)}
                     disabled={watchlistPending}
                     triggerClassName="shrink-0 inline-flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-border text-muted transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-50"
-                    ariaLabel={`将 ${r.symbol} 加入自选`}
+                    ariaLabel={tx('将 {symbol} 加入自选', { symbol: r.symbol })}
                   >
                     <Plus className="h-3 w-3" />
                   </WatchlistAddMenu>
@@ -419,7 +420,7 @@ export function ScreenerTable({
                     volume={intradayResolved.volume}
                     auctionWidth={intradayResolved.auctionWidth}
                   />
-                : <span className="text-[10px] text-muted">分时</span>}
+                : <span className="text-[10px] text-muted">{tx('分时')}</span>}
             </div>
           </td>
         )
@@ -454,7 +455,7 @@ export function ScreenerTable({
         if (key === 'candle' && onToggleDailyKChart) {
           return (
             <span className="inline-flex items-center justify-center gap-1.5">
-              <span>{col.label}</span>
+              <span>{columnLabel(col)}</span>
               <button
                 type="button"
                 onClick={(event) => { event.stopPropagation(); onToggleDailyKChart() }}
@@ -463,8 +464,8 @@ export function ScreenerTable({
                     ? 'text-accent bg-accent/10 hover:bg-accent/20'
                     : 'text-muted hover:text-foreground hover:bg-elevated'
                 }`}
-                title={dailyKChartVisible ? '隐藏日k蜡烛' : '显示日k蜡烛'}
-                aria-label={dailyKChartVisible ? '隐藏日k蜡烛' : '显示日k蜡烛'}
+                title={dailyKChartVisible ? tx('隐藏日k蜡烛') : tx('显示日k蜡烛')}
+                aria-label={dailyKChartVisible ? tx('隐藏日k蜡烛') : tx('显示日k蜡烛')}
               >
                 {dailyKChartVisible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
               </button>
@@ -475,7 +476,7 @@ export function ScreenerTable({
         if (key === 'intraday' && onToggleIntradayChart) {
           return (
             <span className="inline-flex items-center justify-center gap-1.5">
-              <span>{col.label}</span>
+              <span>{columnLabel(col)}</span>
               <button
                 type="button"
                 onClick={(event) => { event.stopPropagation(); onToggleIntradayChart() }}
@@ -484,8 +485,8 @@ export function ScreenerTable({
                     ? 'text-accent bg-accent/10 hover:bg-accent/20'
                     : 'text-muted hover:text-foreground hover:bg-elevated'
                 }`}
-                title={intradayChartVisible ? '隐藏分时图' : '显示分时图'}
-                aria-label={intradayChartVisible ? '隐藏分时图' : '显示分时图'}
+                title={intradayChartVisible ? tx('隐藏分时图') : tx('显示分时图')}
+                aria-label={intradayChartVisible ? tx('隐藏分时图') : tx('显示分时图')}
               >
                 {intradayChartVisible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
               </button>
@@ -496,15 +497,15 @@ export function ScreenerTable({
                   onClick={(event) => { event.stopPropagation(); onRefreshIntraday() }}
                   disabled={intradayRefreshing}
                   className="inline-flex items-center justify-center w-5 h-5 rounded text-muted hover:text-accent hover:bg-accent/10 transition-colors disabled:opacity-40"
-                  title="刷新分时数据"
-                  aria-label="刷新分时数据"
+                  title={tx('刷新分时数据')}
+                  aria-label={tx('刷新分时数据')}
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${intradayRefreshing ? 'animate-spin' : ''}`} />
                 </button>
               )}
               {/* 自动轮询中: 显示旋转图标提示正在实时刷新 */}
               {intradayChartVisible && intradayAutoRefresh && (
-                <RefreshCw className="h-3 w-3 text-accent/60 animate-spin" aria-label="实时刷新中" />
+                <RefreshCw className="h-3 w-3 text-accent/60 animate-spin" aria-label={tx('实时刷新中')} />
               )}
               {/* 纵轴模式切换: 自适应区间 ⇄ 涨跌停带 */}
               {intradayChartVisible && onToggleIntradayYMode && (
@@ -516,10 +517,10 @@ export function ScreenerTable({
                       ? 'text-accent bg-accent/10 hover:bg-accent/20'
                       : 'text-muted hover:text-foreground hover:bg-elevated'
                   }`}
-                  title={intradayYMode === 'limit' ? '纵轴按涨跌停显示 (点击切回自适应)' : '纵轴自适应 (点击按涨跌停显示)'}
-                  aria-label={intradayYMode === 'limit' ? '纵轴按涨跌停' : '纵轴自适应'}
+                  title={intradayYMode === 'limit' ? tx('纵轴按涨跌停显示 (点击切回自适应)') : tx('纵轴自适应 (点击按涨跌停显示)')}
+                  aria-label={intradayYMode === 'limit' ? tx('纵轴按涨跌停') : tx('纵轴自适应')}
                 >
-                  {intradayYMode === 'limit' ? '涨跌停' : '自适应'}
+                  {intradayYMode === 'limit' ? tx('涨跌停') : tx('自适应')}
                 </button>
               )}
             </span>
@@ -529,7 +530,7 @@ export function ScreenerTable({
         if (key === 'strategies' && onToggleStrategyTags) {
           return (
             <span className="inline-flex items-center justify-center gap-1.5">
-              <span>{col.label}</span>
+              <span>{columnLabel(col)}</span>
               <button
                 type="button"
                 onClick={(event) => { event.stopPropagation(); handleToggleStrategyTags() }}
@@ -538,8 +539,8 @@ export function ScreenerTable({
                     ? 'text-accent bg-accent/10 hover:bg-accent/20'
                     : 'text-muted hover:text-foreground hover:bg-elevated'
                 }`}
-                title={strategyTagsExpanded ? '收起策略标签（每行仅显示前几个）' : '展开全部策略标签'}
-                aria-label={strategyTagsExpanded ? '收起策略标签' : '展开全部策略标签'}
+                title={strategyTagsExpanded ? tx('收起策略标签（每行仅显示前几个）') : tx('展开全部策略标签')}
+                aria-label={strategyTagsExpanded ? tx('收起策略标签') : tx('展开全部策略标签')}
               >
                 {strategyTagsExpanded ? <ListTree className="h-3.5 w-3.5" /> : <ListCollapse className="h-3.5 w-3.5" />}
               </button>

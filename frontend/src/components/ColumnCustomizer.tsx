@@ -1,5 +1,6 @@
 import { ListColumnCustomizer } from '@/components/ListColumnCustomizer'
 import { COLUMN_GROUPS, type ColumnConfig } from '@/lib/watchlist-columns'
+import { tx } from '@/lib/i18n'
 import { storage } from '@/lib/storage'
 
 interface ColumnCustomizerProps {
@@ -17,8 +18,8 @@ export function ColumnCustomizer({ columns, onChange, open, onClose }: ColumnCus
       onChange={onChange}
       open={open}
       onClose={onClose}
-      title="自定义列"
-      builtinSectionLabel="内置列"
+      title={tx('自定义列')}
+      builtinSectionLabel={tx('内置列')}
       extColumnAlign="right"
       baselineStore={{
         get: () => storage.watchlistColumnsBaseline.get(null) as ColumnConfig[] | null,

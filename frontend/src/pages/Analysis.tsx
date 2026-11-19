@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { Skeleton } from '@/components/data/Skeleton'
 import { api, type AnalysisColumn, type ExtDataConfig, type ExtDataField } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
+import { useI18n } from '@/lib/i18n'
 
 function dtypeToColumnType(dtype: string): AnalysisColumn['type'] {
   return dtype === 'int' || dtype === 'float' ? 'number' : 'string'
@@ -33,6 +34,7 @@ function firstMatchingField(config: ExtDataConfig | undefined, keywords: string[
 }
 
 export function Analysis() {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const menus = useQuery({ queryKey: QK.analysisMenus, queryFn: api.analysisMenus })
   const extData = useQuery({ queryKey: QK.extData, queryFn: api.extDataList })
@@ -67,11 +69,11 @@ export function Analysis() {
   const save = useMutation({
     mutationFn: () => {
       const cfg = activeConfig
-      if (!cfg) throw new Error('请选择扩展数据源')
-      if (!id.trim()) throw new Error('请输入菜单标识')
-      if (!label.trim()) throw new Error('请输入菜单名称')
-      if (template === 'dimension_rank' && !dimensionField) throw new Error('请选择分组字段')
-      if (template === 'ranking' && !rankField) throw new Error('请选择排名字段')
+      if (!cfg) throw new Error(tx('请选择扩展数据源'))
+      if (!id.trim()) throw new Error(tx('请输入菜单标识'))
+      if (!label.trim()) throw new Error(tx('请输入菜单名称'))
+      if (template === 'dimension_rank' && !dimensionField) throw new Error(tx('请选择分组字段'))
+      if (template === 'ranking' && !rankField) throw new Error(tx('请选择排名字段'))
 
       const detailColumns = selectedColumns
         .map(name => cfg.fields.find(f => f.name === name))
@@ -79,9 +81,9 @@ export function Analysis() {
         .map(f => buildColumn(f as ExtDataField))
       const groupColumns: AnalysisColumn[] = template === 'dimension_rank'
         ? [
-            { field: '__dimension', label: cfg.fields.find(f => f.name === dimensionField)?.label || '分组', type: 'string', visible: true },
-            { field: '__count', label: '股票数', type: 'number', sortable: true, visible: true },
-            ...detailColumns.filter(c => c.type === 'number').slice(0, 2).map(c => ({ ...c, label: `平均${c.label || c.field}`, aggregate: 'avg' as const })),
+            { field: '__dimension', label: cfg.fields.find(f => f.name === dimensionField)?.label || tx('分组'), type: 'string', visible: true },
+            { field: '__count', label: tx('股票数'), type: 'number', sortable: true, visible: true },
+            ...detailColumns.filter(c => c.type === 'number').slice(0, 2).map(c => ({ ...c, label: tx('平均{label}', { label: c.label || c.field }), aggregate: 'avg' as const })),
           ]
         : []
       return api.analysisMenuSave(id.trim(), {
@@ -130,15 +132,15 @@ export function Analysis() {
   return (
     <>
       <PageHeader
-        title="扩展分析"
-        subtitle="自定义分析菜单 · 动态字段 · 动态列"
+        title={tx('扩展分析')}
+        subtitle={tx('自定义分析菜单 · 动态字段 · 动态列')}
         right={
           <button
             onClick={() => { resetForm(); setShowCreate(v => !v) }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-accent/90 text-white text-xs font-medium hover:bg-accent transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
-            新建菜单
+            {tx('新建菜单')}
           </button>
         }
       />
@@ -147,11 +149,11 @@ export function Analysis() {
         <section className="rounded-2xl border border-border bg-surface p-6 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.14),transparent_38%)]">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] text-secondary">
             <BarChart3 className="h-3.5 w-3.5" />
-            扩展数据 → 分析菜单 → 动态页面
+            {tx('扩展数据 → 分析菜单 → 动态页面')}
           </div>
-          <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">把任意扩展字段配置成一个菜单</h2>
+          <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">{tx('把任意扩展字段配置成一个菜单')}</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-secondary">
-            菜单配置决定使用哪个扩展数据源、哪个字段分组、列表展示哪些列。侧边栏会自动显示可见菜单，列表列严格按配置渲染。
+            {tx('菜单配置决定使用哪个扩展数据源、哪个字段分组、列表展示哪些列。侧边栏会自动显示可见菜单，列表列严格按配置渲染。')}
           </p>
         </section>
 
@@ -159,15 +161,15 @@ export function Analysis() {
           <section className="rounded-card border border-border bg-surface p-5 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <label className="space-y-1.5">
-                <span className="text-[11px] text-muted">菜单标识</span>
-                <input value={id} onChange={e => setId(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))} placeholder="如 concept_hot" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
+                <span className="text-[11px] text-muted">{tx('菜单标识')}</span>
+                <input value={id} onChange={e => setId(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))} placeholder={tx('如 concept_hot')} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
               </label>
               <label className="space-y-1.5">
-                <span className="text-[11px] text-muted">菜单名称</span>
-                <input value={label} onChange={e => setLabel(e.target.value)} placeholder="如 概念热度" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
+                <span className="text-[11px] text-muted">{tx('菜单名称')}</span>
+                <input value={label} onChange={e => setLabel(e.target.value)} placeholder={tx('如 概念热度')} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
               </label>
               <label className="space-y-1.5">
-                <span className="text-[11px] text-muted">扩展数据源</span>
+                <span className="text-[11px] text-muted">{tx('扩展数据源')}</span>
                 <select
                   value={dataSource || activeConfig?.id || ''}
                   onChange={e => {
@@ -185,31 +187,31 @@ export function Analysis() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <label className="space-y-1.5">
-                <span className="text-[11px] text-muted">模板</span>
+                <span className="text-[11px] text-muted">{tx('模板')}</span>
                 <select value={template} onChange={e => setTemplate(e.target.value as any)} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground">
-                  <option value="dimension_rank">维度热度榜</option>
-                  <option value="ranking">指标排名榜</option>
-                  <option value="table">明细表</option>
+                  <option value="dimension_rank">{tx('维度热度榜')}</option>
+                  <option value="ranking">{tx('指标排名榜')}</option>
+                  <option value="table">{tx('明细表')}</option>
                 </select>
               </label>
               <label className="space-y-1.5">
-                <span className="text-[11px] text-muted">分组字段</span>
+                <span className="text-[11px] text-muted">{tx('分组字段')}</span>
                 <select value={dimensionField} onChange={e => setDimensionField(e.target.value)} disabled={template !== 'dimension_rank'} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground disabled:opacity-50">
-                  <option value="">请选择</option>
+                  <option value="">{tx('请选择')}</option>
                   {fields.map(f => <option key={f.name} value={f.name}>{f.label || f.name}</option>)}
                 </select>
               </label>
               <label className="space-y-1.5">
-                <span className="text-[11px] text-muted">排名字段</span>
+                <span className="text-[11px] text-muted">{tx('排名字段')}</span>
                 <select value={rankField} onChange={e => setRankField(e.target.value)} disabled={template !== 'ranking'} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground disabled:opacity-50">
-                  <option value="">请选择</option>
+                  <option value="">{tx('请选择')}</option>
                   {numericFields.map(f => <option key={f.name} value={f.name}>{f.label || f.name}</option>)}
                 </select>
               </label>
             </div>
 
             <div>
-              <div className="text-[11px] text-muted mb-2">列表列配置</div>
+              <div className="text-[11px] text-muted mb-2">{tx('列表列配置')}</div>
               <div className="flex flex-wrap gap-2">
                 {fields.filter(f => !['symbol', 'code'].includes(f.name)).map(f => {
                   const active = selectedColumns.includes(f.name)
@@ -229,10 +231,9 @@ export function Analysis() {
             {error && <div className="rounded-btn border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">{error}</div>}
 
             <div className="flex justify-end gap-2">
-              <button onClick={() => setShowCreate(false)} className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs">取消</button>
+              <button onClick={() => setShowCreate(false)} className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs">{tx('取消')}</button>
               <button onClick={() => save.mutate()} disabled={save.isPending} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-btn bg-accent/90 text-white text-xs font-medium disabled:opacity-50">
-                <Save className="h-3.5 w-3.5" />保存
-              </button>
+                <Save className="h-3.5 w-3.5" />{tx('保存')}</button>
             </div>
           </section>
         )}
@@ -250,7 +251,7 @@ export function Analysis() {
                     onClick={() => moveMenu(idx, -1)}
                     disabled={idx === 0 || reorder.isPending}
                     className="p-1 rounded text-muted hover:text-accent hover:bg-accent/10 disabled:opacity-30"
-                    title="上移"
+                    title={tx('上移')}
                   >
                     <ChevronUp className="h-3.5 w-3.5" />
                   </button>
@@ -258,12 +259,12 @@ export function Analysis() {
                     onClick={() => moveMenu(idx, 1)}
                     disabled={idx === menuItems.length - 1 || reorder.isPending}
                     className="p-1 rounded text-muted hover:text-accent hover:bg-accent/10 disabled:opacity-30"
-                    title="下移"
+                    title={tx('下移')}
                   >
                     <ChevronDown className="h-3.5 w-3.5" />
                   </button>
                   {menu.builtin ? (
-                    <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">默认</span>
+                    <span className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">{tx('默认')}</span>
                   ) : (
                     <button onClick={() => del.mutate(menu.id)} disabled={del.isPending} className="p-1 rounded text-muted hover:text-danger hover:bg-danger/10">
                       <Trash2 className="h-3.5 w-3.5" />
@@ -272,14 +273,13 @@ export function Analysis() {
                 </div>
               </div>
               <div className="mt-3 space-y-1 text-[11px] text-secondary">
-                <div>数据源：<span className="font-mono text-muted">{menu.data_source}</span></div>
-                <div>模板：{menu.template}</div>
-                {menu.dimension_field && <div>分组字段：{menu.dimension_field}</div>}
-                <div>列表列：{menu.detail_columns.length} 个</div>
+                <div>{tx('数据源：')}<span className="font-mono text-muted">{menu.data_source}</span></div>
+                <div>{tx('模板：')}{menu.template}</div>
+                {menu.dimension_field && <div>{tx('分组字段：')}{menu.dimension_field}</div>}
+                <div>{tx('列表列：')}{menu.detail_columns.length} {tx('个')}</div>
               </div>
               <Link to={`/analysis/${menu.id}`} className="mt-4 inline-flex w-full items-center justify-center rounded-btn border border-border bg-elevated px-3 py-1.5 text-xs text-foreground hover:bg-border/30 transition-colors">
-                打开分析页
-              </Link>
+                {tx('打开分析页')}</Link>
             </div>
           ))}
           {menus.isLoading &&
@@ -291,7 +291,7 @@ export function Analysis() {
               </div>
             ))}
           {!menus.isLoading && menuItems.length === 0 && (
-            <div className="rounded-card border border-border bg-surface px-5 py-10 text-center text-sm text-muted md:col-span-2 xl:col-span-3">暂无分析菜单，点击右上角新建。</div>
+            <div className="rounded-card border border-border bg-surface px-5 py-10 text-center text-sm text-muted md:col-span-2 xl:col-span-3">{tx('暂无分析菜单，点击右上角新建。')}</div>
           )}
         </section>
       </div>

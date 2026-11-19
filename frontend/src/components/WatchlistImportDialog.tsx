@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Modal } from '@/components/Modal'
 import { toast } from '@/components/Toast'
 import { api, type WatchlistGroup, type WatchlistGroupColor, type WatchlistImportCandidate, type WatchlistImportResult } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { useWatchlistBatchAdd } from '@/lib/useSharedMutations'
 import {
@@ -101,6 +102,7 @@ function Dropzone({
   label: string
   onPick: (list: FileList | File[] | null | undefined) => void
 }) {
+  const { tx } = useI18n()
   const inputRef = useRef<HTMLInputElement>(null)
   return (
     <>
@@ -131,7 +133,7 @@ function Dropzone({
         ) : (
           <ImagePlus className="h-6 w-6 text-accent" />
         )}
-        <span className="text-xs">{busy ? label : '点击选择或拖拽券商自选截图 / CSV / TXT'}</span>
+        <span className="text-xs">{busy ? label : tx('点击选择或拖拽券商自选截图 / CSV / TXT')}</span>
       </button>
     </>
   )
@@ -144,6 +146,7 @@ export function WatchlistImportDialog({
   groups,
   existingBySymbol,
 }: Props) {
+  const { tx } = useI18n()
   const abortRef = useRef<AbortController | null>(null)
   const genRef = useRef(0)
   const qc = useQueryClient()
@@ -273,7 +276,7 @@ export function WatchlistImportDialog({
     const images = files.filter(isImageFile)
     const queue = images.slice(0, MAX_IMPORT_IMAGES)
     if (images.length > MAX_IMPORT_IMAGES) {
-      toast(`一次最多识别 ${MAX_IMPORT_IMAGES} 张，已取前 ${MAX_IMPORT_IMAGES} 张`, 'error')
+      toast(tx('一次最多识别 {n} 张，已取前 {n} 张', { n: MAX_IMPORT_IMAGES }), 'error')
     }
     setPreviewUrls(prev => {
       revokePreviews(prev)
@@ -314,7 +317,7 @@ export function WatchlistImportDialog({
       } else if (all.every(c => !c.matched)) {
         toast(NO_MATCH_MSG, 'error')
       } else if (failed > 0) {
-        toast(`有 ${failed} 张识别失败，已合并其余结果`, 'error')
+        toast(tx('有 {n} 张识别失败，已合并其余结果', { n: failed }), 'error')
       }
     } finally {
       if (gen === genRef.current) {
@@ -344,23 +347,23 @@ export function WatchlistImportDialog({
     const csvs = files.filter(isCsvFile)
     if (csvs.length > 0) {
       if (csvs.length > 1 || images.length > 0) {
-        toast('截图与 CSV 请分别导入', 'error')
+        toast(tx('截图与 CSV 请分别导入'), 'error')
         return
       }
       await runCsvImport(csvs[0])
       return
     }
     if (images.length > 0) {
-      if (images.length < files.length) toast('已忽略非截图文件', 'error')
+      if (images.length < files.length) toast(tx('已忽略非截图文件'), 'error')
       await runRecognizeQueue(images)
       return
     }
-    toast('请选择券商自选截图或 CSV / TXT 文件', 'error')
+    toast(tx('请选择券商自选截图或 CSV / TXT 文件'), 'error')
   }
 
   const runCodes = async () => {
     if (!codesText.trim()) {
-      toast('请粘贴或输入股票代码', 'error')
+      toast(tx('请粘贴或输入股票代码'), 'error')
       return
     }
     await runCodesParse()
@@ -420,7 +423,7 @@ export function WatchlistImportDialog({
   const confirmAdd = async () => {
     const symbols = [...selected]
     if (symbols.length === 0) {
-      toast('请至少选择一只股票', 'error')
+      toast(tx('请至少选择一只股票'), 'error')
       return
     }
     const newCount = symbols.filter(sym => !membership.has(sym)).length
@@ -434,12 +437,12 @@ export function WatchlistImportDialog({
       if (names) {
         toast(
           mergedCount > 0
-            ? `已导入 ${symbols.length} 只到「${names}」（新增 ${newCount}，并入 ${mergedCount}）`
-            : `已导入 ${newCount} 只到「${names}」`,
+            ? tx('已导入 {n} 只到「{names}」（新增 {add}，并入 {merge}）', { n: symbols.length, names, add: newCount, merge: mergedCount })
+            : tx('已导入 {n} 只到「{names}」', { n: newCount, names }),
           'success',
         )
       } else {
-        toast(`已添加 ${newCount} 只自选`, 'success')
+        toast(tx('已添加 {n} 只自选', { n: newCount }), 'success')
       }
       onClose()
     } catch {
@@ -451,7 +454,7 @@ export function WatchlistImportDialog({
 
   const progressLabel =
     progress && progress.total > 1
-      ? `识别中 ${progress.done}/${progress.total}…`
+      ? tx('识别中 {done}/{total}…', { done: progress.done, total: progress.total })
       : progress
         ? '识别中…'
         : null
@@ -463,11 +466,11 @@ export function WatchlistImportDialog({
     if (!c.matched || !sym) {
       status = <span className="text-[10px] text-warning/90">{NO_MATCH_MSG}</span>
     } else if (state.inAllSelected) {
-      status = <span className="text-[10px] text-muted">已在所选分组</span>
+      status = <span className="text-[10px] text-muted">{tx('已在所选分组')}</span>
     } else if (state.inWatchlist) {
       status = (
         <span className="text-[10px] text-muted">
-          {targetGroupIds.length > 0 ? '已在自选 · 将并入所选分组' : '已在自选'}
+          {targetGroupIds.length > 0 ? tx('已在自选 · 将并入所选分组') : tx('已在自选')}
         </span>
       )
     }
@@ -488,7 +491,7 @@ export function WatchlistImportDialog({
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-2">
               <span className="font-medium text-foreground truncate">
-                {c.name || (c.matched && sym ? sym : '未匹配')}
+                {c.name || (c.matched && sym ? sym : tx('未匹配'))}
               </span>
               <span className="text-[11px] text-muted tabular-nums shrink-0">
                 {c.code}
@@ -511,17 +514,15 @@ export function WatchlistImportDialog({
       <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
         <div>
           <h2 id="watchlist-import-title" className="text-sm font-semibold text-foreground">
-            批量导入自选
-          </h2>
+            {tx('批量导入自选')}</h2>
           <p className="text-[11px] text-muted mt-0.5">
-            截图 / CSV / TXT / 粘贴代码均支持，解析后按证券主数据匹配，可多选分组导入
-          </p>
+            {tx('截图 / CSV / TXT / 粘贴代码均支持，解析后按证券主数据匹配，可多选分组导入')}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
           className="h-8 w-8 inline-flex items-center justify-center rounded-btn text-secondary hover:bg-elevated"
-          aria-label="关闭"
+          aria-label={tx('关闭')}
         >
           <X className="h-4 w-4" />
         </button>
@@ -533,7 +534,7 @@ export function WatchlistImportDialog({
         )}
 
         <div className="space-y-2">
-          <Dropzone busy={busy} label={progressLabel ?? '解析中…'} onPick={(l) => void onSourcePick(l)} />
+          <Dropzone busy={busy} label={progressLabel ?? tx('解析中…')} onPick={(l) => void onSourcePick(l)} />
           {!pasteOpen ? (
             <button
               type="button"
@@ -541,8 +542,7 @@ export function WatchlistImportDialog({
               className="w-full inline-flex items-center justify-center gap-1.5 rounded-btn border border-dashed border-border bg-elevated/40 px-3 py-2 text-xs text-secondary hover:bg-elevated/70"
             >
               <Keyboard className="h-3.5 w-3.5 text-accent" />
-              或粘贴证券代码
-            </button>
+              {tx('或粘贴证券代码')}</button>
           ) : (
             <div className="space-y-2 rounded-btn border border-border bg-elevated/40 p-2.5">
               <textarea
@@ -552,20 +552,19 @@ export function WatchlistImportDialog({
                 onKeyDown={e => {
                   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') void runCodes()
                 }}
-                placeholder={'示例：\n600519\n000001 平安银行\n515880 通信ETF国泰'}
+                placeholder={tx('示例：\n600519\n000001 平安银行\n515880 通信ETF国泰')}
                 rows={4}
                 className="w-full resize-y rounded-btn border border-border bg-surface px-3 py-2 text-xs text-foreground placeholder:text-muted focus:border-accent/50 focus:outline-none"
               />
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-muted">空格 / 逗号 / 换行分隔，Ctrl/⌘+Enter 解析</span>
+                <span className="text-[11px] text-muted">{tx('空格 / 逗号 / 换行分隔，Ctrl/⌘+Enter 解析')}</span>
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => { setPasteOpen(false); setCodesText('') }}
                     className="h-7 px-2 rounded-btn text-[11px] text-secondary hover:bg-elevated"
                   >
-                    收起
-                  </button>
+                    {tx('收起')}</button>
                   <button
                     type="button"
                     disabled={busy || !codesText.trim()}
@@ -573,8 +572,7 @@ export function WatchlistImportDialog({
                     className="h-7 px-3 rounded-btn text-xs inline-flex items-center gap-1.5 bg-accent text-white hover:bg-accent/90 disabled:opacity-40"
                   >
                     {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Keyboard className="h-3.5 w-3.5" />}
-                    解析
-                  </button>
+                    {tx('解析')}</button>
                 </div>
               </div>
             </div>
@@ -588,7 +586,7 @@ export function WatchlistImportDialog({
                 key={url}
                 className="shrink-0 w-16 h-16 rounded-btn overflow-hidden border border-border bg-black/40"
               >
-                <img src={url} alt={`预览 ${i + 1}`} className="w-full h-full object-contain" />
+                <img src={url} alt={tx('预览 {n}', { n: i + 1 })} className="w-full h-full object-contain" />
               </div>
             ))}
           </div>
@@ -605,7 +603,7 @@ export function WatchlistImportDialog({
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs text-secondary">
-                {candidates.length} 个代码 · 匹配 {matchedCount} · 可添加 {eligible.length}
+                {candidates.length} {tx('个代码 · 匹配')} {matchedCount} {tx('· 可添加')} {eligible.length}
               </span>
               {eligible.length > 0 ? (
                 <button
@@ -613,10 +611,10 @@ export function WatchlistImportDialog({
                   onClick={toggleAll}
                   className="text-[11px] text-accent hover:underline shrink-0"
                 >
-                  {allSelected ? '取消全选' : '全选可添加'}
+                  {allSelected ? tx('取消全选') : tx('全选可添加')}
                 </button>
               ) : matchedCount > 0 ? (
-                <span className="text-[11px] text-muted shrink-0">所选目标分组已包含这些标的，无需导入</span>
+                <span className="text-[11px] text-muted shrink-0">{tx('所选目标分组已包含这些标的，无需导入')}</span>
               ) : null}
             </div>
 
@@ -627,8 +625,7 @@ export function WatchlistImportDialog({
                 className="flex items-center gap-1 text-[11px] text-muted hover:text-secondary"
               >
                 <span className="transition-transform" style={{ transform: showSkipped ? 'rotate(90deg)' : undefined }}>▸</span>
-                已略过 {skippedCount} 个（已在自选/所选分组，或主数据未匹配）
-              </button>
+                {tx('已略过')} {skippedCount} {tx('个（已在自选/所选分组，或主数据未匹配）')}</button>
             )}
 
             <ul className="divide-y divide-border/60 rounded-btn border border-border overflow-hidden">
@@ -642,7 +639,7 @@ export function WatchlistImportDialog({
       <div className="px-4 py-3 border-t border-border shrink-0 space-y-2.5">
         <div className="space-y-1.5">
           <div className="flex items-start gap-2">
-            <span className="text-[11px] text-secondary pt-1.5 shrink-0">导入到分组</span>
+            <span className="text-[11px] text-secondary pt-1.5 shrink-0">{tx('导入到分组')}</span>
             <div className="flex flex-wrap items-center gap-1.5 min-w-0">
               <button
                 type="button"
@@ -653,10 +650,9 @@ export function WatchlistImportDialog({
                     ? 'border-accent/40 bg-accent/10 text-accent'
                     : 'border-border bg-elevated text-secondary hover:text-foreground'
                 }`}
-                title="不加到任何分组，仅新增标的到自选"
+                title={tx('不加到任何分组，仅新增标的到自选')}
               >
-                未分组
-              </button>
+                {tx('未分组')}</button>
               <span className="mx-1 h-3 w-px shrink-0 self-center bg-border/60" aria-hidden="true" />
               {groups.map(g => {
                 const active = targetGroupIds.includes(g.id)
@@ -676,7 +672,7 @@ export function WatchlistImportDialog({
                         ? `${c.border} ${c.background} ${c.text}`
                         : 'border-border bg-elevated text-secondary hover:bg-elevated/80 hover:text-foreground'
                     }`}
-                    title={`${active ? '移出' : '加入'}目标分组「${g.name}」`}
+                    title={tx('{action}目标分组「{name}」', { action: active ? tx('移出') : tx('加入'), name: g.name })}
                   >
                     <span className={`h-1.5 w-1.5 rounded-full ${active ? c.dot : 'bg-border'}`} />
                     {g.name}
@@ -688,11 +684,10 @@ export function WatchlistImportDialog({
                   type="button"
                   onClick={() => setNewGroupOpen(true)}
                   className="inline-flex items-center gap-1 rounded-full border border-dashed border-border bg-elevated/40 px-2 py-1 text-[11px] text-accent hover:bg-elevated/70"
-                  title="新建分组接收这批导入"
+                  title={tx('新建分组接收这批导入')}
                 >
                   <Plus className="h-3 w-3" />
-                  新建
-                </button>
+                  {tx('新建')}</button>
               )}
             </div>
           </div>
@@ -708,23 +703,22 @@ export function WatchlistImportDialog({
                     if (e.key === 'Enter') void createGroup()
                     if (e.key === 'Escape') { setNewGroupOpen(false); setNewGroupName(''); setNewGroupColor(DEFAULT_WATCHLIST_GROUP_COLOR) }
                   }}
-                  placeholder="新分组名称，Enter 创建"
+                  placeholder={tx('新分组名称，Enter 创建')}
                   className="h-8 min-w-0 flex-1 rounded-btn border border-border bg-surface px-2 text-xs text-foreground placeholder:text-muted focus:border-accent/50 focus:outline-none"
-                  aria-label="新分组名称"
+                  aria-label={tx('新分组名称')}
                 />
                 <button
                   type="button"
                   onClick={() => void createGroup()}
                   disabled={creatingGroup || !newGroupName.trim()}
-                  title="创建分组，并作为本次导入的目标分组"
+                  title={tx('创建分组，并作为本次导入的目标分组')}
                   className="h-8 shrink-0 px-3 rounded-btn text-xs inline-flex items-center gap-1.5 bg-accent text-white hover:bg-accent/90 disabled:opacity-40"
                 >
                   {creatingGroup ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-                  创建
-                </button>
+                  {tx('创建')}</button>
               </div>
               <div className="flex items-center gap-2 pl-1">
-                <span className="text-[11px] text-secondary shrink-0">颜色</span>
+                <span className="text-[11px] text-secondary shrink-0">{tx('颜色')}</span>
                 <div className="flex flex-wrap items-center gap-1.5">
                   {WATCHLIST_GROUP_COLORS.map(option => {
                     const active = option.id === newGroupColor
@@ -734,7 +728,7 @@ export function WatchlistImportDialog({
                         type="button"
                         onClick={() => setNewGroupColor(option.id)}
                         aria-pressed={active}
-                        aria-label={`颜色 ${option.label}`}
+                        aria-label={tx('颜色 {name}', { name: option.label })}
                         title={option.label}
                         className={`h-4 w-4 rounded-full transition-transform ${option.dot} ${active ? `ring-2 ${option.ring} scale-110` : 'hover:scale-110'}`}
                       />
@@ -752,8 +746,7 @@ export function WatchlistImportDialog({
             onClick={onClose}
             className="h-8 px-3 rounded-btn text-xs text-secondary hover:bg-elevated"
           >
-            取消
-          </button>
+            {tx('取消')}</button>
           <button
             type="button"
             disabled={selected.size === 0 || batchAdd.isPending || busy}
@@ -765,7 +758,7 @@ export function WatchlistImportDialog({
             ) : (
               <Upload className="h-3.5 w-3.5" />
             )}
-            导入所选 ({selected.size})
+            {tx('导入所选 (')}{selected.size})
           </button>
         </div>
       </div>

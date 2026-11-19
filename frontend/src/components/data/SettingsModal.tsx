@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
+import { tx } from '@/lib/i18n'
 
 export function SettingsModal({ title, onClose, children, width = 'max-w-md', contentClassName = 'min-h-0 flex-1 overflow-y-auto p-4 sm:p-5' }: {
   title: string
@@ -28,7 +29,7 @@ export function SettingsModal({ title, onClose, children, width = 'max-w-md', co
       >
         <div className="flex items-center justify-between px-5 py-3 border-b border-border shrink-0">
           <h3 className="text-sm font-medium text-foreground">{title}</h3>
-          <button onClick={onClose} aria-label="关闭" className="p-1 rounded hover:bg-elevated text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
+          <button onClick={onClose} aria-label={tx('关闭')} className="p-1 rounded hover:bg-elevated text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
             <X className="h-4 w-4" />
           </button>
         </div>

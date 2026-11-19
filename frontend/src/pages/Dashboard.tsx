@@ -19,6 +19,7 @@ import { AddWidgetPanel } from '@/components/dashboard/AddWidgetPanel'
 import { useDashboardLayout } from '@/components/dashboard/useDashboardLayout'
 import { DEFAULT_LAYOUT, widgetDef, type WidgetCtx } from '@/components/dashboard/registry'
 import { cloneItems, GRID_COLS, type WidgetType } from '@/components/dashboard/layout'
+import { useI18n } from '@/lib/i18n'
 
 /** 兼容旧后端的预热标志; 同步/自动修复也会使统计暂不可用。 */
 export function isDataStatusPending(ds?: DataStatus): boolean {
@@ -37,6 +38,7 @@ export function resolveHasNoData(ds?: DataStatus): boolean {
 type PreviewSource = 'gain' | 'loss' | 'amount' | 'active' | 'concept' | 'industry' | 'alert'
 
 export function Dashboard() {
+  const { t, tx } = useI18n()
   const qc = useQueryClient()
   const [selectedDate, setSelectedDate] = useState<string | undefined>()
   const [manualFetching, setManualFetching] = useState(false)
@@ -179,7 +181,7 @@ export function Dashboard() {
     return (
       <div className="flex h-full items-center justify-center bg-base">
         <div className="flex items-center gap-2 text-sm text-muted">
-          <Loader2 className="h-4 w-4 animate-spin" /> 加载市场看板…
+          <Loader2 className="h-4 w-4 animate-spin" /> {tx('加载市场看板…')}
         </div>
       </div>
     )
@@ -189,8 +191,8 @@ export function Dashboard() {
     return (
       <div className="flex h-full items-center justify-center bg-base p-6">
         <div className="rounded-card border border-border bg-surface p-6 text-center">
-          <div className="text-sm text-danger">看板加载失败</div>
-          <button onClick={() => overview.refetch()} className="mt-3 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-white">重试</button>
+          <div className="text-sm text-danger">{tx('看板加载失败')}</div>
+          <button onClick={() => overview.refetch()} className="mt-3 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-white">{t('common.retry')}</button>
         </div>
       </div>
     )
@@ -257,7 +259,7 @@ export function Dashboard() {
         <div className="pointer-events-none absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-accent to-accent/20" aria-hidden />
         <div className="flex items-center gap-2">
           <Gauge className="h-4 w-4 text-accent" />
-          <h1 className="text-[16px] leading-6 font-semibold text-foreground">市场看板</h1>
+          <h1 className="text-[16px] leading-6 font-semibold text-foreground">{tx('市场看板')}</h1>
           <span
             className="rounded-full border px-2 py-0.5 text-[10px] font-medium"
             style={{
@@ -266,7 +268,7 @@ export function Dashboard() {
               background: `${scoreColor(score)}14`,
             }}
           >
-            {data.emotion.label} · {score}
+            {tx(data.emotion.label)} · {score}
           </span>
         </div>
         <div className="flex items-center gap-3 text-[11px] text-muted">
@@ -282,21 +284,21 @@ export function Dashboard() {
             <span className="font-mono text-secondary">—</span>
           )}
           <span className="flex items-center gap-1"><Timer className="h-3 w-3" />{quoteAge(data.quote_status?.quote_age_ms)}</span>
-          <span className={quoteRunning ? 'text-accent' : 'text-warning'}>{quoteRunning ? '实时' : '非实时'}</span>
+          <span className={quoteRunning ? 'text-accent' : 'text-warning'}>{quoteRunning ? tx('实时') : tx('非实时')}</span>
           <button
             onClick={handleRefresh}
             disabled={manualFetching}
             className="inline-flex items-center gap-1 rounded-btn border border-border bg-elevated px-2 py-1 text-[11px] text-secondary transition-colors hover:text-foreground disabled:opacity-50"
           >
-            <RefreshCw className={`h-3 w-3 ${manualFetching ? 'animate-spin' : ''}`} />重载
+            <RefreshCw className={`h-3 w-3 ${manualFetching ? 'animate-spin' : ''}`} />{tx('重载')}
           </button>
           {!dashEditing ? (
             <button
               onClick={() => setDashEditing(true)}
-              title="拖拽调整组件位置与宽高"
+              title={tx('拖拽调整组件位置与宽高')}
               className="inline-flex items-center gap-1 rounded-btn border border-border bg-elevated px-2 py-1 text-[11px] text-secondary transition-colors hover:text-foreground hover:border-accent/40"
             >
-              <GripVertical className="h-3 w-3" />自定义布局
+              <GripVertical className="h-3 w-3" />{tx('自定义布局')}
             </button>
           ) : (
             <>
@@ -305,13 +307,13 @@ export function Dashboard() {
                 onClick={resetDashLayout}
                 className="inline-flex items-center gap-1 rounded-btn border border-border bg-elevated px-2 py-1 text-[11px] text-secondary transition-colors hover:text-foreground"
               >
-                <RotateCcw className="h-3 w-3" />恢复默认
+                <RotateCcw className="h-3 w-3" />{tx('恢复默认')}
               </button>
               <button
                 onClick={() => setDashEditing(false)}
                 className="inline-flex items-center gap-1 rounded-btn bg-accent px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-accent/90"
               >
-                <Check className="h-3 w-3" />完成
+                <Check className="h-3 w-3" />{t('common.finish')}
               </button>
             </>
           )}
@@ -323,9 +325,7 @@ export function Dashboard() {
         <div className="mb-1.5 flex items-start gap-2 rounded-card border border-amber-500/30 bg-amber-500/8 px-3 py-1.5 text-[11px] leading-relaxed">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
           <div className="min-w-0 flex-1 text-secondary">
-            当前为「自选实时」模式,看板展示的大盘数据为<strong className="text-foreground">盘后快照</strong>(最新有数据日),并非盘中实时;
-            仅自选({data.quote_status?.watchlist_symbol_count ?? 0} 只)支持实时监控。
-            <span className="ml-1 text-accent">全市场实时依赖数据源支持</span>
+            {tx('当前为「自选实时」模式,看板展示的大盘数据为')}<strong className="text-foreground">{tx('盘后快照')}</strong>{tx('(最新有数据日),并非盘中实时; 仅自选(')}{data.quote_status?.watchlist_symbol_count ?? 0} {tx('只)支持实时监控。')}<span className="ml-1 text-accent">{tx('全市场实时依赖数据源支持')}</span>
           </div>
         </div>
       )}
@@ -372,7 +372,8 @@ function FetchDataCard({
   isTickflowProvider: boolean
   providerLabel: string
 }) {
-  const stageText = stage ? (STAGE_LABELS[stage] ?? stage) : '正在同步行情数据…'
+  const { tx } = useI18n()
+  const stageText = stage ? (STAGE_LABELS[stage] ?? stage) : tx('正在同步行情数据…')
   return (
     <div className="mb-3 rounded-card border border-border bg-surface/85 p-3.5">
       <div className="flex items-start gap-3">
@@ -380,18 +381,15 @@ function FetchDataCard({
           <Database className="h-4 w-4 text-accent" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium text-foreground">当前暂无数据</div>
+          <div className="text-sm font-medium text-foreground">{tx('当前暂无数据')}</div>
           <p className="mt-1 text-xs text-secondary leading-relaxed">
-            首次使用需获取行情数据后才能查看看板。{isTickflowProvider
-              ? '可通过 TickFlow 免费服务器拉取近 1 年全 A 股日K'
-              : `将从当前数据源「${providerLabel}」拉取近 1 年全 A 股日K`}(约 5500 只),预计 1-3 分钟,期间可继续浏览其他页面。
-          </p>
+            {tx('首次使用需获取行情数据后才能查看看板。')}{isTickflowProvider
+              ? tx('可通过 TickFlow 免费服务器拉取近 1 年全 A 股日K')
+              : tx('将从当前数据源「{provider}」拉取近 1 年全 A 股日K', { provider: providerLabel })}{tx('(约 5500 只),预计 1-3 分钟,期间可继续浏览其他页面。')}</p>
           <p className="mt-1 text-[11px] text-warning/80 leading-relaxed">
-            ⓘ 获取数据后即可进行策略定制、回测验证、策略扫描等本地分析功能。
-          </p>
+            {tx('ⓘ 获取数据后即可进行策略定制、回测验证、策略扫描等本地分析功能。')}</p>
           <p className="mt-1 text-[11px] text-muted leading-relaxed">
-            💡 配置 fuyao(同花顺 REST) Key 可解锁财务四表 / 龙虎榜 / 盘前风向标 / 竞价异动:
-            <Link to="/settings?tab=data-sources" className="text-accent hover:text-accent/80 transition-colors">前往设置 →</Link>
+            {tx('💡 配置 fuyao(同花顺 REST) Key 可解锁财务四表 / 龙虎榜 / 盘前风向标 / 竞价异动:')}<Link to="/settings?tab=data-sources" className="text-accent hover:text-accent/80 transition-colors">{tx('前往设置 →')}</Link>
           </p>
 
           {isFetching ? (
@@ -399,7 +397,7 @@ function FetchDataCard({
               <div className="flex items-center justify-between text-[11px] text-muted mb-1.5">
                 <span className="inline-flex items-center gap-1.5">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  {isStarting ? '正在启动同步任务…' : stageText}
+                  {isStarting ? tx('正在启动同步任务…') : stageText}
                 </span>
                 <span className="font-mono tabular">
                   {typeof fetchPct === 'number' ? `${Math.round(fetchPct)}%` : ''}
@@ -416,13 +414,12 @@ function FetchDataCard({
             </div>
           ) : fetchFailed ? (
             <div className="mt-3 flex items-center gap-2">
-              <span className="text-xs text-danger">同步失败,请重试</span>
+              <span className="text-xs text-danger">{tx('同步失败,请重试')}</span>
               <button
                 onClick={onStart}
                 className="inline-flex items-center gap-1.5 px-3 h-8 rounded-btn bg-accent text-white text-xs font-medium hover:bg-accent/90 transition-colors"
               >
-                <Play className="h-3.5 w-3.5" />重新获取
-              </button>
+                <Play className="h-3.5 w-3.5" />{tx('重新获取')}</button>
             </div>
           ) : (
             <div className="mt-3 flex items-center gap-3">
@@ -430,14 +427,12 @@ function FetchDataCard({
                 onClick={onStart}
                 className="inline-flex items-center gap-1.5 px-4 h-8 rounded-btn bg-accent text-white text-xs font-medium hover:bg-accent/90 transition-colors"
               >
-                <Play className="h-3.5 w-3.5" />立即获取数据
-              </button>
+                <Play className="h-3.5 w-3.5" />{tx('立即获取数据')}</button>
               <Link
                 to="/data"
                 className="inline-flex items-center gap-0.5 text-xs text-secondary hover:text-accent transition-colors"
               >
-                前往数据页
-                <ArrowUpRight className="h-3 w-3 self-center" />
+                {tx('前往数据页')}<ArrowUpRight className="h-3 w-3 self-center" />
               </Link>
             </div>
           )}
@@ -456,8 +451,9 @@ function WelcomeFetchModal({
   onClose: () => void
   onStart: () => void
 }) {
+  const { tx } = useI18n()
   return (
-    <SettingsModal title="欢迎首次使用 · 获取行情数据" onClose={onClose}>
+    <SettingsModal title={tx('欢迎首次使用 · 获取行情数据')} onClose={onClose}>
       <div className="text-center">
         <motion.div
           initial={{ scale: 0.85, opacity: 0 }}
@@ -467,27 +463,24 @@ function WelcomeFetchModal({
         >
           <Sparkles className="h-7 w-7 text-accent" />
         </motion.div>
-        <h3 className="mt-4 text-[16px] leading-6 font-semibold text-foreground">首次使用,需先获取行情数据</h3>
+        <h3 className="mt-4 text-[16px] leading-6 font-semibold text-foreground">{tx('首次使用,需先获取行情数据')}</h3>
         <p className="mt-2 text-xs text-secondary leading-relaxed">
           {isTickflowProvider
-            ? '可通过 TickFlow 免费服务器拉取近 1 年全 A 股日K'
-            : `将从当前数据源「${providerLabel}」拉取近 1 年全 A 股日K`}(约 5500 只),预计 1-3 分钟。
-          同步期间可继续浏览其他页面,完成后看板自动刷新。
-        </p>
+            ? tx('可通过 TickFlow 免费服务器拉取近 1 年全 A 股日K')
+            : tx('将从当前数据源「{provider}」拉取近 1 年全 A 股日K', { provider: providerLabel })}{tx('(约 5500 只),预计 1-3 分钟。 同步期间可继续浏览其他页面,完成后看板自动刷新。')}</p>
         <div className="mx-auto mt-4 max-w-md rounded-btn bg-elevated/60 px-4 py-3 text-left">
-          <div className="text-[11px] font-medium text-secondary">获取完成后的推荐步骤</div>
+          <div className="text-[11px] font-medium text-secondary">{tx('获取完成后的推荐步骤')}</div>
           <ol className="mt-1.5 space-y-1 text-[11px] text-muted leading-relaxed">
-            <li>1. <span className="text-secondary">配置 fuyao(同花顺 REST) Key</span> — 解锁财务四表 / 龙虎榜 / 盘前风向标 / 竞价异动</li>
-            <li>2. <span className="text-secondary">分钟数据落盘(可选)</span> — 分钟策略回测与板块分时走势需要</li>
-            <li>3. <span className="text-secondary">开始研究</span> — 自选加标的 → 策略扫描 → 回测验证</li>
+            <li>1. <span className="text-secondary">{tx('配置 fuyao(同花顺 REST) Key')}</span> {tx('— 解锁财务四表 / 龙虎榜 / 盘前风向标 / 竞价异动')}</li>
+            <li>2. <span className="text-secondary">{tx('分钟数据落盘(可选)')}</span> {tx('— 分钟策略回测与板块分时走势需要')}</li>
+            <li>3. <span className="text-secondary">{tx('开始研究')}</span> {tx('— 自选加标的 → 策略扫描 → 回测验证')}</li>
           </ol>
           <Link
             to="/settings?tab=data-sources"
             onClick={onClose}
             className="mt-2 inline-flex items-center gap-0.5 text-[11px] text-accent hover:text-accent/80 transition-colors"
           >
-            前往设置 → 数据源
-            <ArrowUpRight className="h-3 w-3 self-center" />
+            {tx('前往设置 → 数据源')}<ArrowUpRight className="h-3 w-3 self-center" />
           </Link>
         </div>
         <div className="mt-5 flex items-center justify-center gap-2.5">
@@ -495,14 +488,12 @@ function WelcomeFetchModal({
             onClick={onClose}
             className="px-4 h-9 rounded-btn text-sm text-secondary hover:text-foreground hover:bg-elevated transition-colors"
           >
-            稍后再说
-          </button>
+            {tx('稍后再说')}</button>
           <button
             onClick={onStart}
             className="inline-flex items-center gap-2 px-5 h-9 rounded-xl bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 hover:bg-accent/90 transition-all"
           >
-            <Play className="h-4 w-4" />开始获取
-          </button>
+            <Play className="h-4 w-4" />{tx('开始获取')}</button>
         </div>
       </div>
     </SettingsModal>

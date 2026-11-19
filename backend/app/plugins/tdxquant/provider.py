@@ -36,16 +36,18 @@ import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
-from zoneinfo import ZoneInfo
+from decimal import Decimal, InvalidOperation
 
 import polars as pl
 
+from app.market_time import CN_TZ, cn_now, cn_today
 from app.plugins.tdxquant.client import (
     SNAPSHOT_FIELDS,
     TdxQuantAuthError,
     TdxQuantClient,
     TdxQuantError,
 )
+from app.price_limits import price_limit_pct, round_price
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +62,11 @@ _HIST_INTERVAL_S = 0.08  # 单标的 K 线/事件请求节流
 _HIST_MAX_COUNT = 2600  # count 模式单次上限(≈10.6 年日K, 项目深窗口即 10 年)
 _ADJ_BACKDAYS = 30  # 推导因子时向前找"除权日前收盘"的回看天数(容忍长期停牌)
 _ADJ_FUTURE_DAYS = 15  # 未来已公告事件窗口: 无前收盘自然跳过, 滚动增量轮补上
-_BEIJING = ZoneInfo("Asia/Shanghai")
+_BEIJING = CN_TZ
+
+
+def _as_bj_date(dt: datetime) -> date:
+    return dt.astimezone(CN_TZ).date() if dt.tzinfo is not None else dt.date()
 
 # 内部指数代码 → TDX 快照代码(实测 2026-10: 上证指数走 TDX 999999 别名)
 _INDEX_CODE_MAP = {"000001.SH": "999999.SH"}
@@ -213,22 +219,40 @@ def _map_snapshot_row(symbol: str, row: dict, fallback_ms: int) -> dict | None:
 def _ref_price(
     prev_close: float, dividend: float, bonus: float, allot: float, allot_price: float
 ) -> float | None:
-    """交易所除权参考价: (P - D + AR·AP) / (1 + S + AR), 四舍五入(half-up)保留 2 位。"""
-    denom = 1.0 + bonus + allot
+    """交易所除权参考价: (P - D + AR·AP) / (1 + S + AR), Decimal ROUND_HALF_UP 保留 2 位。"""
+    for val in (prev_close, dividend, bonus, allot, allot_price):
+        if isinstance(val, bool) or not isinstance(val, (int, float)) or not math.isfinite(float(val)):
+            return None
+    try:
+        d_prev = Decimal(str(prev_close))
+        d_div = Decimal(str(dividend))
+        d_bonus = Decimal(str(bonus))
+        d_allot = Decimal(str(allot))
+        d_ap = Decimal(str(allot_price))
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+    denom = Decimal("1") + d_bonus + d_allot
     if denom <= 0:
         return None
-    x = (prev_close - dividend + allot * allot_price) / denom
-    return math.floor(x * 100 + 0.5) / 100
+    x = (d_prev - d_div + d_allot * d_ap) / denom
+    return round_price(x, 2)
 
 
-def _price_limit(symbol: str) -> float:
-    """按代码前缀给涨跌停幅度(自检容差用): 创业板/科创板 20%, 北交所 30%, 主板 10%。"""
-    code = symbol.split(".")[0]
-    if code.startswith(("300", "301", "302", "688", "689")):
-        return 0.20
-    if code.startswith(("8", "4", "92")):
-        return 0.30
-    return 0.10
+def _price_limit(
+    symbol: str,
+    trade_date: date | None = None,
+    *,
+    is_risk_warning: bool = False,
+) -> float:
+    """按代码与交易日委托给 price_limits 统一涨跌停幅度 (自检容差用)。"""
+    sym = symbol.strip()
+    if "." not in sym and sym.startswith(("43", "83", "87", "92")):
+        sym = f"{sym}.BJ"
+    return price_limit_pct(
+        sym,
+        trade_date or cn_today(),
+        is_risk_warning=is_risk_warning,
+    )
 
 
 def _unwrap_value(raw: dict) -> dict:
@@ -557,8 +581,8 @@ class TdxQuantProvider:
                 on_chunk_done(0, 0)
             return
         client = self._get_client()
-        start_d = start_time.date() if start_time else None
-        end_d = end_time.date() if end_time else date.today()
+        start_d = _as_bj_date(start_time) if start_time else None
+        end_d = _as_bj_date(end_time) if end_time else cn_today()
         span = (end_d - start_d).days if start_d else _HIST_MAX_COUNT * 1.4
         count = _bars_for_window(int(span))
         for i, symbol in enumerate(symbols):
@@ -595,8 +619,8 @@ class TdxQuantProvider:
         if not symbols or asset_type != "stock":
             return pl.DataFrame(schema=_ADJ_SCHEMA)
         client = self._get_client()
-        start_d = start_time.date() if start_time else None
-        end_d = end_time.date() if end_time else date.today()
+        start_d = _as_bj_date(start_time) if start_time else None
+        end_d = _as_bj_date(end_time) if end_time else cn_today()
 
         out_rows: list[dict] = []
         for i, symbol in enumerate(symbols):
@@ -644,6 +668,8 @@ class TdxQuantProvider:
     def _factor_rows(
         self, symbol: str, events: list[dict], closes: dict[date, float],
         start_d: date | None, end_d: date,
+        *,
+        st_symbols: set[str] | frozenset[str] = frozenset(),
     ) -> list[dict]:
         days = sorted(closes)
         rows: list[dict] = []
@@ -671,7 +697,7 @@ class TdxQuantProvider:
             ex_days = [d for d in days if d >= exd]
             if ex_days:  # 涨跌停自检: 错误因子会令复权后除权日涨跌幅超出板限
                 ret = closes[ex_days[0]] / (p / factor) - 1.0
-                if abs(ret) > _price_limit(symbol) + 0.02:
+                if abs(ret) > _price_limit(symbol, exd, is_risk_warning=(symbol in st_symbols)) + 0.02:
                     logger.warning("TdxQuant 除权因子自检剔除 %s %s: 复权后除权日涨跌幅 %.1f%% 超出涨跌停",
                                    symbol, exd, ret * 100)
                     continue
@@ -722,7 +748,7 @@ class TdxQuantProvider:
         # 同步窗口来自 cn_now/单股 API, 可能带时区; 原生接口和返回列均用北京墙钟。
         if start_time is not None and start_time.tzinfo is not None:
             start_time = start_time.astimezone(_BEIJING).replace(tzinfo=None)
-        end_dt = end_time or datetime.now(_BEIJING)
+        end_dt = end_time or cn_now()
         if end_dt.tzinfo is not None:
             end_dt = end_dt.astimezone(_BEIJING).replace(tzinfo=None)
         count = _minute_count_for_window(start_time, end_dt)
@@ -768,7 +794,7 @@ class TdxQuantProvider:
             )
             return pl.DataFrame(schema=_MINUTE_SCHEMA)
         client = self._get_client()
-        now = datetime.now()
+        now = cn_now().replace(tzinfo=None)
         today = now.date()
         fetch = max(_MINUTE_BARS_PER_DAY, min(count, 480)) + _MINUTE_BARS_PER_DAY
         out: list[pl.DataFrame] = []
@@ -828,7 +854,7 @@ class TdxQuantProvider:
                 logger.warning("TdxQuant 增量轮股票池枚举失败: %s", e)
                 return pl.DataFrame(schema=_MINUTE_SCHEMA)
         count = max(1, min(int(count), 30))
-        now = datetime.now()
+        now = cn_now().replace(tzinfo=None)
         out: list[pl.DataFrame] = []
         blank_streak = 0
         failures = 0
@@ -919,11 +945,12 @@ class TdxQuantProvider:
     def test_dataset(self, dataset: str, symbols: list[str] | None = None) -> dict:
         if dataset in ("daily", "adj_factor"):
             syms = [s for s in (symbols or [])][:3] or ["000001.SZ"]
+            now_bj = cn_now().replace(tzinfo=None)
             try:
                 if dataset == "daily":
-                    df = self.get_daily(syms, datetime.now() - timedelta(days=30), datetime.now())
+                    df = self.get_daily(syms, now_bj - timedelta(days=30), now_bj)
                 else:
-                    df = self.get_adj_factors(syms, datetime.now() - timedelta(days=365), datetime.now())
+                    df = self.get_adj_factors(syms, now_bj - timedelta(days=365), now_bj)
             except TdxQuantError as e:
                 return {"provider": self.name, "dataset": dataset, "rows": 0, "error": str(e)}
             head = df.head(5).to_dicts()
@@ -936,7 +963,7 @@ class TdxQuantProvider:
         if dataset in ("minute", "full_minute"):
             syms = [s for s in (symbols or [])][:3] or ["600519.SH"]
             try:
-                end = datetime.now()
+                end = cn_now().replace(tzinfo=None)
                 df = (self.get_intraday_batch(syms) if dataset == "full_minute"
                       else self.get_minute(syms, end - timedelta(days=3), end))
             except TdxQuantError as e:

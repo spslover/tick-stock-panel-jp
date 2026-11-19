@@ -10,11 +10,21 @@ let root: Root
 let host: HTMLDivElement
 let client: QueryClient
 let tokens: ApiTokenRecord[]
+// 面板挂载时 i18n 订阅会顺带回填一次 UI 偏好 (/api/settings/preferences),
+// 必须在桩里单独分流, 否则这条偏好请求会被误判成「意外的网络请求」。
+const isPrefsRequest = (url: string) => url.includes('/api/settings/preferences')
+let unexpectedFetchCalls = 0
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   vi.useFakeTimers()
-  vi.stubGlobal('fetch', vi.fn(() => { throw new Error('Unexpected network request') }))
+  unexpectedFetchCalls = 0
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : input.toString()
+    if (isPrefsRequest(url)) return Response.json({ ui_prefs: {} })
+    unexpectedFetchCalls++
+    throw new Error('Unexpected network request')
+  }))
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -74,7 +84,7 @@ it('opens confirmation for the selected Token without sending a revocation reque
   expect(dialog.textContent).toContain('无法撤销')
   expect(document.activeElement).toBe(button('取消', dialog))
   expect(api.apiTokenRevoke).not.toHaveBeenCalled()
-  expect(fetch).not.toHaveBeenCalled()
+  expect(unexpectedFetchCalls).toBe(0)
 })
 
 it.each(['cancel', 'escape', 'backdrop'])('%s dismisses confirmation without revoking and restores focus', async method => {

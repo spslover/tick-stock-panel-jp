@@ -320,6 +320,8 @@ async def analyze_stock_stream(
     data_dir: Path,
     symbol: str,
     focus: str = "",
+    *,
+    locale: str = "zh-CN",
 ) -> AsyncIterator[str]:
     """流式个股分析:yield 出每个 NDJSON 事件。
 
@@ -357,7 +359,7 @@ async def analyze_stock_stream(
 
     # 5+6. 构建提示词 + 流式调用 LLM(整体 try-except,任何异常都 yield error,避免前端卡死)
     try:
-        from app.services.ai_provider import stream_ai_text
+        from app.services.ai_provider import language_instruction, stream_ai_text
 
         # 虚拟持仓上下文 (V3): 逐账户 (V2 多账户) 收集持有该标的的持仓注入
         # (任何异常静默跳过, 不影响分析)。
@@ -380,7 +382,7 @@ async def analyze_stock_stream(
         got_content = False
         async for delta in stream_ai_text(
             [
-                {"role": "system", "content": _SYSTEM_PROMPT},
+                {"role": "system", "content": _SYSTEM_PROMPT + language_instruction(locale)},
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.5,

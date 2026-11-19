@@ -4,6 +4,7 @@ import { Loader2, Check, AlertCircle } from 'lucide-react'
 import { useBubbleTasks, restoreDialog } from '@/lib/stockAnalysisStore'
 import type { ActiveTask } from '@/lib/stockAnalysisStore'
 import { getPageScale } from '@/lib/pageZoom'
+import { useI18n } from '@/lib/i18n'
 
 /**
  * AI 个股分析任务全局气泡 —— 与财务分析胶囊并列,蓝色主题区分。
@@ -136,6 +137,7 @@ function BubbleItem({ task, isLast, onPointerDown }: {
   isLast: boolean
   onPointerDown: () => void
 }) {
+  const { tx } = useI18n()
   const isWorking = task.phase === 'loading' || task.phase === 'streaming'
   const isError = task.phase === 'error'
 
@@ -158,7 +160,7 @@ function BubbleItem({ task, isLast, onPointerDown }: {
         onPointerDown={onPointerDown}
         role="button"
         tabIndex={0}
-        title={isWorking ? '个股分析中,点击恢复' : isError ? '分析失败,点击重试' : '点击查看个股分析报告'}
+        title={isWorking ? tx('个股分析中,点击恢复') : isError ? tx('分析失败,点击重试') : tx('点击查看个股分析报告')}
         className={`group relative flex w-full cursor-pointer items-center gap-1.5 overflow-hidden rounded-lg border bg-gradient-to-br px-2 py-1.5 backdrop-blur-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.99] ${accent}`}
       >
         {isWorking && (

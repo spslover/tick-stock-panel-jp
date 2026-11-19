@@ -20,7 +20,9 @@ import hmac
 import json
 import logging
 import time
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlsplit
+
+from app.services import safe_http
 
 logger = logging.getLogger(__name__)
 
@@ -108,8 +110,6 @@ def _post_feishu(webhook_url: str, payload: dict, secret: str, max_attempts: int
     max_attempts: 尝试次数, 默认 3 (生产推送语义)。诊断用途(如手动测试配置)可传 1,
     避免失败时等满退避重试。
     """
-    import httpx
-
     last_err = ""
     for attempt in range(1, max_attempts + 1):
         try:
@@ -119,7 +119,7 @@ def _post_feishu(webhook_url: str, payload: dict, secret: str, max_attempts: int
                 payload["timestamp"] = timestamp
                 payload["sign"] = _gen_sign(timestamp, secret)
 
-            resp = httpx.post(webhook_url, json=payload, timeout=5.0)
+            resp = safe_http.post_sync(webhook_url, json=payload, timeout=5.0, max_redirects=0)
             if resp.status_code == 200:
                 try:
                     data = resp.json()
@@ -130,16 +130,22 @@ def _post_feishu(webhook_url: str, payload: dict, secret: str, max_attempts: int
                     if code == 0:
                         return True
                     # 业务失败(签名错/格式错等): 重试无益, 直接失败
-                    logger.warning("飞书推送业务失败(不重试): %s", data)
+                    logger.warning(
+                        "飞书推送业务失败(不重试): %s",
+                        safe_http.redact_url_secrets(str(data), secret_values=[secret] if secret else ()),
+                    )
                     return False
                 return True  # 200 且 JSON 非 dict, 视为成功
             # 4xx 客户端错误(URL 失效等): 不重试; 5xx: 落入重试
-            last_err = f"HTTP {resp.status_code}: {resp.text[:200]}"
+            last_err = safe_http.redact_url_secrets(f"HTTP {resp.status_code}: {resp.text[:200]}")
             if resp.status_code < 500:
                 logger.warning("飞书推送失败(不重试, 客户端错误): %s", last_err)
                 return False
+        except safe_http.UnsafeURLError as e:
+            logger.warning("飞书推送被安全策略拦截: %s", safe_http.redact_url_secrets(str(e)))
+            return False
         except Exception as e:  # noqa: BLE001 — 网络/超时, 可重试
-            last_err = str(e)
+            last_err = safe_http.redact_url_secrets(str(e))
 
         if attempt < max_attempts:
             time.sleep(min(2 ** (attempt - 1), 3))  # 退避: 1s, 2s
@@ -267,15 +273,22 @@ def normalize_wecom_url(url: str) -> str:
     return f"{WECOM_HOOK_PREFIX}?key={url}"
 
 
+def _wecom_url_secrets(webhook_url: str) -> list[str]:
+    try:
+        pairs = parse_qsl(urlsplit(webhook_url).query, keep_blank_values=False)
+    except ValueError:
+        return []
+    return [v for k, v in pairs if k.lower() in {"key", "token", "secret"} and v]
+
+
 def _post_wecom(webhook_url: str, payload: dict) -> bool:
     """发送一次企业微信 webhook 请求并判定成败。
 
     成功响应: HTTP 200 且 errcode=0。失败静默返回 False。
     """
+    secret_vals = _wecom_url_secrets(webhook_url)
     try:
-        import httpx
-
-        resp = httpx.post(webhook_url, json=payload, timeout=5.0)
+        resp = safe_http.post_sync(webhook_url, json=payload, timeout=5.0, max_redirects=0)
         if resp.status_code == 200:
             try:
                 data = resp.json()
@@ -283,14 +296,24 @@ def _post_wecom(webhook_url: str, payload: dict) -> bool:
                     # errcode=0 表示成功; 45009=频率限制, 其它非零=业务失败
                     if data.get("errcode") == 0:
                         return True
-                    logger.warning("企业微信推送业务失败: %s", data)
+                    logger.warning(
+                        "企业微信推送业务失败: %s",
+                        safe_http.redact_url_secrets(str(data), secret_values=secret_vals),
+                    )
                     return False
             except ValueError:
                 return True
-        logger.warning("企业微信推送 HTTP %s: %s", resp.status_code, resp.text[:200])
+        logger.warning(
+            "企业微信推送 HTTP %s: %s",
+            resp.status_code,
+            safe_http.redact_url_secrets(resp.text[:200], secret_values=secret_vals),
+        )
         return False
     except Exception as e:  # noqa: BLE001
-        logger.warning("企业微信 Webhook 推送失败: %s", e)
+        logger.warning(
+            "企业微信 Webhook 推送失败: %s",
+            safe_http.redact_url_secrets(str(e), secret_values=secret_vals),
+        )
         return False
 
 
@@ -355,12 +378,8 @@ _CUSTOM_MAX_ATTEMPTS = 3
 
 
 def is_valid_custom_url(url: str) -> bool:
-    """Accept absolute HTTP(S) URLs, including LAN endpoints used by local deployments."""
-    try:
-        parsed = urlparse((url or "").strip())
-    except ValueError:
-        return False
-    return parsed.scheme in {"http", "https"} and bool(parsed.netloc) and not parsed.username
+    """Accept SSRF-safe HTTP(S) URLs (private/LAN endpoints require explicit opt-in)."""
+    return safe_http.is_safe_url((url or "").strip())
 
 
 def send_custom(
@@ -398,22 +417,25 @@ def send_custom(
         headers["X-TickFlow-Timestamp"] = timestamp
         headers["X-TickFlow-Signature"] = f"sha256={digest}"
 
-    import httpx
-
     last_err = ""
     for attempt in range(1, max_attempts + 1):
         try:
-            response = httpx.post(
-                webhook_url, content=encoded, headers=headers, timeout=5.0,
+            response = safe_http.post_sync(
+                webhook_url, content=encoded, headers=headers, timeout=5.0, max_redirects=0,
             )
             if 200 <= response.status_code < 300:
                 return True
-            last_err = f"HTTP {response.status_code}: {response.text[:200]}"
+            last_err = safe_http.redact_url_secrets(
+                f"HTTP {response.status_code}: {response.text[:200]}"
+            )
             if response.status_code < 500:
                 logger.warning("第三方 Webhook 推送失败(不重试): %s", last_err)
                 return False
-        except Exception as exc:  # Network failures are retryable and must not escape.
-            last_err = str(exc)
+        except safe_http.UnsafeURLError as exc:
+            logger.warning("第三方 Webhook 推送被安全策略拦截: %s", safe_http.redact_url_secrets(str(exc)))
+            return False
+        except Exception as exc:  # noqa: BLE001 — Network failures are retryable and must not escape.
+            last_err = safe_http.redact_url_secrets(str(exc))
         if attempt < max_attempts:
             time.sleep(min(2 ** (attempt - 1), 3))
 

@@ -5,6 +5,7 @@ import { ListChecks, X } from 'lucide-react'
 import { Modal } from '@/components/Modal'
 import { toast } from '@/components/Toast'
 import { api, type WatchlistEntry, type WatchlistGroup } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 
 interface Props {
@@ -16,10 +17,9 @@ interface Props {
 export function WatchlistGroupTransfer(props: Props) {
   const [open, setOpen] = useState(false)
   return <>
-    <button type="button" onClick={() => setOpen(true)} title="批量分组" aria-haspopup="dialog"
+    <button type="button" onClick={() => setOpen(true)} title={tx('批量分组')} aria-haspopup="dialog"
       className="ml-2 inline-flex shrink-0 items-center gap-1 rounded-btn px-2 text-xs text-secondary hover:bg-elevated hover:text-foreground">
-      <ListChecks aria-hidden="true" className="h-4 w-4" />批量分组
-    </button>
+      <ListChecks aria-hidden="true" className="h-4 w-4" />{tx('批量分组')}</button>
     {open && createPortal(<TransferDialog {...props} onClose={() => setOpen(false)} />, document.body)}
   </>
 }
@@ -38,7 +38,7 @@ function TransferDialog({ source, groups, entries, onClose }: Props & { onClose:
   const someVisible = visible.some(e => selected.has(e.symbol))
   const targets = groups.filter(g => g.id !== source)
   const target = targets.find(g => g.id === targetId)
-  const sourceName = source === 'all' ? '全部自选' : source === 'ungrouped' ? '未分组' : groups.find(g => g.id === source)?.name
+  const sourceName = source === 'all' ? tx('全部自选') : source === 'ungrouped' ? tx('未分组') : groups.find(g => g.id === source)?.name
 
   const transfer = useMutation({
     mutationFn: (input: { action: 'move' | 'copy'; target: WatchlistGroup; symbols: string[] }) =>
@@ -47,9 +47,10 @@ function TransferDialog({ source, groups, entries, onClose }: Props & { onClose:
       qc.setQueryData(QK.watchlist, { symbols: data.symbols })
       void qc.invalidateQueries({ queryKey: QK.watchlist })
       const skipped = input.symbols.length - data.changed
-      const verb = input.action === 'move' ? '移动' : '复制'
-      toast(data.changed === 0 ? `所选标的已在「${input.target.name}」中`
-        : `已${verb} ${data.changed} 只到「${input.target.name}」${skipped ? `，${skipped} 只已在组内` : ''}`, 'success')
+      const verb = input.action === 'move' ? tx('移动') : tx('复制')
+      toast(data.changed === 0
+        ? tx('所选标的已在「{name}」中', { name: input.target.name })
+        : tx('已{verb} {n} 只到「{name}」', { verb, n: data.changed, name: input.target.name }) + (skipped ? tx('，{n} 只已在组内', { n: skipped }) : ''), 'success')
       onClose()
     },
     onError: () => {
@@ -70,20 +71,20 @@ function TransferDialog({ source, groups, entries, onClose }: Props & { onClose:
     })
   }
 
-  return <Modal ariaLabel="批量分组" onClose={() => { if (!pending) onClose() }}
+  return <Modal ariaLabel={tx('批量分组')} onClose={() => { if (!pending) onClose() }}
     panelClassName="flex max-h-[90dvh] w-[92vw] max-w-md flex-col overflow-y-auto rounded-card border border-border bg-surface shadow-xl">
     <header className="flex items-start justify-between gap-2 border-b border-border px-4 py-3">
       <div className="min-w-0">
-        <h2 className="text-[16px] font-semibold text-foreground">批量分组</h2>
-        <p className="mt-1 break-words text-xs text-secondary">从「{sourceName}」选择标的</p>
+        <h2 className="text-[16px] font-semibold text-foreground">{tx('批量分组')}</h2>
+        <p className="mt-1 break-words text-xs text-secondary">{tx('从「')}{sourceName}{tx('」选择标的')}</p>
       </div>
-      <button type="button" aria-label="关闭" disabled={pending} onClick={onClose}
+      <button type="button" aria-label={tx('关闭')} disabled={pending} onClick={onClose}
         className="grid h-9 w-9 shrink-0 place-items-center rounded-btn text-secondary hover:bg-elevated">
         <X className="h-4 w-4" />
       </button>
     </header>
     <div className="space-y-3 px-4 py-3">
-      <input type="search" aria-label="搜索分组标的" placeholder="搜索名称或代码" value={query}
+      <input type="search" aria-label={tx('搜索分组标的')} placeholder={tx('搜索名称或代码')} value={query}
         disabled={pending} onChange={e => setQuery(e.target.value)}
         className="h-10 w-full rounded-btn border border-border bg-base px-3 text-sm text-foreground" />
       <div className="overflow-hidden rounded-btn border border-border">
@@ -92,9 +93,9 @@ function TransferDialog({ source, groups, entries, onClose }: Props & { onClose:
             <input type="checkbox" className="accent-accent" checked={allVisible} disabled={!visible.length || pending}
               ref={el => { if (el) el.indeterminate = someVisible && !allVisible }}
               onChange={e => toggle(visible, e.target.checked)} />
-            {search ? '全选搜索结果' : '全选'}
+            {search ? tx('全选搜索结果') : tx('全选')}
           </label>
-          <span role="status" className="text-secondary">已选 {symbols.length} 只</span>
+          <span role="status" className="text-secondary">{tx('已选')} {symbols.length} {tx('只')}</span>
         </div>
         <div className="max-h-[min(32dvh,18rem)] overflow-y-auto overscroll-contain">
           {visible.map(entry => <label key={entry.symbol}
@@ -104,27 +105,26 @@ function TransferDialog({ source, groups, entries, onClose }: Props & { onClose:
             {entry.name && <span className="truncate text-foreground">{entry.name}</span>}
             <span className="ml-auto shrink-0 font-mono text-xs text-secondary">{entry.symbol}</span>
           </label>)}
-          {!visible.length && <p className="px-3 py-4 text-center text-sm text-secondary">{members.length ? '没有匹配的标的' : '当前分组暂无标的'}</p>}
+          {!visible.length && <p className="px-3 py-4 text-center text-sm text-secondary">{members.length ? tx('没有匹配的标的') : tx('当前分组暂无标的')}</p>}
         </div>
       </div>
-      <label className="block text-sm text-secondary">目标分组
-        <select value={target?.id ?? ''} disabled={!targets.length || pending} onChange={e => setTargetId(e.target.value)}
+      <label className="block text-sm text-secondary">{tx('目标分组')}<select value={target?.id ?? ''} disabled={!targets.length || pending} onChange={e => setTargetId(e.target.value)}
           className="mt-1 block h-10 w-full rounded-btn border border-border bg-base px-2 text-foreground">
-          <option value="">请选择目标分组</option>
+          <option value="">{tx('请选择目标分组')}</option>
           {targets.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
         </select>
       </label>
-      {!targets.length && <p className="text-xs text-secondary">请先在「管理自选分组」中新建目标分组。</p>}
+      {!targets.length && <p className="text-xs text-secondary">{tx('请先在「管理自选分组」中新建目标分组。')}</p>}
       {transfer.isError && <p role="alert" className="text-sm text-danger">{transfer.error.message}</p>}
     </div>
     <footer className="flex flex-wrap justify-end gap-2 border-t border-border px-4 py-3">
       {source !== 'ungrouped' && <button type="button" disabled={!canSubmit} onClick={() => target && transfer.mutate({ action: 'copy', target, symbols })}
         className="min-h-10 rounded-btn border border-border bg-elevated px-4 text-sm text-foreground disabled:opacity-50">
-        {pending && transfer.variables?.action === 'copy' ? '复制中…' : '复制到目标组'}
+        {pending && transfer.variables?.action === 'copy' ? tx('复制中…') : tx('复制到目标组')}
       </button>}
       {source !== 'all' && <button type="button" disabled={!canSubmit} onClick={() => target && transfer.mutate({ action: 'move', target, symbols })}
         className="min-h-10 rounded-btn bg-accent px-4 text-sm text-white hover:bg-accent/90 disabled:opacity-50">
-        {pending && transfer.variables?.action === 'move' ? '移动中…' : '移动到目标组'}
+        {pending && transfer.variables?.action === 'move' ? tx('移动中…') : tx('移动到目标组')}
       </button>}
     </footer>
   </Modal>

@@ -16,7 +16,9 @@
 from __future__ import annotations
 
 import logging
+import math
 import shutil
+import threading
 import time
 import uuid
 from collections.abc import Callable
@@ -52,6 +54,8 @@ logger = logging.getLogger(__name__)
 # 和盘中增量热路径 (allow_shift=False, 跳过偏移条件)。
 # 模块级缓存：首次调用时加载，invalidate_custom_signals() 后下次重载。
 # 增量路径每秒级执行, 若不缓存则每轮 glob + 读所有 JSON + 重编译表达式。
+_custom_signals_lock = threading.RLock()
+_custom_signals_epoch = 0
 _custom_signal_exprs: dict[str, pl.Expr] | None = None
 _custom_signal_exprs_today: dict[str, pl.Expr] | None = None
 _custom_prev_fields_cache: set[str] | None = None
@@ -60,15 +64,21 @@ _custom_prev_fields_cache: set[str] | None = None
 def _get_custom_signal_exprs() -> dict[str, pl.Expr]:
     """懒加载自定义信号表达式（带模块级缓存，allow_shift=True）。"""
     global _custom_signal_exprs
-    if _custom_signal_exprs is None:
-        from app.strategy import custom_signals
-        try:
-            sigs = custom_signals.load_all(settings.data_dir)
-            _custom_signal_exprs = custom_signals.build_expressions(sigs)
-        except Exception as e:
-            logger.warning("custom signals load failed: %s", e)
-            _custom_signal_exprs = {}
-    return _custom_signal_exprs
+    with _custom_signals_lock:
+        if _custom_signal_exprs is not None:
+            return _custom_signal_exprs
+        epoch = _custom_signals_epoch
+    from app.strategy import custom_signals
+    try:
+        sigs = custom_signals.load_all(settings.data_dir)
+        exprs = custom_signals.build_expressions(sigs)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("custom signals load failed: %s", e)
+        exprs = {}
+    with _custom_signals_lock:
+        if _custom_signals_epoch == epoch and _custom_signal_exprs is None:
+            _custom_signal_exprs = exprs
+        return _custom_signal_exprs if _custom_signal_exprs is not None else exprs
 
 
 def _get_custom_signal_exprs_today() -> dict[str, pl.Expr]:
@@ -79,34 +89,47 @@ def _get_custom_signal_exprs_today() -> dict[str, pl.Expr]:
     偏移 >1 的信号无法在单日快照求值, 跳过并告警。
     """
     global _custom_signal_exprs_today, _custom_prev_fields_cache
-    if _custom_signal_exprs_today is None or _custom_prev_fields_cache is None:
-        from app.strategy import custom_signals
-        try:
-            sigs = custom_signals.load_all(settings.data_dir)
-            prev_fields = custom_signals.prev_day_fields(sigs)
+    with _custom_signals_lock:
+        if _custom_signal_exprs_today is not None and _custom_prev_fields_cache is not None:
+            return _custom_signal_exprs_today
+        epoch = _custom_signals_epoch
+    from app.strategy import custom_signals
+    try:
+        sigs = custom_signals.load_all(settings.data_dir)
+        prev_fields = custom_signals.prev_day_fields(sigs)
+        exprs_today = custom_signals.build_expressions_prev(sigs, prev_fields)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("custom signals load failed (today): %s", e)
+        prev_fields = set()
+        exprs_today = {}
+    with _custom_signals_lock:
+        if _custom_signals_epoch == epoch and (
+            _custom_signal_exprs_today is None or _custom_prev_fields_cache is None
+        ):
             _custom_prev_fields_cache = prev_fields
-            _custom_signal_exprs_today = custom_signals.build_expressions_prev(
-                sigs, prev_fields
-            )
-        except Exception as e:
-            logger.warning("custom signals load failed (today): %s", e)
-            _custom_signal_exprs_today = {}
-            _custom_prev_fields_cache = set()
-    return _custom_signal_exprs_today
+            _custom_signal_exprs_today = exprs_today
+        return (
+            _custom_signal_exprs_today
+            if _custom_signal_exprs_today is not None
+            else exprs_today
+        )
 
 
 def _custom_prev_fields_today() -> set[str]:
     """当日路径需要 join 昨日值的字段集合 (与表达式缓存同源同失效)。"""
     _get_custom_signal_exprs_today()
-    return _custom_prev_fields_cache or set()
+    with _custom_signals_lock:
+        return set(_custom_prev_fields_cache or ())
 
 
 def invalidate_custom_signals() -> None:
     """失效自定义信号缓存（保存/删除信号后调用，下次计算重新加载）。"""
-    global _custom_signal_exprs, _custom_signal_exprs_today, _custom_prev_fields_cache
-    _custom_signal_exprs = None
-    _custom_signal_exprs_today = None
-    _custom_prev_fields_cache = None
+    global _custom_signal_exprs, _custom_signal_exprs_today, _custom_prev_fields_cache, _custom_signals_epoch
+    with _custom_signals_lock:
+        _custom_signals_epoch += 1
+        _custom_signal_exprs = None
+        _custom_signal_exprs_today = None
+        _custom_prev_fields_cache = None
 
 
 # enriched parquet 仅存储的列 (14 列)
@@ -235,13 +258,17 @@ def _ema_alpha(span: int) -> float:
 
 
 def _math_half_up(expr: pl.Expr, decimals: int = 2) -> pl.Expr:
-    """交易所四舍五入 (round half up)，替代 Python round()（银行家舍入）。
-
-    round(2.625, 2) = 2.62  ← Python 银行家舍入
-    exchange_round(2.625) = 2.63  ← 交易所四舍五入
-    """
-    factor = 10 ** decimals
-    return (expr * factor + 0.5).floor() / factor
+    """交易所四舍五入 (round half up / half away from zero)，消除浮点截断与银行家舍入。"""
+    if decimals < 0:
+        raise ValueError("decimals must be >= 0")
+    scale = max(12, decimals + 4)
+    return (
+        expr.cast(pl.Float64)
+        .cast(pl.String)
+        .cast(pl.Decimal(38, scale), strict=False)
+        .round(decimals, mode="half_away_from_zero")
+        .cast(pl.Float64)
+    )
 
 
 def _apply_adj_factor(raw: pl.DataFrame, factors: pl.DataFrame) -> pl.DataFrame:
@@ -349,6 +376,22 @@ _ALL_INDICATOR_COLS: frozenset[str] = frozenset({
     "change_pct", "change_amount", "amplitude", "_daily_pct", "annual_vol_20d",
     "rsi_6", "rsi_14", "rsi_24",
 })
+
+
+_MIN_VOL_RATIO_ELAPSED_MINUTES = 5.0
+
+
+def _vol_ratio_time_factor(elapsed_minutes: float | None) -> float:
+    """盘中量比时间折算系数 (全天 240 分钟 / 已交易分钟); 开盘初期设下限防失真。"""
+    if (
+        elapsed_minutes is None
+        or not math.isfinite(elapsed_minutes)
+        or elapsed_minutes <= 0
+        or elapsed_minutes >= 240.0
+    ):
+        return 1.0
+    effective = max(float(elapsed_minutes), _MIN_VOL_RATIO_ELAPSED_MINUTES)
+    return 240.0 / effective
 
 
 def _resolve_needed(needed: set[str] | None) -> set[str]:
@@ -503,20 +546,24 @@ def compute_indicators(
         # 盘后/历史: 当日 volume 是完整全天量, 直接相除。
         # 盘中 refresh-cache 重建缓存: 最新分区是实时快照的「部分量」,
         # 与 live 增量路径 (compute_enriched_today) 同口径, 按已交易分钟
-        # 折算到全天量级 — 否则量比被低估约 240/elapsed 倍 (盘中手动重载
-        # 曾出现放量占比 1.8% vs 实时路径 40% 的口径撕裂)。
+        # 折算到全天量级 — 开盘前 5 分钟设最小折算下限防止集合竞价失真。
         from app.market_time import cn_today, trading_minutes_elapsed
 
-        _vr = pl.col("volume") / pl.col("_vol_ma5_prev")
+        _vr = (
+            pl.when(pl.col("_vol_ma5_prev") > 0)
+            .then(pl.col("volume") / pl.col("_vol_ma5_prev"))
+            .otherwise(None)
+        )
         elapsed = trading_minutes_elapsed()
+        factor = _vol_ratio_time_factor(elapsed)
         if (
-            0 < elapsed < 240
+            factor != 1.0
             and "date" in df.columns
             and df["date"].max() == cn_today()
         ):
             _vr = (
-                pl.when(pl.col("date") == cn_today())
-                .then(pl.col("volume") * (240.0 / elapsed) / pl.col("_vol_ma5_prev"))
+                pl.when((pl.col("date") == cn_today()) & (pl.col("_vol_ma5_prev") > 0))
+                .then(pl.col("volume") * factor / pl.col("_vol_ma5_prev"))
                 .otherwise(_vr)
             )
         df = df.with_columns(_vr.alias("vol_ratio_5d"))
@@ -1145,8 +1192,39 @@ BENCHMARK_INDEX_SYMBOLS: frozenset[str] = frozenset(
 # 全部板块基准键 (SH/STAR/SZ/GEM/BJ)
 BENCH_KEYS: tuple[str, ...] = tuple(_BENCHMARK_PREFERENCE)
 
-_benchmark_cache: dict[str, tuple[float, pl.DataFrame | None]] = {}
+_benchmark_cache_lock = threading.RLock()
+_BENCHMARK_CACHE_MAX_ENTRIES = 32
+_benchmark_cache: dict[
+    str, tuple[float, tuple[tuple[str, int, int], ...], pl.DataFrame | None]
+] = {}
 _BENCHMARK_CACHE_TTL = 600.0
+
+
+def _benchmark_dir_signature(index_dir: Path) -> tuple[tuple[str, int, int], ...]:
+    """轻量读取 kline_index_daily 目录文件签名 (rel_path, mtime_ns, size), 无锁执行。"""
+    if not index_dir.exists():
+        return ()
+    entries: list[tuple[str, int, int]] = []
+    try:
+        paths = sorted(index_dir.rglob("*.parquet"))
+    except OSError:
+        return ()
+    for p in paths:
+        try:
+            st = p.stat()
+            entries.append((p.relative_to(index_dir).as_posix(), st.st_mtime_ns, st.st_size))
+        except OSError:
+            continue
+    return tuple(entries)
+
+
+def invalidate_benchmark_cache(data_dir: Path | None = None) -> None:
+    """显式失效基准指数动量缓存 (指定 data_dir 或全清)。"""
+    with _benchmark_cache_lock:
+        if data_dir is None:
+            _benchmark_cache.clear()
+        else:
+            _benchmark_cache.pop(str(Path(data_dir).resolve()), None)
 
 
 def load_benchmark_momentum(data_dir: Path) -> pl.DataFrame | None:
@@ -1156,19 +1234,27 @@ def load_benchmark_momentum(data_dir: Path) -> pl.DataFrame | None:
     bench_key 为板块基准键 (SH/STAR/SZ/GEM/BJ, 见 _BENCHMARK_PREFERENCE)。
     bench_close 供盘中路径外推今日基准动量 (benchmark_momentum_today)。
     无可用指数数据时返回 None (偏离列置 null, 不阻塞主流程)。
-    进程内按 data_dir 缓存 (TTL 10 分钟)。
+    进程内按 data_dir + 目录签名缓存 (TTL 10 分钟, 变更即时失效)。
     """
     import time as _time
 
+    data_path = Path(data_dir)
+    key = str(data_path.resolve())
+    index_dir = data_path / "kline_index_daily"
+    sig_before = _benchmark_dir_signature(index_dir)
     now = _time.monotonic()
-    key = str(Path(data_dir).resolve())
-    cached = _benchmark_cache.get(key)
-    if cached is not None and now - cached[0] < _BENCHMARK_CACHE_TTL:
-        return cached[1]
+    with _benchmark_cache_lock:
+        cached = _benchmark_cache.get(key)
+        if (
+            cached is not None
+            and now - cached[0] < _BENCHMARK_CACHE_TTL
+            and cached[1] == sig_before
+        ):
+            return cached[2]
 
     frame: pl.DataFrame | None = None
     try:
-        index_glob = str(Path(data_dir) / "kline_index_daily" / "**" / "*.parquet")
+        index_glob = str(index_dir / "**" / "*.parquet")
         wanted: list[str] = []
         bench_of: dict[str, str] = {}
         for bench_key, candidates in _BENCHMARK_PREFERENCE.items():
@@ -1220,7 +1306,13 @@ def load_benchmark_momentum(data_dir: Path) -> pl.DataFrame | None:
         logger.warning("基准指数偏离数据加载失败: %s", exc)
         frame = None
 
-    _benchmark_cache[key] = (now, frame)
+    sig_after = _benchmark_dir_signature(index_dir)
+    if sig_after == sig_before:
+        with _benchmark_cache_lock:
+            _benchmark_cache[key] = (_time.monotonic(), sig_before, frame)
+            while len(_benchmark_cache) > _BENCHMARK_CACHE_MAX_ENTRIES:
+                oldest_key = min(_benchmark_cache, key=lambda k: _benchmark_cache[k][0])
+                _benchmark_cache.pop(oldest_key, None)
     return frame
 
 
@@ -2002,8 +2094,7 @@ def _load_recent_history(enriched_base: Path, symbols: list[str], days: int) -> 
 
     只读基础行情列, 作为指标计算的历史前缀。
     """
-    from datetime import date, timedelta
-    cutoff = date.today() - timedelta(days=days + 30)  # 多读 30 天余量
+    cutoff = cn_today() - _timedelta(days=days + 30)  # 多读 30 天余量
 
     cast_options = pl.ScanCastOptions(integer_cast="allow-float")
     try:
@@ -2170,13 +2261,31 @@ def compute_enriched_today(
     # ---- KDJ (递推) ----
     kdj_ln = pl.min_horizontal(pl.col("_kdj_8d_low"), pl.col("low"))
     kdj_hn = pl.max_horizontal(pl.col("_kdj_8d_high"), pl.col("high"))
-    rsv = (pl.col("close") - kdj_ln) / (kdj_hn - kdj_ln).fill_null(1e-12) * 100
-    k_today = rsv / 3 + pl.col("kdj_k") * 2 / 3
-    d_today = k_today / 3 + pl.col("kdj_d") * 2 / 3
+    kdj_range = kdj_hn - kdj_ln
+    rsv = (
+        pl.when(kdj_range.is_finite() & (kdj_range > 0))
+        .then((pl.col("close") - kdj_ln) / kdj_range * 100.0)
+        .otherwise(None)
+    )
+    k_today = (
+        pl.when(rsv.is_not_null() & pl.col("kdj_k").is_not_null())
+        .then(rsv / 3 + pl.col("kdj_k") * 2 / 3)
+        .otherwise(None)
+    )
+    d_today = (
+        pl.when(k_today.is_not_null() & pl.col("kdj_d").is_not_null())
+        .then(k_today / 3 + pl.col("kdj_d") * 2 / 3)
+        .otherwise(None)
+    )
+    j_today = (
+        pl.when(k_today.is_not_null() & d_today.is_not_null())
+        .then(3 * k_today - 2 * d_today)
+        .otherwise(None)
+    )
     df = df.with_columns([
         k_today.alias("kdj_k"),
         d_today.alias("kdj_d"),
-        (3 * k_today - 2 * d_today).alias("kdj_j"),
+        j_today.alias("kdj_j"),
     ])
 
     # ---- ATR (递推) ----
@@ -2212,14 +2321,14 @@ def compute_enriched_today(
     # _vol_ma5_prev_sum 是前5个交易日成交量之和(tail(5)), 不含当天
     # 盘中 volume 是部分量, 按 elapsed_minutes 折算到全天量级
     vol_ma5_prev = pl.col("_vol_ma5_prev_sum") / 5  # 前5日均量(不含当天)
-    if elapsed_minutes and elapsed_minutes > 0:
-        time_factor = 240.0 / elapsed_minutes  # 盘中折算: 部分量 → 全天量级
-    else:
-        time_factor = 1.0  # 盘后/无效时间: 不折算(此时 volume 已是全天量)
+    time_factor = _vol_ratio_time_factor(elapsed_minutes)
     df = df.with_columns([
         vol_ma5.alias("vol_ma5"),
         vol_ma10.alias("vol_ma10"),
-        ((pl.col("volume") * time_factor) / vol_ma5_prev).alias("vol_ratio_5d"),
+        pl.when(vol_ma5_prev > 0)
+          .then((pl.col("volume") * time_factor) / vol_ma5_prev)
+          .otherwise(None)
+          .alias("vol_ratio_5d"),
     ])
 
     # ---- 极值 60 日 (收盘价口径, 与全量 close.rolling_max/min(60) 一致) ----

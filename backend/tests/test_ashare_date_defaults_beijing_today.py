@@ -9,17 +9,16 @@
 """
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
 from datetime import date, timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import polars as pl
-import pytest
 
 from app.api import backtest as backtest_api
 from app.api import factors as factors_api
-from app.api import kline as kline_api
 from app.api import regime as regime_api
 from app.services import market_mainline, regime_builder, repair_daily
 
@@ -31,7 +30,14 @@ class _DummyResult:
     status: str = "ok"
 
 
-def test_backtest_run_defaults_to_beijing_today(monkeypatch) -> None:
+def _mock_repo(tmp_path) -> MagicMock:
+    """带真实 data_dir 的 repo mock —— MagicMock 属性被当路径用会生成垃圾目录。"""
+    repo = MagicMock()
+    repo.store.data_dir = tmp_path
+    return repo
+
+
+def test_backtest_run_defaults_to_beijing_today(monkeypatch, tmp_path) -> None:
     captured_cfg = []
 
     class DummyService:
@@ -46,7 +52,7 @@ def test_backtest_run_defaults_to_beijing_today(monkeypatch) -> None:
     monkeypatch.setattr(backtest_api, "BacktestService", DummyService)
 
     req_data = backtest_api.BacktestRequest(symbols=["600000.SH"])
-    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(repo=MagicMock())))
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(repo=_mock_repo(tmp_path))))
 
     backtest_api.run(req_data, request)
     assert captured_cfg, "应该调用 BacktestService.run"
@@ -54,7 +60,7 @@ def test_backtest_run_defaults_to_beijing_today(monkeypatch) -> None:
     assert captured_cfg[0].start == BJ - timedelta(days=365 * 3)
 
 
-def test_backtest_factor_run_defaults_to_beijing_today(monkeypatch) -> None:
+def test_backtest_factor_run_defaults_to_beijing_today(monkeypatch, tmp_path) -> None:
     captured_cfg = []
 
     class DummyFactorService:
@@ -71,14 +77,14 @@ def test_backtest_factor_run_defaults_to_beijing_today(monkeypatch) -> None:
     monkeypatch.setattr("app.factors.registry.factor_columns_view", lambda: [{"id": "mom_20d"}])
 
     req_data = backtest_api.FactorBacktestRequest(factor_name="mom_20d")
-    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(repo=MagicMock())))
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(repo=_mock_repo(tmp_path))))
 
     backtest_api.factor_run(req_data, request)
     assert captured_cfg
     assert captured_cfg[0].end == BJ
 
 
-def test_factors_trial_uses_beijing_today(monkeypatch) -> None:
+def test_factors_trial_uses_beijing_today(monkeypatch, tmp_path) -> None:
     captured_args = []
 
     class DummyEngine:
@@ -95,18 +101,16 @@ def test_factors_trial_uses_beijing_today(monkeypatch) -> None:
     monkeypatch.setattr("app.factors.dsl.FACTOR_COLUMN", "factor")
 
     req_data = factors_api.FormulaTrialRequest(formula="close / open", days=20)
-    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(repo=MagicMock())))
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(repo=_mock_repo(tmp_path))))
 
-    try:
+    with contextlib.suppress(Exception):
         factors_api.trial_formula(req_data, request)
-    except Exception:
-        pass
     assert captured_args
     _start, end = captured_args[0]
     assert end == BJ
 
 
-def test_regime_recompute_defaults_to_beijing_today(monkeypatch) -> None:
+def test_regime_recompute_defaults_to_beijing_today(monkeypatch, tmp_path) -> None:
     captured_args = []
 
     def fake_run_batch(repo, start, end):
@@ -114,12 +118,12 @@ def test_regime_recompute_defaults_to_beijing_today(monkeypatch) -> None:
         return pl.DataFrame()
 
     monkeypatch.setattr(regime_api, "cn_today", lambda: BJ)
-    monkeypatch.setattr(regime_api, "_data_dir", lambda r: MagicMock())
+    monkeypatch.setattr(regime_api, "_data_dir", lambda r: tmp_path)
     monkeypatch.setattr(regime_builder, "earliest_enriched_date", lambda repo: date(2026, 1, 1))
     monkeypatch.setattr(regime_builder, "run_regime_batch", fake_run_batch)
     monkeypatch.setattr(regime_builder, "refresh_phase_labels", lambda d: 0)
 
-    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(repo=MagicMock())))
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(repo=_mock_repo(tmp_path))))
     regime_api.regime_recompute(request, start=None, end=None)
 
     assert captured_args

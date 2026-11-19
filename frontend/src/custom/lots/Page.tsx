@@ -14,6 +14,7 @@ import { DateShortcuts } from '@/components/DateShortcuts'
 import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { toNavItems } from '@/lib/listNav'
 import { boardTag } from '@/components/stock-table/primitives'
+import { useI18n } from '@/lib/i18n'
 
 const emptyDraft = (): Lot => ({
   id: '',
@@ -29,13 +30,14 @@ const emptyDraft = (): Lot => ({
 
 /** 剩余天数单元格: 到期日 − 今天, 可为负 = 已超期; 无到期日 → — */
 function RemainingDays({ remind }: { remind?: string | null }) {
+  const { tx } = useI18n()
   if (!remind) return <span className="text-muted/60">—</span>
   const remindMs = new Date(`${remind}T00:00:00`).getTime()
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const n = Math.floor((remindMs - today.getTime()) / 86400000)
-  if (n < 0) return <span className="font-mono text-warning">已超期{-n}天</span>
-  return <span className="font-mono text-secondary">{n}天</span>
+  if (n < 0) return <span className="font-mono text-warning">{tx('已超期')}{-n}{tx('天')}</span>
+  return <span className="font-mono text-secondary">{n}{tx('天')}</span>
 }
 
 /** 成本 vs 现价的盈亏% (纯价格比例, 无数量参与) */
@@ -46,6 +48,7 @@ function CostPnL({ close, cost }: { close?: number; cost: number }) {
 }
 
 export function Lots() {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const navigate = useNavigate()
   const [editing, setEditing] = useState<Lot | null>(null) // null=关闭
@@ -114,35 +117,34 @@ export function Lots() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="持仓提醒" subtitle="记录个股 / ETF 买入批次, 自动生成止盈止损 / 到期监控规则" />
+      <PageHeader title={tx('持仓提醒')} subtitle={tx('记录个股 / ETF 买入批次, 自动生成止盈止损 / 到期监控规则')} />
       <div className="flex-1 min-h-0 px-5 py-4">
         <div className="mx-auto max-w-5xl space-y-4">
           <div className="flex items-center justify-between">
-            <div className="text-xs text-secondary">{lots.length} 个批次</div>
+            <div className="text-xs text-secondary">{tx('{n} 个批次', { n: lots.length })}</div>
             <button
               onClick={() => setEditing(emptyDraft())}
               className="inline-flex h-9 items-center gap-1.5 rounded-btn border border-accent/30 bg-accent/10 px-3 text-xs font-medium text-accent transition-colors hover:bg-accent/15 cursor-pointer"
             >
-              <Plus className="h-3.5 w-3.5" />新增批次
+              <Plus className="h-3.5 w-3.5" />{tx('新增批次')}
             </button>
           </div>
 
           {lotsQuery.isLoading ? (
-            <div className="rounded-xl border border-dashed border-border px-6 py-12 text-center text-xs text-muted">加载中…</div>
+            <div className="rounded-xl border border-dashed border-border px-6 py-12 text-center text-xs text-muted">{tx('加载中…')}</div>
           ) : lotsQuery.isError ? (
             <div className="rounded-xl border border-dashed border-border px-6 py-12 text-center">
-              <div className="text-xs text-danger">批次加载失败</div>
+              <div className="text-xs text-danger">{tx('批次加载失败')}</div>
               <button
                 onClick={() => lotsQuery.refetch()}
                 className="mt-2 rounded-btn border border-border px-3 py-1 text-[11px] text-secondary hover:bg-elevated cursor-pointer"
               >
-                重试
-              </button>
+                {tx('重试')}</button>
             </div>
           ) : lots.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border px-6 py-12 text-center">
-              <div className="text-sm text-muted">还没有批次</div>
-              <div className="mt-1 text-[11px] text-muted/70">记录一笔买入后, 系统会按成本价 ± 止盈/止损% 生成价格监控; 填了到期日则自动生成到期提醒。这里只用于生成提醒, 不是持仓记账。</div>
+              <div className="text-sm text-muted">{tx('还没有批次')}</div>
+              <div className="mt-1 text-[11px] text-muted/70">{tx('记录一笔买入后, 系统会按成本价 ± 止盈/止损% 生成价格监控; 填了到期日则自动生成到期提醒。这里只用于生成提醒, 不是持仓记账。')}</div>
             </div>
           ) : (
             <div className="overflow-hidden rounded-xl border border-border bg-surface/40 shadow-sm">
@@ -150,16 +152,16 @@ export function Lots() {
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="border-b border-border/60 bg-surface/60 text-[10px] uppercase tracking-wide text-muted">
-                      <th className="px-4 py-2 font-medium">标的</th>
-                      <th className="px-2 py-2 font-medium text-right">数量(参考)</th>
-                      <th className="px-2 py-2 font-medium text-right">成本价</th>
-                      <th className="px-2 py-2 font-medium text-right">现价</th>
-                      <th className="px-2 py-2 font-medium text-right">盈亏%</th>
-                      <th className="px-2 py-2 font-medium text-right">止盈%</th>
-                      <th className="px-2 py-2 font-medium text-right">止损%</th>
-                      <th className="px-2 py-2 font-medium">买入日期</th>
-                      <th className="px-2 py-2 font-medium text-right">剩余天数</th>
-                      <th className="px-2 py-2 font-medium">到期提醒</th>
+                      <th className="px-4 py-2 font-medium">{tx('标的')}</th>
+                      <th className="px-2 py-2 font-medium text-right">{tx('数量(参考)')}</th>
+                      <th className="px-2 py-2 font-medium text-right">{tx('成本价')}</th>
+                      <th className="px-2 py-2 font-medium text-right">{tx('现价')}</th>
+                      <th className="px-2 py-2 font-medium text-right">{tx('盈亏%')}</th>
+                      <th className="px-2 py-2 font-medium text-right">{tx('止盈%')}</th>
+                      <th className="px-2 py-2 font-medium text-right">{tx('止损%')}</th>
+                      <th className="px-2 py-2 font-medium">{tx('买入日期')}</th>
+                      <th className="px-2 py-2 font-medium text-right">{tx('剩余天数')}</th>
+                      <th className="px-2 py-2 font-medium">{tx('到期提醒')}</th>
                       <th className="px-3 py-2" />
                     </tr>
                   </thead>
@@ -169,7 +171,7 @@ export function Lots() {
                         <td className="px-4 py-2.5">
                           <button
                             onClick={() => setPreviewSymbol(lot.symbol)}
-                            title={`查看 ${lot.symbol} 日K`}
+                            title={tx('查看 {symbol} 日K', { symbol: lot.symbol })}
                             className="inline-flex items-center gap-1.5 min-w-0 hover:bg-elevated/50 rounded px-0.5 py-0.5 transition-colors cursor-pointer"
                           >
                             <span className="font-mono font-medium text-foreground">{lot.symbol}</span>
@@ -190,7 +192,7 @@ export function Lots() {
                             <span className="inline-flex items-center gap-1 text-rose-400">
                               <CalendarClock className="h-3 w-3" />
                               {lot.remind_date}
-                              {lot.lead_days > 0 && <span className="text-muted">· 提前{lot.lead_days}天</span>}
+                              {lot.lead_days > 0 && <span className="text-muted">{tx('· 提前')}{lot.lead_days}{tx('天')}</span>}
                             </span>
                           ) : <span className="text-muted/60">—</span>}
                         </td>
@@ -198,7 +200,7 @@ export function Lots() {
                           <div className="flex items-center justify-end gap-0.5">
                             <button
                               onClick={() => setEditing(lot)}
-                              title="编辑"
+                              title={tx('编辑')}
                               className="p-1.5 rounded-md text-secondary transition-all hover:bg-accent/10 hover:text-accent cursor-pointer"
                             >
                               <Pencil className="h-3.5 w-3.5" />
@@ -206,15 +208,14 @@ export function Lots() {
                             {confirmId === lot.id ? (
                               <button
                                 onClick={() => handleClickDelete(lot.id)}
-                                title="再次点击确认删除"
+                                title={tx('再次点击确认删除')}
                                 className="inline-flex items-center gap-1 rounded-md bg-danger/15 px-1.5 py-0.5 text-[9px] font-medium text-danger border border-danger/30 animate-pulse cursor-pointer"
                               >
-                                <Trash2 className="h-2.5 w-2.5" />确认
-                              </button>
+                                <Trash2 className="h-2.5 w-2.5" />{tx('确认')}</button>
                             ) : (
                               <button
                                 onClick={() => handleClickDelete(lot.id)}
-                                title="删除 (同步删除生成的监控规则)"
+                                title={tx('删除 (同步删除生成的监控规则)')}
                                 className="p-1.5 rounded-md text-secondary transition-all hover:bg-danger/10 hover:text-danger cursor-pointer"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -231,9 +232,8 @@ export function Lots() {
           )}
 
           <div className="flex items-center justify-center gap-1 text-[11px] text-muted">
-            生成的止盈止损 / 到期提醒规则已同步至监控中心
-            <button onClick={() => navigate('/monitor')} className="inline-flex items-center gap-0.5 text-accent hover:text-accent/80 cursor-pointer">
-              去查看 <ArrowUpRight className="h-3 w-3" />
+            {tx('生成的止盈止损 / 到期提醒规则已同步至监控中心')}<button onClick={() => navigate('/monitor')} className="inline-flex items-center gap-0.5 text-accent hover:text-accent/80 cursor-pointer">
+              {tx('去查看')} <ArrowUpRight className="h-3 w-3" />
             </button>
           </div>
         </div>
@@ -253,6 +253,7 @@ export function Lots() {
 }
 
 function LotDialog({ lot, onClose }: { lot: Lot; onClose: () => void }) {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const [draft, setDraft] = useState<Lot>(() => ({ ...lot }))
   const [symbolQuery, setSymbolQuery] = useState('')
@@ -296,7 +297,7 @@ function LotDialog({ lot, onClose }: { lot: Lot; onClose: () => void }) {
 
   const submit = () => {
     setError('')
-    if (!draft.symbol.trim()) return setError('请选择标的')
+    if (!draft.symbol.trim()) return setError(tx('请选择标的'))
     const vals: Partial<Lot> = {
       qty: parseNum(nums.qty),
       cost_price: parseNum(nums.cost_price),
@@ -304,40 +305,40 @@ function LotDialog({ lot, onClose }: { lot: Lot; onClose: () => void }) {
       stop_pct: parseNum(nums.stop_pct),
       lead_days: Math.floor(parseNum(nums.lead_days)),
     }
-    if (!((vals.cost_price ?? 0) > 0)) return setError('成本价必须为正数')
+    if (!((vals.cost_price ?? 0) > 0)) return setError(tx('成本价必须为正数'))
     if ((vals.qty ?? 0) < 0 || (vals.target_pct ?? 0) < 0 || (vals.stop_pct ?? 0) < 0 || (vals.lead_days ?? 0) < 0) {
-      return setError('数量 / 百分比 / 提前天数不能为负数')
+      return setError(tx('数量 / 百分比 / 提前天数不能为负数'))
     }
     if (!((vals.target_pct ?? 0) > 0 || (vals.stop_pct ?? 0) > 0 || draft.remind_date)) {
-      return setError('止盈% / 止损% / 到期日 至少设置一项')
+      return setError(tx('止盈% / 止损% / 到期日 至少设置一项'))
     }
     save.mutate(vals)
   }
 
   return (
-    <Modal onClose={onClose} ariaLabel={lot.id ? '编辑批次' : '新增批次'} panelClassName="w-[92vw] max-w-md bg-surface border border-border rounded-card shadow-xl">
+    <Modal onClose={onClose} ariaLabel={lot.id ? tx('编辑批次') : tx('新增批次')} panelClassName="w-[92vw] max-w-md bg-surface border border-border rounded-card shadow-xl">
       <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
-        <span className="text-sm font-medium text-foreground">{lot.id ? '编辑批次' : '新增批次'}</span>
-        <span className="text-[10px] text-muted">保存后自动同步监控规则</span>
+        <span className="text-sm font-medium text-foreground">{lot.id ? tx('编辑批次') : tx('新增批次')}</span>
+        <span className="text-[10px] text-muted">{tx('保存后自动同步监控规则')}</span>
       </div>
       <div className="space-y-3 px-4 py-4">
         {/* 标的 */}
         <div className="space-y-1.5">
-          <span className="text-[11px] text-muted">标的</span>
+          <span className="text-[11px] text-muted">{tx('标的')}</span>
           {draft.symbol ? (
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1 rounded bg-elevated px-2 py-1 font-mono text-[11px] text-secondary">
                 {draft.symbol}
                 <button onClick={() => setDraft(d => ({ ...d, symbol: '' }))} className="text-muted hover:text-danger cursor-pointer"><span className="text-[10px]">✕</span></button>
               </span>
-              <span className="text-[10px] text-muted">点 ✕ 可重选</span>
+              <span className="text-[10px] text-muted">{tx('点 ✕ 可重选')}</span>
             </div>
           ) : (
             <div className="relative">
               <input
                 value={symbolQuery}
                 onChange={e => setSymbolQuery(e.target.value)}
-                placeholder="搜索代码或名称..."
+                placeholder={tx('搜索代码或名称...')}
                 autoFocus
                 className="h-9 w-full rounded-btn border border-border bg-base pl-8 pr-3 text-xs text-foreground focus:outline-none focus:border-accent/50"
               />
@@ -362,54 +363,54 @@ function LotDialog({ lot, onClose }: { lot: Lot; onClose: () => void }) {
 
         <div className="grid grid-cols-2 gap-3">
           <label className="space-y-1.5">
-            <span className="text-[11px] text-muted">数量 (参考)</span>
+            <span className="text-[11px] text-muted">{tx('数量 (参考)')}</span>
             <input type="number" min={0} placeholder="0" {...numField('qty')} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
           </label>
           <label className="space-y-1.5">
-            <span className="text-[11px] text-muted">成本价</span>
+            <span className="text-[11px] text-muted">{tx('成本价')}</span>
             <input type="number" min={0} step="any" placeholder="0" {...numField('cost_price')} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
           </label>
           <label className="space-y-1.5">
-            <span className="text-[11px] text-muted">止盈%</span>
+            <span className="text-[11px] text-muted">{tx('止盈%')}</span>
             <input type="number" min={0} step="any" placeholder="0" {...numField('target_pct')} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
           </label>
           <label className="space-y-1.5">
-            <span className="text-[11px] text-muted">止损%</span>
+            <span className="text-[11px] text-muted">{tx('止损%')}</span>
             <input type="number" min={0} step="any" placeholder="0" {...numField('stop_pct')} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
           </label>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <span className="text-[11px] text-muted">买入日期 (可选)</span>
-            <DateShortcuts value={draft.buy_date ?? ''} onChange={v => setDraft(d => ({ ...d, buy_date: v || null }))} options={[{ label: '今天', days: 0 }]} />
-            <DatePicker value={draft.buy_date ?? ''} onChange={v => setDraft(d => ({ ...d, buy_date: v || null }))} placeholder="不记录" />
+            <span className="text-[11px] text-muted">{tx('买入日期 (可选)')}</span>
+            <DateShortcuts value={draft.buy_date ?? ''} onChange={v => setDraft(d => ({ ...d, buy_date: v || null }))} options={[{ label: tx('今天'), days: 0 }]} />
+            <DatePicker value={draft.buy_date ?? ''} onChange={v => setDraft(d => ({ ...d, buy_date: v || null }))} placeholder={tx('不记录')} />
           </div>
           <div className="space-y-1.5">
-            <span className="text-[11px] text-muted">到期日 (可选)</span>
-            <DateShortcuts value={draft.remind_date ?? ''} onChange={v => setDraft(d => ({ ...d, remind_date: v || null }))} options={[{ label: '5天', days: 5 }, { label: '10天', days: 10 }, { label: '15天', days: 15 }]} base={draft.buy_date || undefined} />
-            <DatePicker value={draft.remind_date ?? ''} onChange={v => setDraft(d => ({ ...d, remind_date: v || null }))} placeholder="不提醒" />
+            <span className="text-[11px] text-muted">{tx('到期日 (可选)')}</span>
+            <DateShortcuts value={draft.remind_date ?? ''} onChange={v => setDraft(d => ({ ...d, remind_date: v || null }))} options={[{ label: tx('5天'), days: 5 }, { label: tx('10天'), days: 10 }, { label: tx('15天'), days: 15 }]} base={draft.buy_date || undefined} />
+            <DatePicker value={draft.remind_date ?? ''} onChange={v => setDraft(d => ({ ...d, remind_date: v || null }))} placeholder={tx('不提醒')} />
           </div>
         </div>
 
         {draft.remind_date && (
           <label className="space-y-1.5">
-            <span className="text-[11px] text-muted">提前提醒天数</span>
+            <span className="text-[11px] text-muted">{tx('提前提醒天数')}</span>
             <input type="number" min={0} placeholder="1" {...numField('lead_days')} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
-            <span className="block text-[10px] text-muted">提醒仅在交易时段评估; 到期日若逢周末或长假, 请把提前天数调大些 (建议 ≥ 2, 长假更大)</span>
+            <span className="block text-[10px] text-muted">{tx('提醒仅在交易时段评估; 到期日若逢周末或长假, 请把提前天数调大些 (建议 ≥ 2, 长假更大)')}</span>
           </label>
         )}
 
         {error && <div className="rounded border border-danger/30 bg-danger/10 px-3 py-2 text-[11px] text-danger">{error}</div>}
       </div>
       <div className="flex items-center justify-end gap-2 border-t border-border/60 px-4 py-3">
-        <button onClick={onClose} className="h-9 rounded-btn border border-border px-3 text-xs text-secondary hover:bg-elevated cursor-pointer">取消</button>
+        <button onClick={onClose} className="h-9 rounded-btn border border-border px-3 text-xs text-secondary hover:bg-elevated cursor-pointer">{tx('取消')}</button>
         <button
           onClick={submit}
           disabled={save.isPending}
           className={cn('h-9 rounded-btn px-4 text-xs font-medium bg-accent/90 text-white hover:bg-accent cursor-pointer disabled:opacity-50')}
         >
-          {save.isPending ? '保存中...' : '保存'}
+          {save.isPending ? tx('保存中...') : tx('保存')}
         </button>
       </div>
     </Modal>

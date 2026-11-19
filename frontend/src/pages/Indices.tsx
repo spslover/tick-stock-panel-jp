@@ -8,6 +8,7 @@ import { useCapabilities } from '@/lib/useSharedQueries'
 import type { OHLC } from '@/lib/chart-types'
 import { LightweightDaily } from '@/components/charts/LightweightDaily'
 import { LightweightIntraday } from '@/components/charts/LightweightIntraday'
+import { useI18n } from '@/lib/i18n'
 
 function defaultRange() {
   const now = new Date()
@@ -63,6 +64,7 @@ const PINNED_INDEXES = [
 ]
 
 export function Indices() {
+  const { t, tx } = useI18n()
   const qc = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const symbolParam = searchParams.get('symbol') ?? ''
@@ -161,7 +163,7 @@ export function Indices() {
         className={`w-full rounded-btn px-2 py-2 text-left transition-colors ${active ? 'bg-accent/15 text-foreground' : 'hover:bg-elevated text-secondary'}`}
       >
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-xs font-medium">{item.name || item.symbol}</span>
+          <span className="truncate text-xs font-medium">{tx(item.name || item.symbol)}</span>
           <span className={`text-[10px] font-mono ${Number(pct ?? 0) >= 0 ? 'text-bull' : 'text-bear'}`}>{fmtPct(pct)}</span>
         </div>
         <div className="mt-0.5 flex items-center justify-between text-[10px] font-mono text-muted">
@@ -176,9 +178,9 @@ export function Indices() {
     <div className="h-full overflow-auto bg-base p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-semibold text-foreground">指数</h1>
+          <h1 className="text-lg font-semibold text-foreground">{t('nav.indices')}</h1>
           <p className="mt-1 text-xs text-muted">
-            指数使用独立 kline_index_* parquet，不进入股票策略链路。
+            {tx('指数使用独立 kline_index_* parquet，不进入股票策略链路。')}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -188,14 +190,14 @@ export function Indices() {
             className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90 disabled:opacity-50"
           >
             {syncDaily.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-            同步指数日K
+            {tx('同步指数日K')}
           </button>
         </div>
       </div>
 
       <div className="grid grid-cols-[15rem_1fr] gap-4">
         <aside className="rounded-card border border-border bg-surface p-3">
-          <div className="mb-2 px-1 text-[11px] uppercase tracking-wider text-muted">核心指数</div>
+          <div className="mb-2 px-1 text-[11px] uppercase tracking-wider text-muted">{tx('核心指数')}</div>
           <div className="space-y-1">
             {topRows.map(renderIndexItem)}
           </div>
@@ -207,14 +209,14 @@ export function Indices() {
               <div className="flex items-center gap-2">
                 <Activity className="h-4 w-4 text-accent" />
                 <h2 className="truncate text-sm font-semibold text-foreground">
-                  {selectedInfo?.name || selectedSymbol || '未选择指数'}
+                  {selectedInfo?.name || selectedSymbol || tx('未选择指数')}
                 </h2>
                 {selectedSymbol && <span className="font-mono text-xs text-muted">{selectedSymbol}</span>}
                 {selectedSymbol && <span className="font-mono text-xs text-foreground">{fmtNum(selectedQuoteValue)}</span>}
                 {selectedSymbol && <span className={`font-mono text-xs ${Number(selectedQuotePct ?? 0) >= 0 ? 'text-bull' : 'text-bear'}`}>{fmtPct(selectedQuotePct)}</span>}
               </div>
               <div className="mt-1 text-xs text-muted">
-                实时缓存 {quotes.data?.count ?? 0} 只指数 · 日K来源 {daily.data?.source ?? '--'}
+                {tx('实时缓存')} {quotes.data?.count ?? 0} {tx('只指数')} · {tx('日K来源')} {daily.data?.source ?? '--'}
               </div>
             </div>
             <div className="flex items-center gap-2 text-xs">
@@ -224,7 +226,7 @@ export function Indices() {
                 onChange={e => setRange(r => ({ ...r, start: e.target.value }))}
                 className="rounded-btn border border-border bg-base px-2 py-1 text-secondary outline-none focus:border-accent"
               />
-              <span className="text-muted">至</span>
+              <span className="text-muted">{tx('至')}</span>
               <input
                 type="date"
                 value={range.end}
@@ -234,11 +236,11 @@ export function Indices() {
             </div>
           </div>
 
-          {daily.isLoading && <div className="py-10 text-center text-sm text-muted">日K加载中…</div>}
-          {daily.isError && <div className="py-4 text-sm text-danger">指数日K加载失败</div>}
+          {daily.isLoading && <div className="py-10 text-center text-sm text-muted">{tx('日K加载中…')}</div>}
+          {daily.isError && <div className="py-4 text-sm text-danger">{tx('指数日K加载失败')}</div>}
           {!daily.isLoading && !daily.isError && chartRows.length === 0 && (
             <div className="rounded-card bg-elevated p-6 text-center text-sm text-muted">
-              暂无日K数据。可以先同步指数日K，或选择其他指数。
+              {tx('暂无日K数据。可以先同步指数日K，或选择其他指数。')}
             </div>
           )}
           {chartRows.length > 0 && (
@@ -263,15 +265,15 @@ export function Indices() {
                 {!hasMinuteCap ? (
                   <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                     <Lock className="h-5 w-5 text-muted" />
-                    <div className="text-xs text-secondary">指数分时数据不可用</div>
-                    <div className="text-[10px] text-muted">分钟K(批量)数据不可用</div>
+                    <div className="text-xs text-secondary">{tx('指数分时数据不可用')}</div>
+                    <div className="text-[10px] text-muted">{tx('分钟K(批量)数据不可用')}</div>
                   </div>
                 ) : (
                   <>
-                    {minute.isLoading && <div className="py-2 text-xs text-muted">分时加载中…</div>}
+                    {minute.isLoading && <div className="py-2 text-xs text-muted">{tx('分时加载中…')}</div>}
                     {!minute.isLoading && minuteRows.length === 0 && (
                       <div className="flex h-full items-center justify-center text-xs text-muted">
-                        暂无分时数据
+                        {tx('暂无分时数据')}
                       </div>
                     )}
                     {minuteRows.length > 0 && (

@@ -32,6 +32,7 @@ class AnalyzeRequest(BaseModel):
     """AI 大盘复盘请求。"""
     as_of: str | None = None  # 可选:复盘日期(YYYY-MM-DD),缺省取最新有数据日
     focus: str = ""           # 可选:用户追加的复盘关注点
+    locale: str = "zh-CN"
 
 
 @router.get("/dragon-tiger")
@@ -102,7 +103,7 @@ async def analyze_market(request: Request, req: AnalyzeRequest):
 
     async def stream_gen():
         async for chunk in with_heartbeat(
-            recap_market_stream(repo, quote_service, depth_service, as_of, req.focus),
+            recap_market_stream(repo, quote_service, depth_service, as_of, req.focus, locale=req.locale),
         ):
             yield chunk + "\n"
 

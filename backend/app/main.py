@@ -1,14 +1,23 @@
 """FastAPI 入口。"""
 from __future__ import annotations
 
+import base64
+import contextlib
+import hashlib
+import hmac
 import logging
 import sys
 from contextlib import asynccontextmanager
+from html.parser import HTMLParser
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
+from starlette.datastructures import MutableHeaders
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.routing import Match
 
 from app import __version__
 from app.api import (
@@ -72,6 +81,7 @@ from app.services.quote_service import QuoteService
 from app.services.shared_work import WorkBusyError
 from app.startup_diagnostics import startup_phase
 from app.tickflow import client as tf_client
+from app.tickflow.capabilities import CapabilityDenied
 from app.tickflow.policy import detect_capabilities
 from app.tickflow.repository import DataStore, KlineRepository
 
@@ -186,7 +196,7 @@ async def _application_lifespan(app: FastAPI):
             logger.warning("enriched generation requires a full rebuild: %s", exc)
     # 指标异步预热标志: enriched 缓存在后台线程构建, 完成后置 True
     app.state.indicators_ready = False
-    repo._on_warmup_done = lambda: setattr(app.state, "indicators_ready", True)  # noqa: SLF001
+    repo._on_warmup_done = lambda: setattr(app.state, "indicators_ready", True)
 
     # Polars 缓存预热 — enriched 的重计算 (107万行 compute_indicators) 推后台,
     # instruments/index/ETF 仍同步 (毫秒级)。应用立即 ready, 指标算完后自动替换。
@@ -274,7 +284,7 @@ async def _application_lifespan(app: FastAPI):
         minute_refresh.set_app_state(app.state)
         app.state.minute_refresh = minute_refresh
         minute_refresh.start()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         logger.warning("minute_refresh init failed: %s", e)
 
     # 停机缺口自检: 延迟后台扫描, 发现最近交易日的盘中快照/缺口时自动创建
@@ -432,13 +442,13 @@ async def _application_lifespan(app: FastAPI):
                 logger.info("matrix cache prewarm done: %s", result)
             except (HeavyJobCancelledError, MatrixPrewarmCancelledError):
                 logger.info("matrix cache prewarm cancelled")
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.exception("matrix cache prewarm failed")
 
         if not matrix_prewarm_owner.schedule(_prewarm):
             logger.info("matrix cache prewarm already running or shutting down, skip")
 
-    repo._on_refresh_done = _schedule_matrix_cache_prewarm  # noqa: SLF001
+    repo._on_refresh_done = _schedule_matrix_cache_prewarm
     if repo.enriched_ready:
         _schedule_matrix_cache_prewarm()
 
@@ -496,7 +506,7 @@ async def _application_lifespan(app: FastAPI):
     try:
         yield
     finally:
-        repo._on_refresh_done = None  # noqa: SLF001
+        repo._on_refresh_done = None
         wd = getattr(app.state, "watchdog", None)
         if wd:
             await wd.stop()
@@ -575,34 +585,369 @@ async def shared_work_busy_handler(request: Request, exc: WorkBusyError) -> JSON
                         headers={"Retry-After": "3"})
 
 
-# CORS: 允许局域网访问 (自托管场景, 放开所有来源)
-# 注: allow_credentials=True 与 allow_origins=['*'] 不能共存 (浏览器规范),
-# 本项目认证走 header (API Key), 不依赖 cookie, 故关闭 credentials 换取通配来源。
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+_DOCS_PATHS = frozenset({"/docs", "/redoc", "/openapi.json"})
+_DOCS_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "img-src 'self' data: https://fastapi.tiangolo.com; "
+    "font-src 'self' data: https://cdn.jsdelivr.net; "
+    "frame-ancestors 'self'; "
+    "object-src 'none'; "
+    "base-uri 'self'"
 )
+_DEFAULT_BODY_LIMIT = 10 * 1024 * 1024
+
+
+class _InlineScriptExtractor(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self._in_inline_script = False
+        self._buf: list[str] = []
+        self.hashes: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.lower() == "script" and not any(k.lower() == "src" for k, _ in attrs):
+            self._in_inline_script = True
+            self._buf.clear()
+
+    def handle_data(self, data: str) -> None:
+        if self._in_inline_script:
+            self._buf.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() == "script" and self._in_inline_script:
+            body = "".join(self._buf)
+            digest = base64.b64encode(hashlib.sha256(body.encode("utf-8")).digest()).decode("ascii")
+            self.hashes.append(f"sha256-{digest}")
+            self._in_inline_script = False
+            self._buf.clear()
+
+
+_CSP_HASH_CACHE: dict[str, tuple[tuple[int, int], tuple[str, ...]]] = {}
+
+
+def _inline_script_hashes(index_path: Path) -> tuple[str, ...]:
+    try:
+        st = index_path.stat()
+    except OSError:
+        return ()
+    key = str(index_path)
+    sig = (st.st_mtime_ns, st.st_size)
+    cached = _CSP_HASH_CACHE.get(key)
+    if cached is not None and cached[0] == sig:
+        return cached[1]
+    try:
+        html_text = index_path.read_text(encoding="utf-8")
+    except OSError:
+        return ()
+    parser = _InlineScriptExtractor()
+    parser.feed(html_text)
+    parser.close()
+    hashes = tuple(dict.fromkeys(parser.hashes))
+    _CSP_HASH_CACHE[key] = (sig, hashes)
+    return hashes
+
+
+def _build_spa_csp(static_dir: Path) -> str:
+    hashes = _inline_script_hashes(static_dir / "index.html")
+    script_src = " ".join(["'self'", "blob:", *(f"'{h}'" for h in hashes)])
+    return (
+        "default-src 'self'; "
+        f"script-src {script_src}; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self' data:; "
+        "connect-src 'self' https://api.github.com https://github.com https://*.githubusercontent.com; "
+        "frame-src http: https:; "
+        "frame-ancestors 'self'; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'"
+    )
+
+
+class SecurityHeadersMiddleware:
+    """纯 ASGI 安全响应头中间件 (最外层, 不缓冲 StreamingResponse)."""
+
+    def __init__(self, app, static_dir: Path) -> None:
+        self.app = app
+        self.static_dir = static_dir
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        path = scope.get("path", "")
+        csp = _DOCS_CSP if path in ("/docs", "/redoc") else _build_spa_csp(self.static_dir)
+
+        async def send_with_headers(message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                headers.setdefault("X-Content-Type-Options", "nosniff")
+                headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+                headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+                headers.setdefault("Content-Security-Policy", csp)
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
+def _request_body_limit(path: str) -> int:
+    if (
+        path.startswith("/api/config-backup/")
+        or path.startswith("/api/definitions/resources/")
+        or path == "/api/import-center/inspect"
+        or path.startswith("/api/strategies/bundle/")
+    ):
+        return 132 * 1024 * 1024
+    if path == "/api/ext-data/detect-fields" or (
+        path.startswith("/api/ext-data/")
+        and (path.endswith("/upload") or path.endswith("/detect-fields"))
+    ):
+        return 52 * 1024 * 1024
+    if path.startswith("/api/custom/source-packages/") or path.startswith("/api/extension-packages/"):
+        return 22 * 1024 * 1024
+    if path.startswith("/api/ext-data/") and path.endswith("/ingest"):
+        return 16 * 1024 * 1024
+    if path == "/api/watchlist/import-image":
+        return 13 * 1024 * 1024
+    if path in ("/api/watchlist/import-csv", "/api/ext-pages/upload", "/api/import-center/page"):
+        return 6 * 1024 * 1024
+    if path.startswith("/api/ext-data/config/") or path == "/api/settings/sound-packs":
+        return 5 * 1024 * 1024
+    if path == "/api/ext-pages/import-source":
+        return 2 * 1024 * 1024
+    return _DEFAULT_BODY_LIMIT
+
+
+class _BodyTooLargeError(StarletteHTTPException):
+    def __init__(self) -> None:
+        super().__init__(status_code=413, detail="请求体过大")
+
+
+class BodyLimitMiddleware:
+    """纯 ASGI 全局请求体大小守卫 (同时检查 Content-Length 与流式分片)."""
+
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
+        limit = _request_body_limit(path)
+
+        raw_cls = [
+            val
+            for name, val in (scope.get("headers") or ())
+            if name.lower() == b"content-length"
+        ]
+        if raw_cls:
+            parsed_cls: list[int] = []
+            for raw_cl in raw_cls:
+                try:
+                    cl_str = raw_cl.decode("ascii").strip()
+                except UnicodeDecodeError:
+                    resp = JSONResponse(status_code=400, content={"detail": "Invalid Content-Length"})
+                    await resp(scope, receive, send)
+                    return
+                if not cl_str or not cl_str.isascii() or not cl_str.isdigit():
+                    resp = JSONResponse(status_code=400, content={"detail": "Invalid Content-Length"})
+                    await resp(scope, receive, send)
+                    return
+                parsed_cls.append(int(cl_str))
+            if len(parsed_cls) > 1:
+                if len(set(parsed_cls)) == 1 and parsed_cls[0] > limit:
+                    resp = JSONResponse(status_code=413, content={"detail": "请求体过大"})
+                    await resp(scope, receive, send)
+                    return
+                resp = JSONResponse(status_code=400, content={"detail": "Invalid Content-Length"})
+                await resp(scope, receive, send)
+                return
+            if parsed_cls[0] > limit:
+                resp = JSONResponse(status_code=413, content={"detail": "请求体过大"})
+                await resp(scope, receive, send)
+                return
+
+        total = 0
+        exceeded = False
+        response_started = False
+        suppress_non_413 = False
+
+        async def capped_receive():
+            nonlocal total, exceeded
+            msg = await receive()
+            if msg.get("type") == "http.request":
+                total += len(msg.get("body", b""))
+                if total > limit:
+                    exceeded = True
+                    raise _BodyTooLargeError()
+            return msg
+
+        async def wrapped_send(message) -> None:
+            nonlocal response_started, suppress_non_413
+            if message["type"] == "http.response.start":
+                if exceeded and message.get("status") != 413:
+                    suppress_non_413 = True
+                    return
+                response_started = True
+                await send(message)
+                return
+            if suppress_non_413:
+                return
+            await send(message)
+
+        with contextlib.suppress(_BodyTooLargeError):
+            await self.app(scope, capped_receive, wrapped_send)
+        if exceeded and not response_started:
+            resp = JSONResponse(status_code=413, content={"detail": "请求体过大"})
+            await resp(scope, receive, send)
+
+
+def _build_cors_kwargs() -> dict:
+    origins = settings.cors_origins()
+    if not origins:
+        return {
+            "allow_origins": [],
+            "allow_credentials": False,
+            "allow_methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+            "allow_headers": ["Authorization", "Content-Type", "X-Requested-With", "X-CSRF-Token"],
+            "expose_headers": ["X-RateLimit-Limit", "X-RateLimit-Remaining", "Retry-After"],
+        }
+    has_wildcard = "*" in origins
+    if has_wildcard and len(origins) > 1:
+        logger.warning("OPEN_API_CORS_ORIGINS 包含 '*', 强制禁用 allow_credentials")
+    return {
+        "allow_origins": ["*"] if has_wildcard else origins,
+        "allow_credentials": False,
+        "allow_methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+        "allow_headers": ["Authorization", "Content-Type", "X-Requested-With", "X-CSRF-Token"],
+        "expose_headers": ["X-RateLimit-Limit", "X-RateLimit-Remaining", "Retry-After"],
+    }
+
+
+class _DynamicCORSMiddleware:
+    """按 settings.open_api_cors_origins 配置 CORS (默认空列表 = 拒绝跨域)."""
+
+    def __init__(self, app) -> None:
+        self.app = app
+        self._cached_raw: str | None = None
+        self._cors: CORSMiddleware | None = None
+
+    async def __call__(self, scope, receive, send) -> None:
+        raw = settings.open_api_cors_origins
+        if self._cors is None or raw != self._cached_raw:
+            self._cached_raw = raw
+            self._cors = CORSMiddleware(self.app, **_build_cors_kwargs())
+        await self._cors(scope, receive, send)
+
+
+def _last_header_token(request: Request, name: str) -> str:
+    headers = request.headers
+    if hasattr(headers, "getlist"):
+        raw = ",".join(v for v in headers.getlist(name) if v)
+    else:
+        raw = headers.get(name) or ""
+    if not raw.strip():
+        return ""
+    return raw.split(",")[-1].strip()
+
+
+def _normalize_origin_parts(scheme: str, netloc: str) -> tuple[str, str]:
+    s = scheme.strip().lower()
+    n = netloc.strip().lower()
+    if s == "http" and n.endswith(":80"):
+        n = n[:-3]
+    elif s == "https" and n.endswith(":443"):
+        n = n[:-4]
+    return s, n
+
+
+def _header_values(request: Request, name: str) -> list[str]:
+    headers = request.headers
+    if hasattr(headers, "getlist"):
+        raw_vals = headers.getlist(name)
+    else:
+        single = headers.get(name)
+        raw_vals = [single] if single is not None else []
+    return [v.strip() for v in raw_vals if isinstance(v, str) and v.strip()]
+
+
+def _verify_csrf(request: Request) -> JSONResponse | None:
+    if request.method in _SAFE_METHODS:
+        return None
+    path = request.url.path
+    if not path.startswith("/api/"):
+        return None
+    authz_vals = _header_values(request, "authorization")
+    if len(authz_vals) == 1 and authz_vals[0].startswith("Bearer ") and not path.startswith("/api/auth/"):
+        return None
+
+    sfs_values = [v.lower() for v in _header_values(request, "sec-fetch-site")]
+    if len(set(sfs_values)) > 1 or any(v not in ("same-origin", "none") for v in sfs_values):
+        return JSONResponse(status_code=403, content={"detail": "拒绝跨站请求"})
+
+    expected_scheme = (request.url.scheme or "http").lower()
+    expected_netloc = (request.headers.get("host") or request.url.netloc or "").strip().lower()
+    if auth_api.is_trusted_proxy_request(request):
+        xfp = _last_header_token(request, "x-forwarded-proto")
+        if xfp:
+            expected_scheme = xfp.lower()
+        xfh = _last_header_token(request, "x-forwarded-host")
+        if xfh:
+            expected_netloc = xfh.lower()
+    expected = _normalize_origin_parts(expected_scheme, expected_netloc)
+
+    origins = _header_values(request, "origin")
+    if origins:
+        if len({o.lower() for o in origins}) > 1:
+            return JSONResponse(status_code=403, content={"detail": "拒绝跨源请求"})
+        for origin in origins:
+            if origin.lower() == "null":
+                return JSONResponse(status_code=403, content={"detail": "拒绝跨源请求"})
+            parsed = urlsplit(origin)
+            if not parsed.scheme or not parsed.netloc:
+                return JSONResponse(status_code=403, content={"detail": "拒绝跨源请求"})
+            if _normalize_origin_parts(parsed.scheme, parsed.netloc) != expected:
+                return JSONResponse(status_code=403, content={"detail": "拒绝跨源请求"})
+    else:
+        referers = _header_values(request, "referer")
+        if len(set(referers)) > 1:
+            return JSONResponse(status_code=403, content={"detail": "拒绝跨站来源请求"})
+        for referer in referers:
+            parsed = urlsplit(referer)
+            if not parsed.scheme or not parsed.netloc:
+                return JSONResponse(status_code=403, content={"detail": "拒绝跨站来源请求"})
+            if _normalize_origin_parts(parsed.scheme, parsed.netloc) != expected:
+                return JSONResponse(status_code=403, content={"detail": "拒绝跨站来源请求"})
+
+    csrf_cookie = request.cookies.get("tf_csrf")
+    if csrf_cookie is not None:
+        csrf_headers = _header_values(request, "x-csrf-token")
+        if len(csrf_headers) != 1 or not hmac.compare_digest(
+            csrf_headers[0].encode("utf-8"), csrf_cookie.encode("utf-8")
+        ):
+            return JSONResponse(status_code=403, content={"detail": "CSRF 令牌无效"})
+    return None
 
 
 # ================================================================
 # 访问认证中间件
 # ================================================================
-# 拦截所有 /api/ 请求, 三种状态:
+# 拦截所有 /api/ 请求 (及已设密码下的 /docs, /redoc, /openapi.json), 三种状态:
 #   1. 未设密码 + 本机/内网 → 放行(让本机用户访问面板 + 调 /api/auth/setup 设密码)
 #   2. 未设密码 + 公网       → 拒绝(403, 防裸奔也防抢占; 引导本机设密码)
 #   3. 已设密码              → 检查 session, 无效则 401(前端跳登录)
-# 白名单: /api/auth/* (设密码/登录本身)、/health 等探活。
+# 白名单: /api/auth/* (设密码/登录本身)、/health、/api/health、/api/openapi.json?tier=a、/api/events。
 _AUTH_WHITELIST_PREFIX = ("/api/auth/",)
 _AUTH_WHITELIST_EXACT = (
     "/health",
     "/api/health",
-    "/openapi.json",
     "/api/openapi.json",
-    "/docs",
-    "/redoc",
     # SSE 事件流: EventSource 带不了 Authorization 头, 凭证即 query 里的
     # 一次性票据, 端点内校验 (api/events.py); POST /api/events/ticket 不在
     # 白名单, 仍走网关 Bearer 通道
@@ -610,7 +955,6 @@ _AUTH_WHITELIST_EXACT = (
 )
 
 
-@app.middleware("http")
 async def workload_middleware(request: Request, call_next):
     import time
 
@@ -627,21 +971,46 @@ async def workload_middleware(request: Request, call_next):
         workload.record(f"http.{group}", "request", elapsed_s=time.perf_counter() - started)
 
 
-@app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
+    # /docs, /redoc, /openapi.json 暴露内部接口清单: 已设密码时要求有效会话, 未设密码时仅本机/内网
+    if path in _DOCS_PATHS:
+        from app.services import auth as auth_service
+
+        if auth_service.is_configured():
+            token = request.cookies.get(auth_api.COOKIE_NAME)
+            if token and auth_service.is_valid_session(token):
+                return await call_next(request)
+            return JSONResponse(status_code=401, content={"detail": "未登录或会话已过期"})
+        if auth_api._is_local_network(auth_api._client_ip(request)):
+            return await call_next(request)
+        return JSONResponse(
+            status_code=403,
+            content={
+                "detail": "面板尚未初始化访问密码,请通过 SSH/本机浏览器访问以设置密码",
+                "code": "NOT_INITIALIZED",
+            },
+        )
+
     # 仅 /api/ 走认证; 静态资源(前端页面/assets)放行, 由前端处理跳转
     if not path.startswith("/api/"):
         return await call_next(request)
     # CORS 预检不带凭据, 直接放行 (CORSMiddleware 在外层应答)
     if request.method == "OPTIONS":
         return await call_next(request)
+    # CSRF 同源校验 (覆盖 /api/auth/* 与未设密码状态下的状态变更请求, Bearer 通道除外)
+    csrf_err = _verify_csrf(request)
+    if csrf_err is not None:
+        return csrf_err
     # 白名单放行(设密码/登录/探活本身不拦)
     if path.startswith(_AUTH_WHITELIST_PREFIX) or path in _AUTH_WHITELIST_EXACT:
         return await call_next(request)
 
     # ── API Token 通道 (外部调用方; 与密码会话并行, 见 open-platform-plan §4) ──
-    authz = request.headers.get("authorization", "")
+    authz_vals = _header_values(request, "authorization")
+    if len(authz_vals) > 1:
+        return JSONResponse(status_code=401, content={"detail": "Authorization 请求头重复"})
+    authz = authz_vals[0] if authz_vals else ""
     if authz.startswith("Bearer "):
         from app.services import api_gateway
         # 网络门禁先行: 默认仅本机/内网可调 Token 通道 (API_TOKEN_LOCAL_ONLY=0 放开);
@@ -685,6 +1054,17 @@ async def auth_middleware(request: Request, call_next):
         return await call_next(request)
     # 未登录: 401(前端跳登录页)
     return JSONResponse(status_code=401, content={"detail": "未登录或会话已过期"})
+
+
+# 中间件执行顺序 (外 -> 内):
+#   SecurityHeadersMiddleware -> _DynamicCORSMiddleware -> BodyLimitMiddleware
+#   -> auth_middleware -> workload_middleware -> router
+# Starlette 后注册者在外层, 故按逆序挂载。
+app.middleware("http")(workload_middleware)
+app.middleware("http")(auth_middleware)
+app.add_middleware(BodyLimitMiddleware)
+app.add_middleware(_DynamicCORSMiddleware)
+app.add_middleware(SecurityHeadersMiddleware, static_dir=Path(settings.static_dir))
 
 
 # 路由
@@ -739,19 +1119,38 @@ app.state.extension_load_errors = extension_load_errors
 # 能力门控异常 → 403(而非默认 500)
 # 业务代码用 capset.require(Cap.X) 断言能力,缺失时抛 CapabilityDenied;
 # 若不注册 handler 会冒泡成 500 Internal Server Error,对前端不友好且语义错误。
-from fastapi import Request
-from fastapi.responses import JSONResponse
 
-from app.tickflow.capabilities import CapabilityDenied
+
+@app.get("/api/health", include_in_schema=False)
+def api_health() -> dict:
+    """兼容 /api/health 探活端点 (复用 /health 逻辑, 不纳入 Tier A 契约)."""
+    from app.api.routes import health
+
+    return health()
 
 
 @app.get("/api/openapi.json", include_in_schema=False)
-async def openapi_contract_view(tier: str = "a"):
+async def openapi_contract_view(request: Request, tier: str = "a"):
     """Tier A 契约视图: 只保留对外开放 (Token 可达) 的端点 = 稳定承诺面。
 
     开放清单的权威来源是 api_gateway 的规则表 — 规则表即契约, 单源维护。
     二开方以此生成客户端; 未出现在此视图的端点属内部实现, 随时变化。
     """
+    if tier != "a":
+        from app.services import auth as auth_service
+
+        if auth_service.is_configured():
+            token = request.cookies.get(auth_api.COOKIE_NAME)
+            if not (token and auth_service.is_valid_session(token)):
+                return JSONResponse(status_code=401, content={"detail": "未登录或会话已过期"})
+        elif not auth_api._is_local_network(auth_api._client_ip(request)):
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "detail": "面板尚未初始化访问密码,请通过 SSH/本机浏览器访问以设置密码",
+                    "code": "NOT_INITIALIZED",
+                },
+            )
     spec = app.openapi()
     if tier == "a":
         from app.services import api_gateway
@@ -806,6 +1205,8 @@ def _register_static_routes(target: FastAPI, static_dir: Path) -> None:
 
     @target.get("/{full_path:path}", include_in_schema=False)
     def spa_fallback(full_path: str):
+        if full_path == "api" or full_path.startswith("api/"):
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
         # 只直出 dist 根目录文件 (单段路径); index.html 仍走下方 no-store 分支。
         if full_path and "/" not in full_path and full_path not in (".", ".."):
             asset = static_dir / full_path
@@ -821,6 +1222,29 @@ def _register_static_routes(target: FastAPI, static_dir: Path) -> None:
                 headers={"Cache-Control": "no-store, must-revalidate"},
             )
         return {"error": "frontend not built"}
+
+    @target.exception_handler(405)
+    async def api_not_found_on_spa_405(
+        request: Request, exc: StarletteHTTPException,
+    ) -> JSONResponse:
+        req_path = request.url.path
+        if req_path == "/api" or req_path.startswith("/api/"):
+            for route in target.routes:
+                if getattr(route, "endpoint", None) is spa_fallback:
+                    continue
+                match, _ = route.matches(request.scope)
+                if match != Match.NONE:
+                    return JSONResponse(
+                        status_code=405,
+                        content={"detail": exc.detail},
+                        headers=getattr(exc, "headers", None) or {},
+                    )
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
+        return JSONResponse(
+            status_code=405,
+            content={"detail": exc.detail},
+            headers=getattr(exc, "headers", None) or {},
+        )
 
 
 _static = Path(settings.static_dir)

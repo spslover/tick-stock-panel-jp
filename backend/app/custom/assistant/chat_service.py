@@ -154,6 +154,7 @@ async def chat_stream(
     *,
     history: list[dict[str, str]],
     context: dict | None = None,
+    locale: str = "zh-CN",
     engine: Any = None,
     data_dir: str | None = None,
     repo: Any = None,
@@ -184,7 +185,7 @@ async def chat_stream(
         yield _line({"type": "notice", "message": f"对话较长, 已仅保留最近 {_MAX_HISTORY_MESSAGES // 2} 轮作为上下文。"})
 
     req_messages: list[dict[str, Any]] = [
-        {"role": "system", "content": build_system_prompt(context)},
+        {"role": "system", "content": build_system_prompt(context, locale=locale)},
         *truncated,
     ]
     schemas = assistant_tools.build_tool_schemas()

@@ -26,6 +26,7 @@ import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { boardTag } from '@/components/stock-table/primitives'
 import { fmtBigNum } from '@/lib/format'
 import { PageHeader } from '@/components/PageHeader'
+import { tx, useI18n } from '@/lib/i18n'
 import { MarkdownRenderer } from '@/components/financials/MarkdownRenderer'
 import { toast } from '@/components/Toast'
 import { usePreferences } from '@/lib/useSharedQueries'
@@ -34,6 +35,9 @@ import {
   startReviewGeneration, resetReview, isReviewGenerating, cancelReviewGeneration,
   type ReviewPhase,
 } from '@/lib/reviewStore'
+
+/** 「最新」是复盘目标日的哨兵值: 比较用原始中文, 只有展示时才翻译 */
+const LATEST_LABEL = '最新'
 
 // ================================================================
 // 涨跌幅格式化(注意单位差异)
@@ -69,6 +73,7 @@ function fmtArchivedAt(iso: string): string {
 // Phase 类型复用 store 的定义(单一来源)
 
 export function ReviewPage() {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   // 复盘日期:当前固定取最新交易日(后续如需日期选择可改回 useState)
   const asOf: string | undefined = undefined
@@ -96,7 +101,7 @@ export function ReviewPage() {
     mutationFn: (id: string) => api.reviewReportDelete(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QK.reviewReports })
-      toast('已删除', 'success')
+      toast(tx('已删除'), 'success')
     },
     onError: () => { /* request() 已 toast */ },
   })
@@ -131,7 +136,7 @@ export function ReviewPage() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: QK.preferences })
       setShowSchedule(false)
-      toast(vars.enabled ? '已开启定时复盘' : '已关闭定时复盘', 'success')
+      toast(vars.enabled ? tx('已开启定时复盘') : tx('已关闭定时复盘'), 'success')
     },
     onError: () => { /* request() 已 toast */ },
   })
@@ -140,7 +145,7 @@ export function ReviewPage() {
     mutationFn: (channels: string[]) => api.updateReviewPush(channels),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: QK.preferences })
-      toast(vars.length === 0 ? '已关闭复盘推送' : '已更新复盘推送渠道', 'success')
+      toast(vars.length === 0 ? tx('已关闭复盘推送') : tx('已更新复盘推送渠道'), 'success')
     },
     onError: () => { /* request() 已 toast */ },
   })
@@ -155,7 +160,7 @@ export function ReviewPage() {
     mutationFn: (mode: 'auto' | 'manual') => api.updateReviewPush(reviewPushChannels, mode),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QK.preferences })
-      toast('已更新推送触发方式', 'success')
+      toast(tx('已更新推送触发方式'), 'success')
     },
     onError: () => { /* request() 已 toast */ },
   })
@@ -179,7 +184,7 @@ export function ReviewPage() {
       qc.invalidateQueries({ queryKey: QK.preferences })
       qc.invalidateQueries({ queryKey: ['market-recap-prompt'] })
       setPromptDraft(null)
-      toast(vars.trim() ? '已保存复盘提示词' : '已恢复默认提示词', 'success')
+      toast(vars.trim() ? tx('已保存复盘提示词') : tx('已恢复默认提示词'), 'success')
     },
     onError: () => { /* request() 已 toast */ },
   })
@@ -232,9 +237,9 @@ export function ReviewPage() {
     if (!text) return
     try {
       await navigator.clipboard.writeText(text)
-      toast('已复制到剪贴板', 'success')
+      toast(tx('已复制到剪贴板'), 'success')
     } catch {
-      toast('复制失败,请手动选择文本', 'error')
+      toast(tx('复制失败,请手动选择文本'), 'error')
     }
   }, [content, viewing])
 
@@ -247,7 +252,7 @@ export function ReviewPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `复盘_${reportDate}.md`
+    a.download = tx('复盘_{date}.md', { date: reportDate })
     a.click()
     URL.revokeObjectURL(url)
   }, [content, viewing, meta, asOf])
@@ -259,7 +264,7 @@ export function ReviewPage() {
   }, [])
 
   const isGenerating = phase === 'loading' || phase === 'streaming'
-  const displayDate = viewing?.as_of ?? meta?.as_of ?? marketQuery.data?.as_of ?? asOf ?? '最新'
+  const displayDate = viewing?.as_of ?? meta?.as_of ?? marketQuery.data?.as_of ?? asOf ?? LATEST_LABEL
   // 龙虎榜跟随复盘目标日 (历史复盘联动当期榜单); 非 ISO 日期(如"最新")取最近一期
   const dtDate = /^\d{4}-\d{2}-\d{2}$/.test(displayDate ?? '') ? displayDate : undefined
   const [previewSymbol, setPreviewSymbol] = useState<string | null>(null)
@@ -271,18 +276,18 @@ export function ReviewPage() {
   return (
     <>
       <PageHeader
-        title="AI 复盘"
+        title={tx('AI 复盘')}
         titleExtra={<Sparkles className="h-4 w-4 text-accent" />}
-        subtitle={`${displayDate}${data?.emotion ? ` · 情绪 ${data.emotion.label}` : ''}`}
+        subtitle={`${displayDate === LATEST_LABEL ? tx('最新') : displayDate}${data?.emotion ? ` · ${tx('情绪')} ${data.emotion.label}` : ''}`}
         right={
           <div className="flex items-center gap-1">
             <button
               onClick={() => { marketQuery.refetch() }}
               disabled={marketQuery.isFetching}
               className="inline-flex items-center gap-1 rounded-btn border border-border bg-elevated px-2 py-1 text-[11px] text-secondary transition-colors hover:text-foreground disabled:opacity-50"
-              title="刷新市场数据"
+              title={tx('刷新市场数据')}
             >
-              <RefreshCw className={cn('h-3 w-3', marketQuery.isFetching && 'animate-spin')} />刷新
+              <RefreshCw className={cn('h-3 w-3', marketQuery.isFetching && 'animate-spin')} />{tx('刷新')}
             </button>
             <button
               onClick={openSchedule}
@@ -292,9 +297,9 @@ export function ReviewPage() {
                   ? 'border-accent/40 bg-accent/10 text-accent hover:bg-accent/20'
                   : 'border-border bg-elevated text-secondary hover:text-foreground',
               )}
-              title={reviewSched.enabled ? `定时复盘已开启 · 每日 ${String(reviewSched.hour).padStart(2,'0')}:${String(reviewSched.minute).padStart(2,'0')}` : '定时复盘'}
+              title={reviewSched.enabled ? `${tx('定时复盘已开启')} · ${String(reviewSched.hour).padStart(2,'0')}:${String(reviewSched.minute).padStart(2,'0')}` : tx('定时复盘')}
             >
-              <Clock className="h-3 w-3" />定时
+              <Clock className="h-3 w-3" />{tx('定时')}
             </button>
             <button
               onClick={generate}
@@ -307,9 +312,9 @@ export function ReviewPage() {
               )}
             >
               {isGenerating ? (
-                <><RefreshCw className="h-3.5 w-3.5 animate-spin" />生成中…</>
+                <><RefreshCw className="h-3.5 w-3.5 animate-spin" />{tx('生成中…')}</>
               ) : (
-                <><Sparkles className="h-3.5 w-3.5" />生成复盘</>
+                <><Sparkles className="h-3.5 w-3.5" />{tx('生成复盘')}</>
               )}
             </button>
           </div>
@@ -322,8 +327,7 @@ export function ReviewPage() {
           {marketQuery.isLoading && !data ? (
             <div className="flex h-40 items-center justify-center">
               <div className="flex items-center gap-2 text-sm text-muted">
-                <RefreshCw className="h-4 w-4 animate-spin" /> 加载市场数据…
-              </div>
+                <RefreshCw className="h-4 w-4 animate-spin" /> {tx('加载市场数据…')}</div>
             </div>
           ) : !data || !data.as_of ? (
             <div className="flex flex-col items-center justify-center gap-4 rounded-card border border-border bg-surface/80 px-6 py-16">
@@ -333,15 +337,14 @@ export function ReviewPage() {
                 </div>
               </div>
               <div className="text-center">
-                <div className="text-sm font-medium text-foreground">暂无市场数据</div>
-                <p className="mt-1 text-xs text-muted">复盘需要日 K 与指数,请先前往「数据」页同步</p>
+                <div className="text-sm font-medium text-foreground">{tx('暂无市场数据')}</div>
+                <p className="mt-1 text-xs text-muted">{tx('复盘需要日 K 与指数,请先前往「数据」页同步')}</p>
               </div>
               <Link
                 to="/data"
                 className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-4 py-2 text-xs font-medium text-white shadow-sm transition-all hover:bg-accent/90 hover:shadow"
               >
-                <Database className="h-3.5 w-3.5" />前往数据页同步
-                <ChevronRight className="h-3.5 w-3.5" />
+                <Database className="h-3.5 w-3.5" />{tx('前往数据页同步')}<ChevronRight className="h-3.5 w-3.5" />
               </Link>
             </div>
           ) : (
@@ -360,11 +363,11 @@ export function ReviewPage() {
                   value={focus}
                   onChange={(e) => setFocus(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && !isGenerating) generate() }}
-                  placeholder="可选:补充复盘关注点,如「半导体板块持续性如何」「量能是否持续」"
+                  placeholder={tx('可选:补充复盘关注点,如「半导体板块持续性如何」「量能是否持续」')}
                   className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted/60"
                 />
                 {focus && (
-                  <button onClick={() => setFocus('')} className="text-xs text-muted transition-colors hover:text-foreground">清除</button>
+                  <button onClick={() => setFocus('')} className="text-xs text-muted transition-colors hover:text-foreground">{tx('清除')}</button>
                 )}
               </div>
 
@@ -416,7 +419,7 @@ export function ReviewPage() {
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-accent" />
-                  <h3 className="text-sm font-medium text-foreground">定时复盘</h3>
+                  <h3 className="text-sm font-medium text-foreground">{tx('定时复盘')}</h3>
                 </div>
                 <button
                   onClick={() => setShowSchedule(false)}
@@ -427,13 +430,11 @@ export function ReviewPage() {
               </div>
 
               <p className="mb-4 text-[11px] leading-relaxed text-muted">
-                开启后,每个交易日到点自动生成大盘复盘报告并归档,静默执行。
-                下次打开本页即可在历史列表看到新报告;也可选推送到飞书。
-              </p>
+                {tx('开启后,每个交易日到点自动生成大盘复盘报告并归档,静默执行。 下次打开本页即可在历史列表看到新报告;也可选推送到飞书。')}</p>
 
               {/* 开关(只改本地草稿, 不提交) */}
               <label className="flex items-center justify-between rounded-btn bg-elevated/40 px-3 py-2.5">
-                <span className="text-xs text-foreground">启用定时复盘</span>
+                <span className="text-xs text-foreground">{tx('启用定时复盘')}</span>
                 <button
                   type="button"
                   role="switch"
@@ -451,7 +452,7 @@ export function ReviewPage() {
               {/* 时间设置(仅开启时可编辑, 本地草稿) */}
               {draft.enabled && (
                 <div className="mt-3 flex items-center gap-2 rounded-btn bg-elevated/40 px-3 py-2.5">
-                  <span className="text-[11px] text-muted">每日</span>
+                  <span className="text-[11px] text-muted">{tx('每日')}</span>
                   <input
                     type="number" min={0} max={23} value={draft.hour}
                     onChange={e => setDraft(d => ({ ...d, hour: Math.max(0, Math.min(23, Number(e.target.value))) }))}
@@ -463,15 +464,15 @@ export function ReviewPage() {
                     onChange={e => setDraft(d => ({ ...d, minute: Math.max(0, Math.min(59, Number(e.target.value))) }))}
                     className="w-12 px-1.5 py-1 rounded-btn bg-base border border-border text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50"
                   />
-                  <span className="text-[10px] text-muted/70">不早于 15:00 · 工作日执行</span>
+                  <span className="text-[10px] text-muted/70">{tx('不早于 15:00 · 工作日执行')}</span>
                 </div>
               )}
 
               {/* 推送渠道(多选, 独立常驻, 与定时无关, 即时生效) */}
               <div className="mt-3 rounded-btn bg-elevated/40 px-3 py-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-foreground">生成后推送完整报告</span>
-                  <span className="text-[10px] text-muted/70">{reviewPushChannels.length === 0 ? '未开启' : `${reviewPushChannels.length} 个渠道`}</span>
+                  <span className="text-xs text-foreground">{tx('生成后推送完整报告')}</span>
+                  <span className="text-[10px] text-muted/70">{reviewPushChannels.length === 0 ? tx('未开启') : tx('{n} 个渠道', { n: reviewPushChannels.length })}</span>
                 </div>
                 <div className="mt-2 space-y-1.5">
                   {/* 飞书(可用, 多选) */}
@@ -489,10 +490,10 @@ export function ReviewPage() {
                     <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded border', reviewPushChannels.includes('feishu') ? 'border-accent bg-accent text-white' : 'border-border')}>
                       {reviewPushChannels.includes('feishu') && <Check className="h-2.5 w-2.5" />}
                     </span>
-                    <span className="text-[11px] text-foreground">飞书</span>
-                    <span className="text-[9px] text-muted">群推送 Webhook</span>
+                    <span className="text-[11px] text-foreground">{tx('飞书')}</span>
+                    <span className="text-[9px] text-muted">{tx('群推送 Webhook')}</span>
                     <span className={cn('ml-auto text-[9px]', feishuConfigured ? 'text-emerald-500' : 'text-warning')}>
-                      {feishuConfigured ? '已配置' : '未配置'}
+                      {feishuConfigured ? tx('已配置') : tx('未配置')}
                     </span>
                   </button>
                   {/* 企业微信(可用, 多选) */}
@@ -510,10 +511,10 @@ export function ReviewPage() {
                     <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded border', reviewPushChannels.includes('wecom') ? 'border-accent bg-accent text-white' : 'border-border')}>
                       {reviewPushChannels.includes('wecom') && <Check className="h-2.5 w-2.5" />}
                     </span>
-                    <span className="text-[11px] text-foreground">企业微信</span>
-                    <span className="text-[9px] text-muted">群推送 Webhook</span>
+                    <span className="text-[11px] text-foreground">{tx('企业微信')}</span>
+                    <span className="text-[9px] text-muted">{tx('群推送 Webhook')}</span>
                     <span className={cn('ml-auto text-[9px]', wecomConfigured ? 'text-emerald-500' : 'text-warning')}>
-                      {wecomConfigured ? '已配置' : '未配置'}
+                      {wecomConfigured ? tx('已配置') : tx('未配置')}
                     </span>
                   </button>
                   <button
@@ -530,10 +531,10 @@ export function ReviewPage() {
                     <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded border', reviewPushChannels.includes('custom') ? 'border-accent bg-accent text-white' : 'border-border')}>
                       {reviewPushChannels.includes('custom') && <Check className="h-2.5 w-2.5" />}
                     </span>
-                    <span className="text-[11px] text-foreground">第三方系统</span>
+                    <span className="text-[11px] text-foreground">{tx('第三方系统')}</span>
                     <span className="text-[9px] text-muted">JSON Webhook</span>
                     <span className={cn('ml-auto text-[9px]', customConfigured ? 'text-emerald-500' : 'text-warning')}>
-                      {customConfigured ? '已配置' : '未配置'}
+                      {customConfigured ? tx('已配置') : tx('未配置')}
                     </span>
                   </button>
                   <button
@@ -550,17 +551,17 @@ export function ReviewPage() {
                     <span className={cn('flex h-3 w-3 shrink-0 items-center justify-center rounded border', reviewPushChannels.includes('email') ? 'border-accent bg-accent text-white' : 'border-border')}>
                       {reviewPushChannels.includes('email') && <Check className="h-2.5 w-2.5" />}
                     </span>
-                    <span className="text-[11px] text-foreground">邮件</span>
+                    <span className="text-[11px] text-foreground">{tx('邮件')}</span>
                     <span className="text-[9px] text-muted">SMTP</span>
                     <span className={cn('ml-auto text-[9px]', emailConfigured ? 'text-emerald-500' : 'text-warning')}>
-                      {emailConfigured ? '已配置' : '未配置'}
+                      {emailConfigured ? tx('已配置') : tx('未配置')}
                     </span>
                   </button>
                 </div>
 
                 {/* 推送触发方式: auto=归档即推 / manual=仅归档不自动外发 */}
                 <div className="mt-2 flex items-center justify-between">
-                  <span className="text-[11px] text-foreground">推送触发方式</span>
+                  <span className="text-[11px] text-foreground">{tx('推送触发方式')}</span>
                   <div className="flex items-center gap-0.5 rounded-btn bg-base p-0.5">
                     <button
                       type="button"
@@ -571,8 +572,7 @@ export function ReviewPage() {
                         reviewPushMode === 'auto' ? 'bg-accent text-white' : 'text-muted hover:text-secondary',
                       )}
                     >
-                      自动
-                    </button>
+                      {tx('自动')}</button>
                     <button
                       type="button"
                       disabled={pushModeMut.isPending}
@@ -582,25 +582,22 @@ export function ReviewPage() {
                         reviewPushMode === 'manual' ? 'bg-accent text-white' : 'text-muted hover:text-secondary',
                       )}
                     >
-                      手动确认
-                    </button>
+                      {tx('手动确认')}</button>
                   </div>
                 </div>
 
                 <p className="mt-1.5 text-[10px] leading-relaxed text-muted/70">
                   {reviewPushMode === 'auto'
-                    ? '定时与手动生成的复盘归档后都会自动推送完整报告。'
-                    : '复盘仅归档保存，不自动外发。'}
-                  复用「设置 → 实时监控」的渠道配置。
-                  {(
+                    ? tx('定时与手动生成的复盘归档后都会自动推送完整报告。')
+                    : tx('复盘仅归档保存，不自动外发。')}
+                  {tx('复用「设置 → 实时监控」的渠道配置。')}{(
                     (reviewPushChannels.includes('feishu') && !feishuConfigured)
                     || (reviewPushChannels.includes('wecom') && !wecomConfigured)
                     || (reviewPushChannels.includes('custom') && !customConfigured)
                     || (reviewPushChannels.includes('email') && !emailConfigured)
                   ) && (
                     <Link to="/settings?tab=monitoring&highlight=webhooks" className="ml-1 text-accent hover:underline" onClick={() => setShowSchedule(false)}>
-                      前往配置 →
-                    </Link>
+                      {tx('前往配置 →')}</Link>
                   )}
                 </p>
               </div>
@@ -614,11 +611,10 @@ export function ReviewPage() {
                 >
                   <span className="flex items-center gap-1.5 text-xs text-foreground">
                     <Wand2 className="h-3.5 w-3.5 text-accent" />
-                    自定义复盘提示词
-                  </span>
+                    {tx('自定义复盘提示词')}</span>
                   <span className="flex items-center gap-1.5">
                     <span className={cn('text-[9px]', promptCustomized ? 'text-accent' : 'text-muted/70')}>
-                      {promptCustomized ? '已自定义' : '默认模板'}
+                      {promptCustomized ? tx('已自定义') : tx('默认模板')}
                     </span>
                     {showPromptEditor
                       ? <ChevronUp className="h-3.5 w-3.5 text-muted" />
@@ -632,13 +628,12 @@ export function ReviewPage() {
                       value={promptText}
                       onChange={e => setPromptDraft(e.target.value)}
                       spellCheck={false}
-                      placeholder="留空使用内置默认提示词;也可点下方「填入默认模板」后在其基础上修改"
+                      placeholder={tx('留空使用内置默认提示词;也可点下方「填入默认模板」后在其基础上修改')}
                       className="h-44 w-full resize-y rounded-btn bg-base border border-border p-2.5 font-mono text-[11px] leading-relaxed text-foreground outline-none placeholder:text-muted/60 focus:border-accent/50"
                     />
                     <div className="mt-1.5 flex items-center justify-between">
                       <span className="text-[9px] text-muted/70">
-                        {promptText.length.toLocaleString()} / 32,000 字符
-                        {promptCustomized && ' · 自定义后不再跟随版本默认模板更新'}
+                        {promptText.length.toLocaleString()} {tx('/ 32,000 字符')}{promptCustomized && ' ' + tx('· 自定义后不再跟随版本默认模板更新')}
                       </span>
                       <div className="flex items-center gap-1.5">
                         <button
@@ -647,23 +642,21 @@ export function ReviewPage() {
                           onClick={() => setPromptDraft(promptQuery.data?.default ?? '')}
                           className="rounded-btn bg-base px-2 py-1 text-[10px] text-secondary border border-border/60 transition-colors hover:text-foreground disabled:opacity-50"
                         >
-                          填入默认模板
-                        </button>
+                          {tx('填入默认模板')}</button>
                         <button
                           type="button"
                           disabled={promptMut.isPending || !promptCustomized}
                           onClick={() => promptMut.mutate('')}
                           className="rounded-btn bg-base px-2 py-1 text-[10px] text-secondary border border-border/60 transition-colors hover:text-foreground disabled:opacity-50"
                         >
-                          恢复默认
-                        </button>
+                          {tx('恢复默认')}</button>
                         <button
                           type="button"
                           disabled={promptMut.isPending || promptQuery.isLoading}
                           onClick={() => promptMut.mutate(promptText)}
                           className="rounded-btn bg-accent px-2.5 py-1 text-[10px] font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-50"
                         >
-                          {promptMut.isPending ? '保存中…' : '保存'}
+                          {promptMut.isPending ? tx('保存中…') : tx('保存')}
                         </button>
                       </div>
                     </div>
@@ -673,8 +666,7 @@ export function ReviewPage() {
 
               {!draft.enabled && (
                 <p className="mt-3 text-[10px] text-muted/70">
-                  当前: 已关闭。开启后将按设定时间自动复盘。
-                </p>
+                  {tx('当前: 已关闭。开启后将按设定时间自动复盘。')}</p>
               )}
 
               {/* 操作区: 取消 + 保存(统一提交开关+时间) */}
@@ -683,14 +675,13 @@ export function ReviewPage() {
                   onClick={() => setShowSchedule(false)}
                   className="rounded-btn bg-elevated px-4 py-1.5 text-xs text-secondary transition-colors hover:text-foreground"
                 >
-                  取消
-                </button>
+                  {tx('取消')}</button>
                 <button
                   onClick={() => reviewMut.mutate({ enabled: draft.enabled, hour: draft.hour, minute: draft.minute })}
                   disabled={reviewMut.isPending}
                   className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-50"
                 >
-                  {reviewMut.isPending ? '保存中…' : '保存'}
+                  {reviewMut.isPending ? tx('保存中…') : tx('保存')}
                 </button>
               </div>
             </motion.div>
@@ -714,8 +705,8 @@ export function ReviewPage() {
 // 详细数据请去 Dashboard 看,这里只给 AI 报告提供背景参照
 // ================================================================
 // 指数简称映射:全称太长(上证指数/深证成指/创业板指/科创综指)摘要条放不下,统一缩成单字
-const INDEX_SHORT: Record<string, string> = {
-  '上证指数': '上', '深证成指': '深', '创业板指': '创', '科创综指': '科', '科创50': '科',
+const INDEX_SHORT: Record<string, string> = { // i18n-exempt: 指数全称→简称是数据映射
+  '上证指数': '上', '深证成指': '深', '创业板指': '创', '科创综指': '科', '科创50': '科', // i18n-exempt
 }
 function indexShort(name?: string | null, symbol?: string): string {
   if (!name) return symbol ?? '—'
@@ -724,14 +715,14 @@ function indexShort(name?: string | null, symbol?: string): string {
 
 // 批量替换文本中的指数全称为简称(用于历史列表 summary 显示,
 // 兼容存量旧报告 —— 它们存盘时 summary 还是全称)。
-const _INDEX_FULL_RE = /上证指数|深证成指|创业板指|科创综指|科创50/g
+const _INDEX_FULL_RE = /上证指数|深证成指|创业板指|科创综指|科创50/g // i18n-exempt: 匹配后端摘要里的指数全称
 function shortenIndexNames(text: string): string {
   return text.replace(_INDEX_FULL_RE, (m) => INDEX_SHORT[m] ?? m)
 }
 
 // 从 summary 的指数段(如「上-2.26%、深-3.44%、创-4.07%、科-2.02%」)
 // 解析出 [{name, pctStr, pctNum}],供列表项按涨跌染色渲染。
-const _INDEX_PCT_RE = /([上深创科])([+-]?\d+\.\d+%)/g
+const _INDEX_PCT_RE = /([上深创科])([+-]?\d+\.\d+%)/g // i18n-exempt: 匹配后端摘要里的简称
 function parseIndexPcts(indexSegment: string): { name: string; pctStr: string; pctNum: number }[] {
   const out: { name: string; pctStr: string; pctNum: number }[] = []
   for (const m of indexSegment.matchAll(_INDEX_PCT_RE)) {
@@ -741,6 +732,7 @@ function parseIndexPcts(indexSegment: string): { name: string; pctStr: string; p
 }
 
 function MarketSummaryBar({ data }: { data: OverviewMarket }) {
+  const { tx } = useI18n()
   const score = data.emotion?.score ?? null
   const emoColor = scoreColor(score)
   const indices = (data.indices ?? []).slice(0, 4)
@@ -756,8 +748,8 @@ function MarketSummaryBar({ data }: { data: OverviewMarket }) {
           {score ?? '—'}
         </span>
         <div className="leading-tight">
-          <div className="text-[11px] font-medium text-foreground">{data.emotion?.label ?? '情绪'}</div>
-          <div className="text-[9px] text-secondary">情绪温度</div>
+          <div className="text-[11px] font-medium text-foreground">{data.emotion?.label ?? tx('情绪')}</div>
+          <div className="text-[9px] text-secondary">{tx('情绪温度')}</div>
         </div>
       </div>
 
@@ -779,7 +771,7 @@ function MarketSummaryBar({ data }: { data: OverviewMarket }) {
 
       {/* 涨跌结构 */}
       <div className="flex items-center gap-1.5 text-[11px]">
-        <span className="text-secondary">涨跌</span>
+        <span className="text-secondary">{tx('涨跌')}</span>
         <span className="font-mono font-semibold text-bull">{data.breadth?.up ?? 0}</span>
         <span className="text-muted">/</span>
         <span className="font-mono font-semibold text-bear">{data.breadth?.down ?? 0}</span>
@@ -787,14 +779,14 @@ function MarketSummaryBar({ data }: { data: OverviewMarket }) {
 
       {/* 涨停结构 */}
       <div className="flex items-center gap-1.5 text-[11px]">
-        <span className="text-secondary">涨停</span>
+        <span className="text-secondary">{tx('涨停')}</span>
         <span className="font-mono font-semibold text-bull">{data.limit?.limit_up ?? 0}</span>
-        <span className="text-secondary">封板 {(data.limit?.seal_rate ?? 0).toFixed(0)}%</span>
+        <span className="text-secondary">{tx('封板')} {(data.limit?.seal_rate ?? 0).toFixed(0)}%</span>
       </div>
 
       {/* 成交额 */}
       <div className="flex items-center gap-1.5 text-[11px]">
-        <span className="text-secondary">成交</span>
+        <span className="text-secondary">{tx('成交')}</span>
         <span className="font-mono font-semibold text-foreground">{fmtBigNum(data.amount?.total)}</span>
       </div>
     </div>
@@ -817,20 +809,20 @@ function ReportPanel({
   onRegenerate: () => void
   reportEndRef: React.RefObject<HTMLDivElement>
 }) {
+  const { tx } = useI18n()
   if (phase === 'error') {
     return (
       <div className="flex flex-col items-center justify-center gap-3 rounded-card border border-border bg-surface/80 px-6 py-14">
         <div className="grid h-12 w-12 place-items-center rounded-full bg-danger/10">
           <AlertTriangle className="h-5 w-5 text-danger" />
         </div>
-        <div className="text-sm font-medium text-foreground">复盘失败</div>
-        <div className="max-w-md text-center text-xs text-secondary">{error || '请检查 AI 配置后重试'}</div>
+        <div className="text-sm font-medium text-foreground">{tx('复盘失败')}</div>
+        <div className="max-w-md text-center text-xs text-secondary">{error || tx('请检查 AI 配置后重试')}</div>
         <button
           onClick={onRegenerate}
           className="mt-1 inline-flex items-center gap-1.5 rounded-btn bg-accent/15 px-3 py-1.5 text-xs text-accent transition-colors hover:bg-accent/20"
         >
-          <RefreshCw className="h-3.5 w-3.5" />重新生成
-        </button>
+          <RefreshCw className="h-3.5 w-3.5" />{tx('重新生成')}</button>
       </div>
     )
   }
@@ -845,22 +837,20 @@ function ReportPanel({
           <Sparkles className="absolute -right-1 -top-1 h-5 w-5 text-accent" />
         </div>
         <div className="text-center">
-          <div className="text-[16px] leading-6 font-semibold text-foreground">AI 大盘复盘</div>
+          <div className="text-[16px] leading-6 font-semibold text-foreground">{tx('AI 大盘复盘')}</div>
           <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-secondary">
-            一键生成今日盘后复盘报告 —— 从一句话定调到明日交易计划,
-            结构化输出可直接指导次日仓位与节奏。
-          </p>
+            {tx('一键生成今日盘后复盘报告 —— 从一句话定调到明日交易计划, 结构化输出可直接指导次日仓位与节奏。')}</p>
         </div>
         {/* 报告七节预览 —— 空状态也有内容感,暗示报告结构 */}
         <div className="mt-2 grid w-full max-w-md grid-cols-2 gap-2 sm:grid-cols-4">
           {[
-            { icon: '🎯', label: '一句话定调' },
-            { icon: '📊', label: '盘面总览' },
-            { icon: '🔥', label: '板块主线' },
-            { icon: '💰', label: '资金情绪' },
-            { icon: '📰', label: '消息催化' },
-            { icon: '🎯', label: '明日计划' },
-            { icon: '⚠️', label: '风险提示' },
+            { icon: '🎯', label: tx('一句话定调') },
+            { icon: '📊', label: tx('盘面总览') },
+            { icon: '🔥', label: tx('板块主线') },
+            { icon: '💰', label: tx('资金情绪') },
+            { icon: '📰', label: tx('消息催化') },
+            { icon: '🎯', label: tx('明日计划') },
+            { icon: '⚠️', label: tx('风险提示') },
           ].map((s) => (
             <div key={s.label} className="flex flex-col items-center gap-1 rounded-btn bg-elevated/40 px-2 py-2">
               <span className="text-[16px] leading-6">{s.icon}</span>
@@ -870,8 +860,7 @@ function ReportPanel({
         </div>
         <div className="mt-2 flex items-center gap-1.5 text-[11px] text-muted">
           <Sparkles className="h-3 w-3 text-accent" />
-          点击右上角「生成复盘」开始
-        </div>
+          {tx('点击右上角「生成复盘」开始')}</div>
       </div>
     )
   }
@@ -893,17 +882,15 @@ function ReportPanel({
         <div className="flex items-center gap-1.5">
           {isGenerating ? <RefreshCw className="h-3.5 w-3.5 animate-spin text-accent" /> : <BookOpenCheck className="h-3.5 w-3.5 text-accent" />}
           <span className="text-xs font-medium text-foreground">
-            {showViewingTag ? `历史复盘 · ${viewing!.as_of}` : isGenerating ? 'AI 正在复盘…' : '复盘报告'}
+            {showViewingTag ? tx('历史复盘 · {d}', { d: viewing!.as_of }) : isGenerating ? tx('AI 正在复盘…') : tx('复盘报告')}
           </span>
         </div>
         {showActions && (
           <div className="flex items-center gap-1">
-            <button onClick={onCopy} className="inline-flex items-center gap-1 rounded-btn bg-elevated px-2 py-1 text-[11px] text-secondary transition-colors hover:text-foreground hover:bg-elevated/70" title="复制全文">
-              <Copy className="h-3 w-3" />复制
-            </button>
-            <button onClick={onDownload} className="inline-flex items-center gap-1 rounded-btn bg-elevated px-2 py-1 text-[11px] text-secondary transition-colors hover:text-foreground hover:bg-elevated/70" title="下载为 Markdown">
-              <Download className="h-3 w-3" />下载
-            </button>
+            <button onClick={onCopy} className="inline-flex items-center gap-1 rounded-btn bg-elevated px-2 py-1 text-[11px] text-secondary transition-colors hover:text-foreground hover:bg-elevated/70" title={tx('复制全文')}>
+              <Copy className="h-3 w-3" />{tx('复制')}</button>
+            <button onClick={onDownload} className="inline-flex items-center gap-1 rounded-btn bg-elevated px-2 py-1 text-[11px] text-secondary transition-colors hover:text-foreground hover:bg-elevated/70" title={tx('下载为 Markdown')}>
+              <Download className="h-3 w-3" />{tx('下载')}</button>
           </div>
         )}
       </div>
@@ -916,16 +903,15 @@ function ReportPanel({
               </div>
               <RefreshCw className="absolute -inset-1 h-13 w-13 animate-spin text-accent/30" style={{ animationDuration: '3s' }} />
             </div>
-            <div className="text-sm text-foreground">AI 正在复盘今日盘面…</div>
-            <div className="text-xs text-secondary">分析指数结构 · 连板梯队 · 板块轮动 · 资金情绪</div>
+            <div className="text-sm text-foreground">{tx('AI 正在复盘今日盘面…')}</div>
+            <div className="text-xs text-secondary">{tx('分析指数结构 · 连板梯队 · 板块轮动 · 资金情绪')}</div>
             <button
               type="button"
               onClick={cancelReviewGeneration}
               className="mt-1 inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-secondary transition-colors hover:bg-elevated hover:text-foreground"
             >
               <X className="h-3 w-3" />
-              取消生成
-            </button>
+              {tx('取消生成')}</button>
           </div>
         ) : (
           <div className="prose prose-invert max-w-none">
@@ -955,12 +941,13 @@ function HistoryPanel({
   onBackToGenerating: () => void
   onDelete: (id: string) => void
 }) {
+  const { tx } = useI18n()
   const empty = !generating && reports.length === 0
   return (
     <div className="overflow-hidden rounded-card border border-border bg-surface/80">
       <div className="flex items-center gap-1.5 border-b border-border bg-gradient-to-r from-accent/5 to-transparent px-3 py-2.5">
         <History className="h-3.5 w-3.5 text-accent" />
-        <span className="text-xs font-medium text-foreground">历史复盘</span>
+        <span className="text-xs font-medium text-foreground">{tx('历史复盘')}</span>
         <span className="font-mono text-[10px] text-muted">({reports.length})</span>
       </div>
       <div className="max-h-[calc(100vh-26rem)] overflow-y-auto p-2">
@@ -969,8 +956,8 @@ function HistoryPanel({
         ) : empty ? (
           <div className="flex flex-col items-center justify-center gap-2 px-3 py-10 text-center">
             <History className="h-7 w-7 text-muted/40" strokeWidth={1.5} />
-            <div className="text-[11px] text-muted">暂无历史复盘</div>
-            <div className="text-[10px] text-muted/60">生成完成后自动归档</div>
+            <div className="text-[11px] text-muted">{tx('暂无历史复盘')}</div>
+            <div className="text-[10px] text-muted/60">{tx('生成完成后自动归档')}</div>
           </div>
         ) : (
           <div className="space-y-1">
@@ -987,8 +974,8 @@ function HistoryPanel({
                   <RefreshCw className="h-3.5 w-3.5 animate-spin text-accent" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[11px] font-medium text-accent">生成中…</div>
-                  <div className="mt-0.5 truncate text-[10px] text-secondary">AI 正在复盘今日盘面</div>
+                  <div className="truncate text-[11px] font-medium text-accent">{tx('生成中…')}</div>
+                  <div className="mt-0.5 truncate text-[10px] text-secondary">{tx('AI 正在复盘今日盘面')}</div>
                 </div>
               </div>
             )}
@@ -1037,7 +1024,7 @@ function HistoryPanel({
                   <button
                     onClick={(e) => { e.stopPropagation(); onDelete(r.id) }}
                     className="shrink-0 p-1 text-muted opacity-0 transition-all hover:text-bear group-hover:opacity-100"
-                    title="删除"
+                    title={tx('删除')}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -1103,7 +1090,7 @@ function _DtPill({ item, idx, value, onOpenStock }: {
       type="button"
       onClick={() => code && onOpenStock(code)}
       className="group inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-elevated/40 py-0.5 pl-0.5 pr-2.5 transition-all hover:border-accent/40 hover:bg-elevated/70"
-      title={`查看 ${label} · 净买 ${fmtVolume(value ?? null)}`}
+      title={tx('查看 {label} · 净买 {v}', { label, v: fmtVolume(value ?? null) })}
     >
       <span className={cn('grid h-[18px] w-[18px] min-w-[18px] place-items-center rounded-full font-mono text-[9px] font-bold leading-none', _rankCls(idx))}>
         {idx + 1}
@@ -1177,11 +1164,12 @@ function _DtTh({ label, sortKey, sort, onSort, className }: {
   )
 }
 
-function _DtStockTable({ items, tab, onOpenStock }: {
+function DtStockTable({ items, tab, onOpenStock }: {
   items: DragonTigerStockItem[]
   tab: _DtTabKey
   onOpenStock: (s: string) => void
 }) {
+  const { tx } = useI18n()
   const isOrg = tab === 'org'
   const [sort, setSort] = useState<{ key: _DtSortKey; desc: boolean }>({ key: isOrg ? 'org_net_value' : 'net_value', desc: true })
   const onSort = (k: _DtSortKey) =>
@@ -1202,14 +1190,14 @@ function _DtStockTable({ items, tab, onOpenStock }: {
         'group flex items-center gap-2 bg-elevated/50 px-2.5 py-1.5 text-[9px] font-medium uppercase tracking-wider text-muted/70',
       )}>
         <span className="w-5 shrink-0 text-center">#</span>
-        <span className="w-14 shrink-0"><_DtTh label="涨跌幅" sortKey="change" sort={sort} onSort={onSort} /></span>
-        <span className="min-w-0 flex-1">股票</span>
-        <span className="w-24 shrink-0"><_DtTh label="净买额" sortKey="net_value" sort={sort} onSort={onSort} className="w-full justify-end" /></span>
-        <span className="w-14 shrink-0"><_DtTh label="占比" sortKey="net_rate" sort={sort} onSort={onSort} className="w-full justify-end" /></span>
-        {isOrg && <span className="w-20 shrink-0"><_DtTh label="机构净买" sortKey="org_net_value" sort={sort} onSort={onSort} className="w-full justify-end" /></span>}
-        <span className="w-20 shrink-0"><_DtTh label="买入额" sortKey="buy_value" sort={sort} onSort={onSort} className="w-full justify-end" /></span>
-        <span className="w-20 shrink-0"><_DtTh label="卖出额" sortKey="sell_value" sort={sort} onSort={onSort} className="w-full justify-end" /></span>
-        <span className="w-11 shrink-0 text-right">榜期</span>
+        <span className="w-14 shrink-0"><_DtTh label={tx('涨跌幅')} sortKey="change" sort={sort} onSort={onSort} /></span>
+        <span className="min-w-0 flex-1">{tx('股票')}</span>
+        <span className="w-24 shrink-0"><_DtTh label={tx('净买额')} sortKey="net_value" sort={sort} onSort={onSort} className="w-full justify-end" /></span>
+        <span className="w-14 shrink-0"><_DtTh label={tx('占比')} sortKey="net_rate" sort={sort} onSort={onSort} className="w-full justify-end" /></span>
+        {isOrg && <span className="w-20 shrink-0"><_DtTh label={tx('机构净买')} sortKey="org_net_value" sort={sort} onSort={onSort} className="w-full justify-end" /></span>}
+        <span className="w-20 shrink-0"><_DtTh label={tx('买入额')} sortKey="buy_value" sort={sort} onSort={onSort} className="w-full justify-end" /></span>
+        <span className="w-20 shrink-0"><_DtTh label={tx('卖出额')} sortKey="sell_value" sort={sort} onSort={onSort} className="w-full justify-end" /></span>
+        <span className="w-11 shrink-0 text-right">{tx('榜期')}</span>
       </div>
       {sorted.map((i, idx) => {
         const barPct = Math.max(2, Math.min(100, (Math.abs(i.net_value ?? 0) / maxAbs) * 100))
@@ -1222,7 +1210,7 @@ function _DtStockTable({ items, tab, onOpenStock }: {
             type="button"
             onClick={() => code && onOpenStock(code)}
             className="flex w-full items-center gap-2 border-t border-border/30 px-2.5 py-2 text-left text-[11px] transition-colors hover:bg-accent/[0.05]"
-            title={`查看 ${label} 详情`}
+            title={tx('查看 {label} 详情', { label })}
           >
             <span className={cn('w-5 shrink-0 text-center font-mono text-[9px] tabular-nums', idx < 3 ? 'text-amber-400/90' : 'text-muted/50')}>
               {idx + 1}
@@ -1246,9 +1234,9 @@ function _DtStockTable({ items, tab, onOpenStock }: {
                       ? 'border border-amber-500/30 bg-amber-500/10 text-amber-500'
                       : 'border border-border bg-elevated/50 text-muted/80',
                   )}
-                  title={`同花顺人气第 ${i.hot_rank} 名`}
+                  title={tx('同花顺人气第 {n} 名', { n: i.hot_rank })}
                 >
-                  人气{i.hot_rank}
+                  {tx('人气')}{i.hot_rank}
                 </span>
               )}
             </span>
@@ -1283,7 +1271,7 @@ function _DtStockTable({ items, tab, onOpenStock }: {
                   ? 'border border-sky-500/25 bg-sky-500/10 text-sky-400/90'
                   : 'border border-border/60 bg-elevated/50 text-muted/80',
               )}>
-                {i.range_days === 3 ? '3日' : '当日'}
+                {i.range_days === 3 ? tx('3日') : tx('当日')}
               </span>
             </span>
           </button>
@@ -1298,7 +1286,7 @@ function _DtSeatList({ seats, onOpenStock }: {
   onOpenStock: (s: string) => void
 }) {
   if (!seats.length) {
-    return <p className="py-4 text-center text-[11px] text-muted">本期无游资上榜数据</p>
+    return <p className="py-4 text-center text-[11px] text-muted">{tx('本期无游资上榜数据')}</p>
   }
   return (
     <div className="grid gap-1.5">
@@ -1326,7 +1314,7 @@ function _DtSeatList({ seats, onOpenStock }: {
                   type="button"
                   onClick={() => code && onOpenStock(code)}
                   className="inline-flex items-baseline gap-1.5 rounded-full border border-border/60 bg-surface/60 px-2 py-0.5 text-[10px] transition-all hover:border-accent/40 hover:text-accent"
-                  title={`查看 ${_dtLabel(r)} 详情`}
+                  title={tx('查看 {name} 详情', { name: _dtLabel(r) })}
                 >
                   <span>{_dtLabel(r)}</span>
                   {(() => { const b = boardTag(code); return b && (
@@ -1354,6 +1342,7 @@ export function DragonTigerCard({ date, onOpenStock }: {
   date?: string
   onOpenStock: (symbol: string) => void
 }) {
+  const { tx } = useI18n()
   const [expanded, setExpanded] = useState(false)
   const [tab, setTab] = useState<_DtTabKey>('all')
   const q = useQuery({
@@ -1386,9 +1375,9 @@ export function DragonTigerCard({ date, onOpenStock }: {
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-elevated/60">
           <Trophy className="h-4 w-4 text-muted/50" />
         </span>
-        <span className="text-[11px] text-muted">龙虎榜需要 fuyao 数据源 (同花顺特色数据)</span>
+        <span className="text-[11px] text-muted">{tx('龙虎榜需要 fuyao 数据源 (同花顺特色数据)')}</span>
         <Link to="/settings?tab=data-sources" className="ml-auto inline-flex items-center gap-0.5 text-[10px] text-accent hover:underline">
-          前往配置 <ChevronRight className="h-3 w-3" />
+          {tx('前往配置')} <ChevronRight className="h-3 w-3" />
         </Link>
       </div>
     )
@@ -1401,8 +1390,8 @@ export function DragonTigerCard({ date, onOpenStock }: {
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-elevated/60">
           <Trophy className="h-4 w-4 text-muted/50" />
         </span>
-        <span className="text-[11px] text-muted">龙虎榜暂不可用{d?.message ? ` (${d.message.slice(0, 40)})` : ''}</span>
-        <button onClick={() => q.refetch()} className="ml-auto text-[10px] text-accent hover:underline">重试</button>
+        <span className="text-[11px] text-muted">{tx('龙虎榜暂不可用')}{d?.message ? ` (${d.message.slice(0, 40)})` : ''}</span>
+        <button onClick={() => q.refetch()} className="ml-auto text-[10px] text-accent hover:underline">{tx('重试')}</button>
       </div>
     )
   }
@@ -1429,18 +1418,17 @@ export function DragonTigerCard({ date, onOpenStock }: {
         </span>
         <span className="leading-tight">
           <span className="flex items-center gap-2">
-            <span className="text-[13px] font-semibold text-foreground">龙虎榜</span>
+            <span className="text-[13px] font-semibold text-foreground">{tx('龙虎榜')}</span>
             {isFallback && (
               <span
                 className="rounded border border-warning/30 bg-warning/10 px-1.5 py-px text-[9px] leading-tight text-warning"
-                title="当日榜单未发布(约17:00后), 已自动显示上一期"
+                title={tx('当日榜单未发布(约17:00后), 已自动显示上一期')}
               >
-                当日未发布 · 显示上一期
-              </span>
+                {tx('当日未发布 · 显示上一期')}</span>
             )}
           </span>
           <span className="mt-0.5 block text-[10px] text-muted">
-            {d.trade_date} · {d.all?.stock_count ?? allItems.length} 只上榜 · 点击{expanded ? '收起' : '查看三榜明细'}
+            {d.trade_date} · {d.all?.stock_count ?? allItems.length} {tx('只上榜 · 点击')}{expanded ? tx('收起') : tx('查看三榜明细')}
           </span>
         </span>
         <span className="ml-auto flex items-center gap-1.5">
@@ -1451,9 +1439,9 @@ export function DragonTigerCard({ date, onOpenStock }: {
       {/* 收起态: 排名药丸摘要 */}
       {!expanded && (
         <div className="flex flex-col gap-1.5 px-4 pb-3">
-          <_DtSummaryRow label="净买 Top5" items={topBuy} pick={i => i.net_value} onOpenStock={onOpenStock} />
+          <_DtSummaryRow label={tx('净买 Top5')} items={topBuy} pick={i => i.net_value} onOpenStock={onOpenStock} />
           <_DtSummaryRow items={topSell} pick={i => i.net_value} onOpenStock={onOpenStock} />
-          <_DtSummaryRow label="机构 Top5" items={topOrg} pick={i => i.org_net_value} onOpenStock={onOpenStock} />
+          <_DtSummaryRow label={tx('机构 Top5')} items={topOrg} pick={i => i.org_net_value} onOpenStock={onOpenStock} />
           <_DtSummaryRow items={botOrg} pick={i => i.org_net_value} onOpenStock={onOpenStock} />
         </div>
       )}
@@ -1483,7 +1471,7 @@ export function DragonTigerCard({ date, onOpenStock }: {
                         : 'text-secondary hover:text-foreground',
                     )}
                   >
-                    {t.label}
+                    {tx(t.label)}
                   </button>
                 ))}
               </div>
@@ -1491,7 +1479,7 @@ export function DragonTigerCard({ date, onOpenStock }: {
               {tab === 'hot_money' ? (
                 <_DtSeatList seats={seats} onOpenStock={onOpenStock} />
               ) : (
-                <_DtStockTable
+                <DtStockTable
                   key={tab}
                   items={_dtSorted(tab === 'org' ? orgItems : allItems, tab === 'org' ? 'org_net_value' : 'net_value')}
                   tab={tab}

@@ -45,10 +45,22 @@ async function click(label: string) {
   await act(async () => button!.click())
 }
 
+// 面板挂载时 i18n 订阅会顺带回填一次 UI 偏好 (/api/settings/preferences),
+// 必须在桩里单独分流, 否则它会吃掉 AI 测试接口的队列响应。
+const isPrefsRequest = (url: string) => url.includes('/api/settings/preferences')
+
 it('both test buttons show the complete routing error and clear it after a successful retry', async () => {
-  const fetcher = vi.fn()
-    .mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'Method Not Allowed' }), { status: 405 }))
-    .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true, model: 'codex_cli', response: 'OK' })))
+  const responses = [
+    new Response(JSON.stringify({ detail: 'Method Not Allowed' }), { status: 405 }),
+    new Response(JSON.stringify({ ok: true, model: 'codex_cli', response: 'OK' })),
+  ]
+  const aiCalls: { url: string; init?: RequestInit }[] = []
+  const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input.toString()
+    if (isPrefsRequest(url)) return Response.json({ ui_prefs: {} })
+    aiCalls.push({ url, init })
+    return responses.shift()!
+  })
   vi.stubGlobal('fetch', fetcher)
   await setup()
   await click('测试连接')
@@ -58,16 +70,20 @@ it('both test buttons show the complete routing error and clear it after a succe
   await click('测试')
   expect(host.querySelector('[role=alert]')).toBeNull()
   expect(host.querySelector('[role=status]')?.textContent).toContain('连通成功')
-  expect(fetcher).toHaveBeenCalledTimes(2)
-  for (const [url, init] of fetcher.mock.calls) {
+  expect(aiCalls).toHaveLength(2)
+  for (const { url, init } of aiCalls) {
     expect(url).toBe('/api/settings/ai/test')
-    expect(JSON.parse(init.body)).toEqual({ provider: 'codex_cli', model: '' })
+    expect(JSON.parse(init!.body as string)).toEqual({ provider: 'codex_cli', model: '' })
   }
 })
 
 it('shows the full CLI login guidance without replacing it with a deployment error', async () => {
   const error = 'Codex CLI 调用失败: 401 Unauthorized\n请执行 codex login'
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: false, error }))))
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : input.toString()
+    if (isPrefsRequest(url)) return Response.json({ ui_prefs: {} })
+    return new Response(JSON.stringify({ ok: false, error }))
+  }))
   await setup()
   await click('测试')
   expect(host.querySelector('[role=alert]')?.textContent).toBe(error)

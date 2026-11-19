@@ -10,6 +10,10 @@
           if (localStorage.getItem('tf-theme') !== 'light') {
             document.documentElement.classList.add('dark')
           }
+          var loc = localStorage.getItem('tf-locale')
+          if (loc === 'en' || loc === 'ja' || loc === 'zh-CN') {
+            document.documentElement.lang = loc
+          }
         } catch (e) {
           document.documentElement.classList.add('dark')
         }

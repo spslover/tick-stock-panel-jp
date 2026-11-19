@@ -6,6 +6,7 @@ import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { QK } from '@/lib/queryKeys'
 import { resetBadge } from '@/lib/monitorBadge'
+import { useI18n } from '@/lib/i18n'
 
 // ── 分钟K探测 (迁移自 MinuteDataProbe) ─────────────────
 interface ProbeResult {
@@ -16,6 +17,7 @@ interface ProbeResult {
 }
 
 function MinuteProbePanel() {
+  const { tx } = useI18n()
   const [symbol, setSymbol] = useState('603261.SH')
   const [days, setDays] = useState(10)
   const [loading, setLoading] = useState(false)
@@ -64,16 +66,14 @@ function MinuteProbePanel() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-sm font-semibold text-foreground">分钟K数据探测</h2>
+        <h2 className="text-sm font-semibold text-foreground">{tx('分钟K数据探测')}</h2>
         <p className="mt-1 text-xs text-muted">
-          逐日调用 <code className="px-1 rounded bg-elevated text-secondary">/api/kline/minute</code> 接口，
-          检测每只股票最近若干天的分钟K数据是否齐全。本地无数据时会自动走 TickFlow 实时拉取。
-        </p>
+          {tx('逐日调用')} <code className="px-1 rounded bg-elevated text-secondary">/api/kline/minute</code> {tx('接口， 检测每只股票最近若干天的分钟K数据是否齐全。本地无数据时会自动走 TickFlow 实时拉取。')}</p>
       </div>
 
       <div className="flex flex-wrap items-end gap-3 rounded-btn bg-elevated p-4">
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted">股票代码</label>
+          <label className="text-xs text-muted">{tx('股票代码')}</label>
           <input
             value={symbol}
             onChange={(e) => setSymbol(e.target.value)}
@@ -83,7 +83,7 @@ function MinuteProbePanel() {
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted">回溯天数</label>
+          <label className="text-xs text-muted">{tx('回溯天数')}</label>
           <input
             type="number"
             min={1}
@@ -99,7 +99,7 @@ function MinuteProbePanel() {
           className="flex items-center gap-1.5 rounded-btn bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50 cursor-pointer"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-          {loading ? '探测中…' : '开始探测'}
+          {loading ? tx('探测中…') : tx('开始探测')}
         </button>
       </div>
 
@@ -113,15 +113,15 @@ function MinuteProbePanel() {
       {total > 0 && (
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-btn bg-elevated p-3">
-            <div className="text-xs text-muted">检测天数</div>
+            <div className="text-xs text-muted">{tx('检测天数')}</div>
             <div className="mt-1 text-lg font-semibold text-foreground">{total}</div>
           </div>
           <div className="rounded-btn bg-elevated p-3">
-            <div className="text-xs text-muted">有数据</div>
+            <div className="text-xs text-muted">{tx('有数据')}</div>
             <div className="mt-1 text-lg font-semibold text-emerald-400">{hasData}</div>
           </div>
           <div className="rounded-btn bg-elevated p-3">
-            <div className="text-xs text-muted">缺失</div>
+            <div className="text-xs text-muted">{tx('缺失')}</div>
             <div className="mt-1 text-lg font-semibold text-danger">{missing.length}</div>
           </div>
         </div>
@@ -132,10 +132,10 @@ function MinuteProbePanel() {
           <table className="w-full text-sm">
             <thead className="bg-elevated text-xs text-muted">
               <tr>
-                <th className="px-4 py-2 text-left font-medium">日期</th>
-                <th className="px-4 py-2 text-right font-medium">分钟K条数</th>
-                <th className="px-4 py-2 text-left font-medium">数据来源</th>
-                <th className="px-4 py-2 text-center font-medium">状态</th>
+                <th className="px-4 py-2 text-left font-medium">{tx('日期')}</th>
+                <th className="px-4 py-2 text-right font-medium">{tx('分钟K条数')}</th>
+                <th className="px-4 py-2 text-left font-medium">{tx('数据来源')}</th>
+                <th className="px-4 py-2 text-center font-medium">{tx('状态')}</th>
               </tr>
             </thead>
             <tbody>
@@ -149,12 +149,10 @@ function MinuteProbePanel() {
                   <td className="px-4 py-2 text-center">
                     {r.ok ? (
                       <span className="inline-flex items-center gap-1 text-emerald-400">
-                        <CheckCircle2 className="h-4 w-4" /> 有
-                      </span>
+                        <CheckCircle2 className="h-4 w-4" /> {tx('有')}</span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-danger">
-                        <XCircle className="h-4 w-4" /> 缺失
-                      </span>
+                        <XCircle className="h-4 w-4" /> {tx('缺失')}</span>
                     )}
                   </td>
                 </tr>
@@ -167,14 +165,9 @@ function MinuteProbePanel() {
       {missing.length > 0 && (
         <div className="rounded-btn border border-warning/40 bg-warning/10 p-3 text-xs text-foreground">
           <div className="mb-1 flex items-center gap-1.5 font-medium text-warning">
-            <AlertTriangle className="h-4 w-4" /> 缺失日期的诊断
-          </div>
+            <AlertTriangle className="h-4 w-4" /> {tx('缺失日期的诊断')}</div>
           <p className="leading-relaxed text-secondary">
-            缺失日期若为<span className="text-foreground">周末/节假日</span>属正常；
-            若为<span className="text-foreground">停牌日</span>（成交量为 0）也属正常；
-            若为<span className="text-foreground">正常交易日</span>（日K有成交量）却缺失分钟K，
-            则是 TickFlow 数据源未提供该日分钟数据。
-          </p>
+            {tx('缺失日期若为')}<span className="text-foreground">{tx('周末/节假日')}</span>{tx('属正常； 若为')}<span className="text-foreground">{tx('停牌日')}</span>{tx('（成交量为 0）也属正常； 若为')}<span className="text-foreground">{tx('正常交易日')}</span>{tx('（日K有成交量）却缺失分钟K， 则是 TickFlow 数据源未提供该日分钟数据。')}</p>
         </div>
       )}
     </div>
@@ -183,6 +176,7 @@ function MinuteProbePanel() {
 
 // ── 演示数据生成 ──────────────────────────────────────
 function SeedPanel() {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const [count, setCount] = useState(12)
   const [recent, setRecent] = useState(true)
@@ -191,13 +185,13 @@ function SeedPanel() {
   const seedMut = useMutation({
     mutationFn: () => api.alertSeed(count, recent),
     onSuccess: (data) => {
-      setMsg(`已生成 ${data.generated} 条触发记录`)
+      setMsg(tx('已生成 {n} 条触发记录', { n: data.generated }))
       qc.invalidateQueries({ queryKey: ['alerts'] })
       qc.invalidateQueries({ queryKey: ['alerts-total'] })
       setTimeout(() => setMsg(''), 4000)
     },
     onError: () => {
-      setMsg('生成失败')
+      setMsg(tx('生成失败'))
       setTimeout(() => setMsg(''), 4000)
     },
   })
@@ -205,7 +199,7 @@ function SeedPanel() {
   const clearMut = useMutation({
     mutationFn: () => api.alertsClear(),
     onSuccess: (data) => {
-      setMsg(`已清空 ${data.cleared} 条触发记录`)
+      setMsg(tx('已清空 {n} 条触发记录', { n: data.cleared }))
       qc.invalidateQueries({ queryKey: ['alerts'] })
       qc.invalidateQueries({ queryKey: ['alerts-total'] })
       resetBadge()
@@ -216,12 +210,12 @@ function SeedPanel() {
   const ruleSeedMut = useMutation({
     mutationFn: () => api.monitorRuleSeed(),
     onSuccess: (data) => {
-      setMsg(`已生成 ${data.generated} 条监控规则`)
+      setMsg(tx('已生成 {n} 条监控规则', { n: data.generated }))
       qc.invalidateQueries({ queryKey: QK.monitorRules })
       setTimeout(() => setMsg(''), 4000)
     },
     onError: () => {
-      setMsg('规则生成失败')
+      setMsg(tx('规则生成失败'))
       setTimeout(() => setMsg(''), 4000)
     },
   })
@@ -229,16 +223,15 @@ function SeedPanel() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-sm font-semibold text-foreground">监控触发记录演示数据</h2>
+        <h2 className="text-sm font-semibold text-foreground">{tx('监控触发记录演示数据')}</h2>
         <p className="mt-1 text-xs text-muted">
-          生成模拟的触发记录,用于测试监控中心页面的展示效果、未读徽标、新增闪烁等功能。生成的数据可随时清空。
-        </p>
+          {tx('生成模拟的触发记录,用于测试监控中心页面的展示效果、未读徽标、新增闪烁等功能。生成的数据可随时清空。')}</p>
       </div>
 
       <div className="space-y-3 rounded-btn bg-elevated p-4">
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted">生成条数</label>
+            <label className="text-xs text-muted">{tx('生成条数')}</label>
             <input
               type="number"
               min={1}
@@ -255,7 +248,7 @@ function SeedPanel() {
               onChange={(e) => setRecent(e.target.checked)}
               className="h-3.5 w-3.5 accent-accent"
             />
-            <span className="text-xs text-secondary">时间戳设为"刚刚"(测试闪烁效果)</span>
+            <span className="text-xs text-secondary">{tx('时间戳设为"刚刚"(测试闪烁效果)')}</span>
           </label>
         </div>
 
@@ -266,16 +259,14 @@ function SeedPanel() {
             className="flex items-center gap-1.5 rounded-btn bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50 cursor-pointer"
           >
             {seedMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
-            生成演示数据
-          </button>
+            {tx('生成演示数据')}</button>
           <button
             onClick={() => clearMut.mutate()}
             disabled={clearMut.isPending}
             className="flex items-center gap-1.5 rounded-btn border border-danger/40 bg-danger/10 px-4 py-1.5 text-sm font-medium text-danger hover:bg-danger/20 disabled:opacity-50 cursor-pointer"
           >
             {clearMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
-            清空全部
-          </button>
+            {tx('清空全部')}</button>
         </div>
       </div>
 
@@ -286,10 +277,9 @@ function SeedPanel() {
       {/* 监控规则生成 */}
       <div className="space-y-3 rounded-btn bg-elevated p-4">
         <div>
-          <h3 className="text-sm font-medium text-foreground">监控规则</h3>
+          <h3 className="text-sm font-medium text-foreground">{tx('监控规则')}</h3>
           <p className="mt-0.5 text-xs text-muted">
-            生成多种类型的演示监控规则 (个股信号/价格/市场异动/策略变更),用于测试监控中心规则列表展示。
-          </p>
+            {tx('生成多种类型的演示监控规则 (个股信号/价格/市场异动/策略变更),用于测试监控中心规则列表展示。')}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -298,18 +288,17 @@ function SeedPanel() {
             className="flex items-center gap-1.5 rounded-btn bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50 cursor-pointer"
           >
             {ruleSeedMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
-            生成演示规则
-          </button>
+            {tx('生成演示规则')}</button>
         </div>
       </div>
 
       <div className="rounded-btn border border-border/40 bg-surface/40 p-4 text-xs leading-relaxed text-muted">
-        <div className="mb-1 font-medium text-secondary">使用说明</div>
+        <div className="mb-1 font-medium text-secondary">{tx('使用说明')}</div>
         <ul className="list-disc space-y-0.5 pl-4">
-          <li>勾选「时间戳设为刚刚」后,切到其他页面再回监控中心,新记录会闪烁高亮</li>
-          <li>生成后菜单「监控中心」会出现红色未读徽标</li>
-          <li>数据覆盖策略/信号/价格/市场异动四种来源</li>
-          <li>清空操作不可撤销</li>
+          <li>{tx('勾选「时间戳设为刚刚」后,切到其他页面再回监控中心,新记录会闪烁高亮')}</li>
+          <li>{tx('生成后菜单「监控中心」会出现红色未读徽标')}</li>
+          <li>{tx('数据覆盖策略/信号/价格/市场异动四种来源')}</li>
+          <li>{tx('清空操作不可撤销')}</li>
         </ul>
       </div>
     </div>
@@ -318,6 +307,7 @@ function SeedPanel() {
 
 // ── 封单监控模拟触发 ──────────────────────────────────
 function LadderTestPanel() {
+  const { tx } = useI18n()
   const [result, setResult] = useState<Awaited<ReturnType<typeof api.monitorRuleTestLadder>> | null>(null)
   const [error, setError] = useState('')
   const [pushMsg, setPushMsg] = useState('')
@@ -331,28 +321,27 @@ function LadderTestPanel() {
   const triggerMut = useMutation({
     mutationFn: () => api.monitorRuleTriggerLadder(),
     onSuccess: (data) => {
-      setPushMsg(`✅ 已真实触发 ${data.triggered} 条预警 (落盘 + 飞书 + SSE)`)
+      setPushMsg(tx('✅ 已真实触发 {n} 条预警 (落盘 + 飞书 + SSE)', { n: data.triggered }))
       setTimeout(() => setPushMsg(''), 6000)
     },
     onError: (e: any) => {
-      setPushMsg(`❌ 触发失败: ${e?.message ?? String(e)}`)
+      setPushMsg(tx('❌ 触发失败: {msg}', { msg: e?.message ?? String(e) }))
       setTimeout(() => setPushMsg(''), 6000)
     },
   })
 
   const fmtVal = (v: number | null | undefined, metric: string) => {
     if (v == null) return '—'
-    if (metric === 'sealed_amount') return `${(v / 1e8).toFixed(4)} 亿`
-    return `${v.toLocaleString()} 手`
+    if (metric === 'sealed_amount') return tx('{v} 亿', { v: (v / 1e8).toFixed(4) })
+    return tx('{v} 手', { v: v.toLocaleString() })
   }
 
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-sm font-semibold text-foreground">封单监控模拟触发</h2>
+        <h2 className="text-sm font-semibold text-foreground">{tx('封单监控模拟触发')}</h2>
         <p className="mt-1 text-xs text-muted">
-          用当前 depth 封单数据 + 最新日 enriched, 评估所有 ladder 规则。
-        </p>
+          {tx('用当前 depth 封单数据 + 最新日 enriched, 评估所有 ladder 规则。')}</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 rounded-btn bg-elevated p-4">
@@ -362,11 +351,10 @@ function LadderTestPanel() {
           className="flex items-center gap-1.5 rounded-btn bg-accent px-4 py-1.5 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-50 cursor-pointer"
         >
           {testMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
-          模拟触发
-        </button>
+          {tx('模拟触发')}</button>
         <button
           onClick={() => {
-            if (confirm('将真实推送飞书 + 写入监控中心 + 触发 SSE 通知。确认?')) {
+            if (confirm(tx('将真实推送飞书 + 写入监控中心 + 触发 SSE 通知。确认?'))) {
               triggerMut.mutate()
             }
           }}
@@ -374,19 +362,16 @@ function LadderTestPanel() {
           className="flex items-center gap-1.5 rounded-btn border border-amber-400/40 bg-amber-400/10 px-4 py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-400/20 disabled:opacity-50 cursor-pointer"
         >
           {triggerMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
-          真实触发预警
-        </button>
+          {tx('真实触发预警')}</button>
         {result && (
           <span className="text-xs text-muted">
-            日期 {result.as_of} · 封单股 {result.sealed_count} · 触发 {result.triggered.length} · 未触发 {result.not_triggered.length}
+            {tx('日期')} {result.as_of} {tx('· 封单股')} {result.sealed_count} {tx('· 触发')} {result.triggered.length} {tx('· 未触发')} {result.not_triggered.length}
           </span>
         )}
       </div>
 
       <div className="rounded-btn border border-amber-400/30 bg-amber-400/5 p-3 text-xs text-muted">
-        <span className="font-medium text-amber-400">模拟触发</span>:纯条件判断,不落盘不推送。
-        <span className="font-medium text-amber-400 ml-2">真实触发</span>:走完整链路(落盘 alerts.jsonl + 推送飞书 + SSE 通知),会在监控中心和飞书看到预警。
-      </div>
+        <span className="font-medium text-amber-400">{tx('模拟触发')}</span>{tx(':纯条件判断,不落盘不推送。')}<span className="font-medium text-amber-400 ml-2">{tx('真实触发')}</span>{tx(':走完整链路(落盘 alerts.jsonl + 推送飞书 + SSE 通知),会在监控中心和飞书看到预警。')}</div>
 
       {pushMsg && (
         <div className="rounded-btn border border-accent/40 bg-accent/10 p-3 text-sm text-accent">{pushMsg}</div>
@@ -401,7 +386,7 @@ function LadderTestPanel() {
 
       {result && result.triggered.length > 0 && (
         <div className="space-y-2">
-          <h3 className="text-sm font-medium text-emerald-400">✅ 会触发 ({result.triggered.length})</h3>
+          <h3 className="text-sm font-medium text-emerald-400">{tx('✅ 会触发 (')}{result.triggered.length})</h3>
           {result.triggered.map((ev) => (
             <div key={ev.rule_id} className="rounded-btn border border-emerald-400/30 bg-emerald-400/5 p-3 text-sm">
               <div className="flex items-center gap-2 mb-1">
@@ -411,7 +396,7 @@ function LadderTestPanel() {
               </div>
               <div className="text-xs text-secondary">{ev.message}</div>
               <div className="mt-1 text-xs text-muted tabular-nums">
-                当前封单: {fmtVal(ev.sealed_metric === 'sealed_amount' ? ev.current_sealed_amount : ev.current_sealed_vol, ev.sealed_metric)}
+                {tx('当前封单:')} {fmtVal(ev.sealed_metric === 'sealed_amount' ? ev.current_sealed_amount : ev.current_sealed_vol, ev.sealed_metric)}
               </div>
             </div>
           ))}
@@ -420,7 +405,7 @@ function LadderTestPanel() {
 
       {result && result.not_triggered.length > 0 && (
         <div className="space-y-2">
-          <h3 className="text-sm font-medium text-muted">⚪ 未触发 ({result.not_triggered.length})</h3>
+          <h3 className="text-sm font-medium text-muted">{tx('⚪ 未触发 (')}{result.not_triggered.length})</h3>
           {result.not_triggered.map((r) => (
             <div key={r.rule_id} className="rounded-btn border border-border bg-surface/40 p-3 text-sm">
               <div className="flex items-center gap-2 mb-1">
@@ -428,7 +413,7 @@ function LadderTestPanel() {
                 <span className="text-secondary text-xs">{r.rule_name}</span>
               </div>
               <div className="text-xs text-muted tabular-nums">
-                阈值 {fmtVal(r.threshold, r.metric)} · 当前 {fmtVal(r.current_value, r.metric)} · {r.reason}
+                {tx('阈值')} {fmtVal(r.threshold, r.metric)} {tx('· 当前')} {fmtVal(r.current_value, r.metric)} · {r.reason}
               </div>
             </div>
           ))}
@@ -437,8 +422,7 @@ function LadderTestPanel() {
 
       {result && result.triggered.length === 0 && result.not_triggered.length === 0 && (
         <div className="rounded-btn border border-border bg-surface/40 p-4 text-center text-sm text-muted">
-          无 ladder 监控规则,请先在连板梯队页设置封单监控
-        </div>
+          {tx('无 ladder 监控规则,请先在连板梯队页设置封单监控')}</div>
       )}
     </div>
   )
@@ -446,13 +430,14 @@ function LadderTestPanel() {
 
 // ── Dev 主页面 ────────────────────────────────────────
 export function Dev() {
+  const { tx } = useI18n()
   const [tab, setTab] = useState<'minute' | 'seed' | 'ladder'>('seed')
 
   return (
     <div className="flex flex-col h-full">
       <PageHeader
-        title="系统工具"
-        subtitle="数据诊断与预警调试"
+        title={tx('系统工具')}
+        subtitle={tx('数据诊断与预警调试')}
         right={
           <div className="flex items-center gap-1 rounded-btn bg-elevated p-0.5">
             <button
@@ -462,7 +447,7 @@ export function Dev() {
                 tab === 'seed' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary',
               )}
             >
-              <FlaskConical className="h-3.5 w-3.5" />演示数据
+              <FlaskConical className="h-3.5 w-3.5" />{tx('演示数据')}
             </button>
             <button
               onClick={() => setTab('ladder')}
@@ -471,7 +456,7 @@ export function Dev() {
                 tab === 'ladder' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary',
               )}
             >
-              <Bell className="h-3.5 w-3.5" />封单监控
+              <Bell className="h-3.5 w-3.5" />{tx('封单监控')}
             </button>
             <button
               onClick={() => setTab('minute')}
@@ -480,7 +465,7 @@ export function Dev() {
                 tab === 'minute' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary',
               )}
             >
-              <Activity className="h-3.5 w-3.5" />分钟K探测
+              <Activity className="h-3.5 w-3.5" />{tx('分钟K探测')}
             </button>
           </div>
         }

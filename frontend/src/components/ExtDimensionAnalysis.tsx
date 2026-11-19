@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { api, type AnalysisColumn, type ExtDataConfig, type ExtDataField } from '@/lib/api'
+import { tx, useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 
 interface DimensionAnalysisProps {
@@ -33,6 +34,8 @@ interface DimensionGroup {
 }
 
 const PAGE_LIMIT = 5000
+// 业务字段名(后端 ext-data 列名), 用于判断是否按代码等宽字体展示; 不能翻译
+const SYMBOL_FIELDS = new Set(['symbol', 'code', '股票代码'])
 const SEPARATORS = /[、,，;；|/\s]+/
 
 function normalizeText(v: unknown): string {
@@ -80,7 +83,7 @@ function formatNumber(v: unknown, digits = 2) {
 
 function formatValue(v: unknown, col?: AnalysisColumn) {
   if (v == null || v === '') return '—'
-  if (typeof v === 'boolean') return v ? '是' : '否'
+  if (typeof v === 'boolean') return v ? tx('是') : tx('否')
   if (typeof v !== 'number') return String(v)
 
   const digits = col?.precision ?? (col?.type === 'number' || col?.type === 'amount' || col?.type === 'percent' ? 2 : 2)
@@ -149,12 +152,13 @@ export function ExtDimensionAnalysis({
   menuId,
   title,
   subtitle,
-  kindLabel = '维度',
-  emptyHint = '还没有可用于分析的扩展数据。',
+  kindLabel = tx('维度'),
+  emptyHint = tx('还没有可用于分析的扩展数据。'),
   accentClass = 'bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.16),transparent_36%)]',
   keywords = [],
   fallbackFieldNames = [],
 }: DimensionAnalysisProps) {
+  const { tx } = useI18n()
   const configs = useQuery({ queryKey: QK.extData, queryFn: api.extDataList })
   const menuQuery = useQuery({
     queryKey: QK.analysisMenu(menuId ?? ''),
@@ -172,8 +176,8 @@ export function ExtDimensionAnalysis({
   const activeConfigId = menu?.data_source || selectedConfigId || pickDefaultConfig(availableConfigs, keywords)
   const activeConfig = availableConfigs.find(c => c.id === activeConfigId)
   const activeDimensionField = menu?.dimension_field || dimensionField || pickDefaultDimensionField(activeConfig, fallbackFieldNames)
-  const activeTitle = menu?.label || title || '扩展分析'
-  const activeKindLabel = menu?.template === 'table' ? '数据' : kindLabel
+  const activeTitle = menu?.label || tx(title ?? '扩展分析')
+  const activeKindLabel = tx(menu?.template === 'table' ? '数据' : kindLabel)
 
   const configuredColumns = useMemo(() => {
     const cols = menu?.detail_columns?.filter(c => c.visible !== false) ?? []
@@ -194,13 +198,13 @@ export function ExtDimensionAnalysis({
   const rows = rowsQuery.data?.rows ?? []
   const baseFields = activeConfig?.fields ?? rowsQuery.data?.fields ?? []
   const fields = rows.some(r => r.name != null) && !baseFields.some(f => f.name === 'name')
-    ? [...baseFields, { name: 'name', dtype: 'string', label: '名称' }]
+    ? [...baseFields, { name: 'name', dtype: 'string', label: tx('名称') }]
     : baseFields
   const dimensionOptions = fields.filter(f => f.name !== 'symbol' && f.name !== 'code')
   const displayColumns = configuredColumns ?? columnsFromFields(fields, activeDimensionField, rows)
   const groupColumns = (menu?.group_columns?.length ? menu.group_columns : [
     { field: '__dimension', label: activeKindLabel },
-    { field: '__count', label: '股票数', type: 'number' as const, sortable: true },
+    { field: '__count', label: tx('股票数'), type: 'number' as const, sortable: true },
   ]).filter(c => c.visible !== false)
 
   const sortedRows = useMemo(() => {
@@ -263,7 +267,7 @@ export function ExtDimensionAnalysis({
               className="h-8 min-w-40 rounded-btn border border-border bg-surface px-2 text-xs text-foreground focus:outline-none focus:border-accent/50"
             >
               {availableConfigs.length === 0 ? (
-                <option value="">暂无扩展数据</option>
+                <option value="">{tx('暂无扩展数据')}</option>
               ) : availableConfigs.map(config => (
                 <option key={config.id} value={config.id}>{config.label}</option>
               ))}
@@ -275,7 +279,7 @@ export function ExtDimensionAnalysis({
               className="h-8 min-w-36 rounded-btn border border-border bg-surface px-2 text-xs text-foreground disabled:opacity-50 focus:outline-none focus:border-accent/50"
             >
               {dimensionOptions.length === 0 ? (
-                <option value="">暂无字段</option>
+                <option value="">{tx('暂无字段')}</option>
               ) : dimensionOptions.map(field => (
                 <option key={field.name} value={field.name}>{field.label || field.name}</option>
               ))}
@@ -289,12 +293,10 @@ export function ExtDimensionAnalysis({
           <div className="relative z-10 max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] text-secondary">
               <Layers3 className="h-3.5 w-3.5" />
-              扩展数据驱动 · 菜单可配置 · 列动态渲染
-            </div>
+              {tx('扩展数据驱动 · 菜单可配置 · 列动态渲染')}</div>
             <h2 className="mt-4 text-2xl font-semibold tracking-tight text-foreground">{activeTitle}</h2>
             <p className="mt-2 text-sm leading-6 text-secondary">
-              页面按分析菜单配置读取扩展数据源，使用分组字段生成榜单，并严格按照 detail_columns 渲染明细列。
-            </p>
+              {tx('页面按分析菜单配置读取扩展数据源，使用分组字段生成榜单，并严格按照 detail_columns 渲染明细列。')}</p>
           </div>
           <div className="absolute right-8 top-6 hidden h-28 w-28 rounded-full border border-foreground/10 bg-foreground/[0.03] lg:flex items-center justify-center">
             <BarChart3 className="h-12 w-12 text-foreground/20" />
@@ -302,27 +304,27 @@ export function ExtDimensionAnalysis({
         </section>
 
         {configs.isLoading || menuQuery.isLoading ? (
-          <div className="rounded-card border border-border bg-surface px-5 py-10 text-center text-sm text-muted">加载配置中…</div>
+          <div className="rounded-card border border-border bg-surface px-5 py-10 text-center text-sm text-muted">{tx('加载配置中…')}</div>
         ) : menuQuery.isError ? (
-          <div className="rounded-card border border-border bg-surface px-5 py-10 text-center text-sm text-muted">分析菜单不存在或已删除。</div>
+          <div className="rounded-card border border-border bg-surface px-5 py-10 text-center text-sm text-muted">{tx('分析菜单不存在或已删除。')}</div>
         ) : !activeConfig ? (
           <div className="rounded-card border border-border bg-surface px-5 py-10 text-center">
             <Database className="mx-auto h-8 w-8 text-muted" />
             <div className="mt-3 text-sm text-secondary">{emptyHint}</div>
-            <div className="mt-1 text-xs text-muted">请先在“数据”页面新增扩展数据，并在“扩展分析”中创建分析菜单。</div>
+            <div className="mt-1 text-xs text-muted">{tx('请先在“数据”页面新增扩展数据，并在“扩展分析”中创建分析菜单。')}</div>
           </div>
         ) : (
           <>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <StatCard label="数据源" value={activeConfig.label} hint={`${activeConfig.mode === 'snapshot' ? '快照' : '时序'} · ${activeConfig.id}`} icon={Database} />
-              <StatCard label="分组数量" value={groups.length || '—'} hint={activeDimensionField ? `按 ${fieldLabel(fields, activeDimensionField)} 聚合` : '未配置分组字段'} icon={Tags} />
-              <StatCard label="覆盖标的" value={coveredSymbols || rows.length} hint={rowsQuery.data?.date ? `数据日期 ${rowsQuery.data.date}` : '当前快照'} icon={Users} />
-              <StatCard label="列表列数" value={displayColumns.length} hint={`配置列 ${displayColumns.length} 个`} icon={TrendingUp} />
+              <StatCard label={tx('数据源')} value={activeConfig.label} hint={`${activeConfig.mode === 'snapshot' ? tx('快照') : tx('时序')} · ${activeConfig.id}`} icon={Database} />
+              <StatCard label={tx('分组数量')} value={groups.length || '—'} hint={activeDimensionField ? tx('按 {field} 聚合', { field: fieldLabel(fields, activeDimensionField) }) : tx('未配置分组字段')} icon={Tags} />
+              <StatCard label={tx('覆盖标的')} value={coveredSymbols || rows.length} hint={rowsQuery.data?.date ? tx('数据日期 {date}', { date: rowsQuery.data.date }) : tx('当前快照')} icon={Users} />
+              <StatCard label={tx('列表列数')} value={displayColumns.length} hint={tx('配置列 {n} 个', { n: displayColumns.length })} icon={TrendingUp} />
             </div>
 
             {missingConfiguredColumns.length > 0 && (
               <div className="rounded-card border border-warning/40 bg-warning/5 px-4 py-3 text-xs text-warning">
-                菜单中有字段在当前数据中不存在：{missingConfiguredColumns.map(c => c.field).join('、')}
+                {tx('菜单中有字段在当前数据中不存在：')}{missingConfiguredColumns.map(c => c.field).join('、')}
               </div>
             )}
 
@@ -331,8 +333,8 @@ export function ExtDimensionAnalysis({
                 <section className="rounded-card border border-border bg-surface overflow-hidden">
                   <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3">
                     <div>
-                      <h3 className="text-sm font-medium text-foreground">分组榜单</h3>
-                      <p className="mt-0.5 text-[11px] text-muted">按覆盖标的数量排序</p>
+                      <h3 className="text-sm font-medium text-foreground">{tx('分组榜单')}</h3>
+                      <p className="mt-0.5 text-[11px] text-muted">{tx('按覆盖标的数量排序')}</p>
                     </div>
                     <span className="text-[10px] text-muted">Top {Math.min(filteredGroups.length, 100)}</span>
                   </div>
@@ -342,14 +344,14 @@ export function ExtDimensionAnalysis({
                       <input
                         value={search}
                         onChange={(e) => { setSearch(e.target.value); setSelectedGroup(null) }}
-                        placeholder={`搜索${activeKindLabel}`}
+                        placeholder={tx('搜索{kind}', { kind: activeKindLabel })}
                         className="h-8 w-full rounded-btn border border-border bg-base pl-8 pr-3 text-xs text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent/50"
                       />
                     </div>
                   </div>
                   <div className="max-h-[560px] overflow-auto p-2 space-y-1">
                     {filteredGroups.length === 0 ? (
-                      <div className="px-3 py-8 text-center text-xs text-muted">没有可展示的分组</div>
+                      <div className="px-3 py-8 text-center text-xs text-muted">{tx('没有可展示的分组')}</div>
                     ) : filteredGroups.slice(0, 100).map((group, i) => {
                       const active = currentGroup?.key === group.key
                       return (
@@ -385,14 +387,14 @@ export function ExtDimensionAnalysis({
                 <div className="px-5 py-4 border-b border-border flex items-center justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-[16px] leading-6 font-semibold text-foreground">{menu?.template === 'table' || menu?.template === 'ranking' ? '明细列表' : currentGroup?.key ?? `选择${activeKindLabel}`}</h3>
-                      <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] text-accent">{tableRows.length} 条</span>
+                      <h3 className="text-[16px] leading-6 font-semibold text-foreground">{menu?.template === 'table' || menu?.template === 'ranking' ? tx('明细列表') : currentGroup?.key ?? tx('选择{kind}', { kind: activeKindLabel })}</h3>
+                      <span className="rounded-full bg-accent/10 px-2 py-0.5 text-[10px] text-accent">{tableRows.length} {tx('条')}</span>
                     </div>
-                    <p className="mt-1 text-xs text-muted">列来自菜单 detail_columns：{displayColumns.map(f => f.label || f.field).join(' / ') || '暂无字段'}</p>
+                    <p className="mt-1 text-xs text-muted">{tx('列来自菜单 detail_columns：')}{displayColumns.map(f => f.label || f.field).join(' / ') || tx('暂无字段')}</p>
                   </div>
                   <div className="hidden sm:flex items-center gap-2 text-[11px] text-muted">
                     <CalendarDays className="h-3.5 w-3.5" />
-                    {rowsQuery.data?.date ?? '当前快照'}
+                    {rowsQuery.data?.date ?? tx('当前快照')}
                   </div>
                 </div>
 
@@ -407,13 +409,13 @@ export function ExtDimensionAnalysis({
                     </thead>
                     <tbody className="divide-y divide-border/70">
                       {rowsQuery.isLoading ? (
-                        <tr><td className="px-4 py-8 text-center text-muted" colSpan={Math.max(displayColumns.length, 1)}>加载数据中…</td></tr>
+                        <tr><td className="px-4 py-8 text-center text-muted" colSpan={Math.max(displayColumns.length, 1)}>{tx('加载数据中…')}</td></tr>
                       ) : tableRows.length === 0 ? (
-                        <tr><td className="px-4 py-8 text-center text-muted" colSpan={Math.max(displayColumns.length, 1)}>暂无明细数据</td></tr>
+                        <tr><td className="px-4 py-8 text-center text-muted" colSpan={Math.max(displayColumns.length, 1)}>{tx('暂无明细数据')}</td></tr>
                       ) : tableRows.slice(0, 300).map((row, i) => (
                         <tr key={`${row.symbol ?? row.code ?? i}-${i}`} className="hover:bg-elevated/30">
                           {displayColumns.map(col => (
-                            <td key={col.field} className={`whitespace-nowrap px-4 py-2 ${col.field === activeDimensionField ? 'max-w-[18rem] truncate text-secondary' : col.field === 'symbol' || col.field === 'code' || col.field === '股票代码' ? 'font-mono text-secondary' : 'text-foreground'}`}>
+                            <td key={col.field} className={`whitespace-nowrap px-4 py-2 ${col.field === activeDimensionField ? 'max-w-[18rem] truncate text-secondary' : SYMBOL_FIELDS.has(col.field) ? 'font-mono text-secondary' : 'text-foreground'}`}>
                               {formatValue(row[col.field], col)}
                             </td>
                           ))}
@@ -424,7 +426,7 @@ export function ExtDimensionAnalysis({
                 </div>
 
                 {tableRows.length > 300 && (
-                  <div className="border-t border-border px-4 py-2 text-center text-[11px] text-muted">仅展示前 300 条明细，共 {tableRows.length} 条</div>
+                  <div className="border-t border-border px-4 py-2 text-center text-[11px] text-muted">{tx('仅展示前 300 条明细，共 {n} 条', { n: tableRows.length })}</div>
                 )}
               </section>
             </div>

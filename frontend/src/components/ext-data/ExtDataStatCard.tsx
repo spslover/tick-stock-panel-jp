@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Settings, Tag, Upload, Code, RefreshCw, CheckCircle2, Loader2, Pencil, ChevronDown, ChevronUp, AlertTriangle, Trash2 } from 'lucide-react'
 import { api, type ExtDataConfig } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { invalidateExtDataQueries } from '@/lib/ext-data-cache'
 import { SettingsModal } from '@/components/data/SettingsModal'
@@ -16,6 +17,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
   deleting: boolean
   onEdit?: () => void
 }) {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
@@ -125,21 +127,20 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                 ? 'bg-blue-500/10 text-blue-400'
                 : 'bg-amber-500/10 text-amber-400'
             }`}>
-              {config.mode === 'snapshot' ? '快照' : '时序'}
+              {config.mode === 'snapshot' ? tx('快照') : tx('时序')}
             </span>
             {config.mode === 'timeseries' && config.pull?.time_field && (
               <span
                 className="whitespace-nowrap text-[10px] leading-none font-medium px-1.5 py-1 rounded-md bg-emerald-500/10 text-emerald-500 dark:text-emerald-400"
-                title={`日内多盘 · 时间列 ${config.pull.time_field}`}
+                title={tx('日内多盘 · 时间列 {field}', { field: config.pull.time_field })}
               >
-                多盘
-              </span>
+                {tx('多盘')}</span>
             )}
           </div>
         </div>
         <button
           onClick={() => setSettingsOpen(v => !v)}
-          aria-label={`${config.label}设置`}
+          aria-label={tx('{name} 设置', { name: config.label })}
           className="shrink-0 p-1.5 rounded-md hover:bg-elevated/70 transition-colors text-muted hover:text-secondary"
         >
           <Settings className="h-3.5 w-3.5" />
@@ -152,7 +153,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
         style={descMaxH !== undefined ? { maxHeight: descMaxH } : undefined}
         className="px-4 pt-2 pb-1.5 text-[10px] text-muted leading-relaxed max-h-[52px] shrink-0 overflow-hidden break-words"
       >
-        {config.description || `扩展数据 · ${config.mode === 'snapshot' ? '与标的 JOIN' : '与日K JOIN'}`}
+        {config.description || tx('扩展数据 · {mode}', { mode: config.mode === 'snapshot' ? tx('与标的 JOIN') : tx('与日K JOIN') })}
       </div>
 
       <div className="flex-1 min-h-0 px-4 pb-2">
@@ -181,7 +182,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
             <button
               onClick={() => setFieldsExpanded(false)}
               className="w-full flex items-center justify-center pt-1.5 text-muted hover:text-secondary transition-colors"
-              title="收起字段"
+              title={tx('收起字段')}
             >
               <ChevronUp className="h-3 w-3" />
             </button>
@@ -191,7 +192,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
           <button
             onClick={() => setFieldsExpanded(true)}
             className="mx-auto mt-1 flex items-center rounded-full border border-border/60 bg-elevated/60 px-2.5 py-0.5 text-muted hover:text-secondary hover:border-border transition-colors"
-            title="展开全部字段"
+            title={tx('展开全部字段')}
           >
             <ChevronDown className="h-3 w-3" />
           </button>
@@ -200,11 +201,11 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
 
       <div className="mt-auto px-4 pb-4 pt-2.5 border-t border-border/60 space-y-1 text-[11px]">
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-muted shrink-0">标识</span>
+          <span className="text-muted shrink-0">{tx('标识')}</span>
           <span className="font-mono text-secondary/80 truncate" title={config.id}>{config.id}</span>
         </div>
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-muted shrink-0">最新</span>
+          <span className="text-muted shrink-0">{tx('最新')}</span>
           <span
             className="text-secondary/80 tabular-nums truncate"
             title={config.latest_sync_date ?? undefined}
@@ -214,13 +215,12 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
         </div>
         {config.plate && (
           <div className="flex items-baseline justify-between gap-3">
-            <span className="text-muted shrink-0">盘次</span>
+            <span className="text-muted shrink-0">{tx('盘次')}</span>
             <span
               className="font-mono text-secondary/80 tabular-nums whitespace-nowrap"
-              title={`${config.plate.date} 多盘保留, @时刻可选盘`}
+              title={tx('{date} 多盘保留, @时刻可选盘', { date: config.plate.date })}
             >
-              {config.plate.plates} 盘 · {config.plate.from.slice(0, 5)}–{config.plate.to.slice(0, 5)}
-            </span>
+              {tx('{n} 盘 · {from}–{to}', { n: config.plate.plates, from: config.plate.from.slice(0, 5), to: config.plate.to.slice(0, 5) })}            </span>
           </div>
         )}
       </div>
@@ -236,18 +236,18 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                     ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
                     : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
                 }`}>
-                  {config.mode === 'snapshot' ? '快照' : '时序'}
+                  {config.mode === 'snapshot' ? tx('快照') : tx('时序')}
                 </span>
                 <span className="font-mono text-secondary">{config.id}</span>
                 <span className="text-muted/50">·</span>
-                <span className="text-muted">{config.fields.filter(f => f.name !== 'symbol' && f.name !== 'code').length} 个字段</span>
+                <span className="text-muted">{config.fields.filter(f => f.name !== 'symbol' && f.name !== 'code').length} {tx('个字段')}</span>
                 <span className="text-muted/50">·</span>
-                <span className="text-muted">最新 <span className="text-secondary font-mono">{config.latest_sync_date ?? '—'}</span></span>
+                <span className="text-muted">{tx('最新')} <span className="text-secondary font-mono">{config.latest_sync_date ?? '—'}</span></span>
               </div>
 
               {/* 数据写入: 主操作区 */}
               <div>
-                <div className="text-[11px] font-medium text-secondary mb-2">数据写入</div>
+                <div className="text-[11px] font-medium text-secondary mb-2">{tx('数据写入')}</div>
                 <div className="grid grid-cols-3 gap-1 rounded-xl bg-elevated/50 p-1 border border-border/40">
                   <button
                     onClick={() => setIngestTab('pull')}
@@ -255,24 +255,21 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                       ingestTab === 'pull' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary hover:bg-elevated/40'
                     }`}
                   >
-                    <RefreshCw className="h-3.5 w-3.5" />拉取
-                  </button>
+                    <RefreshCw className="h-3.5 w-3.5" />{tx('拉取')}</button>
                   <button
                     onClick={() => setIngestTab('api')}
                     className={`inline-flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-medium transition-all ${
                       ingestTab === 'api' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary hover:bg-elevated/40'
                     }`}
                   >
-                    <Code className="h-3.5 w-3.5" />推送
-                  </button>
+                    <Code className="h-3.5 w-3.5" />{tx('推送')}</button>
                   <button
                     onClick={() => setIngestTab('file')}
                     className={`inline-flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-medium transition-all ${
                       ingestTab === 'file' ? 'bg-surface text-foreground shadow-sm' : 'text-muted hover:text-secondary hover:bg-elevated/40'
                     }`}
                   >
-                    <Upload className="h-3.5 w-3.5" />上传
-                  </button>
+                    <Upload className="h-3.5 w-3.5" />{tx('上传')}</button>
                 </div>
               </div>
 
@@ -305,7 +302,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                     {uploading ? (
                       <>
                         <Loader2 className="h-5 w-5 text-accent animate-spin" />
-                        <span className="text-[11px] text-muted">上传中…</span>
+                        <span className="text-[11px] text-muted">{tx('上传中…')}</span>
                       </>
                     ) : (
                       <>
@@ -313,9 +310,8 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                           <Upload className="h-5 w-5" />
                         </div>
                         <span className={`text-xs ${dragOver ? 'text-accent' : 'text-secondary'}`}>
-                          拖拽文件到此处，或点击选择
-                        </span>
-                        <span className="text-[10px] text-muted/70">支持 CSV / Excel，需包含 symbol 列</span>
+                          {tx('拖拽文件到此处，或点击选择')}</span>
+                        <span className="text-[10px] text-muted/70">{tx('支持 CSV / Excel，需包含 symbol 列')}</span>
                       </>
                     )}
                   </div>
@@ -324,7 +320,7 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
 
               {uploadResult && (
                 <div className="text-[11px] text-green-400 bg-green-500/10 border border-green-500/25 rounded-lg px-3 py-2.5 text-center flex items-center justify-center gap-1.5 font-medium">
-                  <CheckCircle2 className="h-3.5 w-3.5" />上传成功 · {uploadResult.rows} 行 · {uploadResult.date}
+                  <CheckCircle2 className="h-3.5 w-3.5" />{tx('上传成功 ·')} {uploadResult.rows} {tx('行 ·')} {uploadResult.date}
                 </div>
               )}
 
@@ -334,36 +330,33 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                   {onEdit && (
                     <button
                       onClick={() => { setSettingsOpen(false); onEdit() }}
-                      title="编辑名称、描述与字段定义"
+                      title={tx('编辑名称、描述与字段定义')}
                       className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-[10px] text-muted hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                     >
                       <Pencil className="h-3 w-3" />
-                      编辑配置
-                    </button>
+                      {tx('编辑配置')}</button>
                   )}
                   <ExtConfigExportButton id={config.id} label={config.label} />
                   <button
                     onClick={() => {
                       api.extDataFixSymbol(config.id).then((res) => {
-                        setUploadResult({ rows: res.fixed_files, date: '格式修复完成' })
+                        setUploadResult({ rows: res.fixed_files, date: tx('格式修复完成') })
                         qc.invalidateQueries({ queryKey: QK.extData })
                         setTimeout(() => setUploadResult(null), 3000)
                       })
                     }}
-                    title="历史数据 symbol 列缺交易所后缀时批量补全 (600000 → 600000.SH)"
+                    title={tx('历史数据 symbol 列缺交易所后缀时批量补全 (600000 → 600000.SH)')}
                     className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-[10px] text-muted hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                   >
                     <Tag className="h-3 w-3" />
-                    修复代码格式
-                  </button>
+                    {tx('修复代码格式')}</button>
                 </div>
                 <button
                   onClick={() => setShowDelete(true)}
                   className="inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-[10px] text-danger/60 hover:text-danger hover:bg-danger/[0.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-danger/40 transition-colors"
                 >
                   <Trash2 className="h-3 w-3" />
-                  删除
-                </button>
+                  {tx('删除')}</button>
               </div>
             </div>
           </SettingsModal>
@@ -394,13 +387,11 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                   <AlertTriangle className="h-5 w-5 text-danger" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-semibold text-foreground mb-1.5">确认删除「{config.label}」？</h3>
+                  <h3 className="text-sm font-semibold text-foreground mb-1.5">{tx('确认删除「')}{config.label}」？</h3>
                   <p className="text-xs text-secondary leading-relaxed">
-                    将<span className="text-danger font-medium">永久删除</span>该扩展数据配置及其全部数据，包括字段、已上传/拉取的所有记录。
-                  </p>
+                    {tx('将')}<span className="text-danger font-medium">{tx('永久删除')}</span>{tx('该扩展数据配置及其全部数据，包括字段、已上传/拉取的所有记录。')}</p>
                   <p className="mt-2 text-[11px] text-danger/90">
-                    操作不可恢复。
-                  </p>
+                    {tx('操作不可恢复。')}</p>
                 </div>
               </div>
               <div className="flex items-center justify-end gap-2 mt-5">
@@ -409,14 +400,13 @@ export function ExtDataStatCard({ config, onDelete, deleting, onEdit }: {
                   disabled={deleting}
                   className="px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:bg-elevated/80 text-sm transition-colors disabled:opacity-50"
                 >
-                  取消
-                </button>
+                  {tx('取消')}</button>
                 <button
                   onClick={() => { onDelete(); setShowDelete(false) }}
                   disabled={deleting}
                   className="px-3 py-1.5 rounded-btn bg-danger/90 text-white text-sm font-medium hover:bg-danger disabled:opacity-50 transition-colors"
                 >
-                  {deleting ? '删除中…' : '确认删除'}
+                  {deleting ? tx('删除中…') : tx('确认删除')}
                 </button>
               </div>
             </motion.div>

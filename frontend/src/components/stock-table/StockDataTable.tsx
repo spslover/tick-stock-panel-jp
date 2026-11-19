@@ -8,6 +8,7 @@
 import { cloneElement, isValidElement, useEffect, useRef, type ReactElement, type ReactNode } from 'react'
 import { useVirtualizer, type VirtualItem } from '@tanstack/react-virtual'
 import type { ColumnConfig } from '@/lib/list-columns'
+import { columnLabel } from '@/lib/column-i18n'
 import { UNSORTABLE_KEYS } from '@/lib/stock-table'
 import { VIRTUAL_LIST_THRESHOLD, useParentScroll } from '@/components/virtual-list/useParentScroll'
 import type { SortState } from './useTableSort'
@@ -149,7 +150,7 @@ export function StockDataTable({
                   className={`${alignThClass(col.align)} ${sortable ? 'cursor-pointer select-none group' : ''}`}
                   onClick={sortable ? () => onSortToggle!(col.id) : undefined}
                 >
-                  {contentOverride !== undefined ? contentOverride : col.label}
+                  {contentOverride !== undefined ? contentOverride : columnLabel(col)}
                   {sortable && (
                     <span className="inline-block ml-1 text-[10px] opacity-30 group-hover:opacity-60 transition-opacity">
                       {isSorted ? (dir === 'asc' ? '↑' : '↓') : '↕'}

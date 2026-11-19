@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { usePreferences, useCapabilities } from '@/lib/useSharedQueries'
 import { MissingCapChip } from '@/lib/capability-labels'
@@ -14,6 +15,7 @@ import { MissingCapChip } from '@/lib/capability-labels'
  */
 // 注: 文件名保留 DepthConfigCard.tsx, 导出 DepthConfigContent(纯内容无外框)
 export function DepthConfigContent({ disabled }: { disabled?: boolean }) {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const prefs = usePreferences()
   const caps = useCapabilities()
@@ -51,8 +53,8 @@ export function DepthConfigContent({ disabled }: { disabled?: boolean }) {
     return (
       <div className="space-y-2">
         <p className="text-xs text-muted leading-relaxed">
-          真假涨停判定依赖五档盘口实时快照,该数据当前不可用。
-          配置提供五档盘口的数据源后,连板梯队将自动区分真封板(显示封单量)与假涨停(归入炸板)。
+          {tx('真假涨停判定依赖五档盘口实时快照,该数据当前不可用。')}
+          {tx('配置提供五档盘口的数据源后,连板梯队将自动区分真封板(显示封单量)与假涨停(归入炸板)。')}
         </p>
         <MissingCapChip capKey="depth5.batch" />
       </div>
@@ -66,8 +68,8 @@ export function DepthConfigContent({ disabled }: { disabled?: boolean }) {
       {/* 盘中轮询间隔 */}
       <div className="flex items-center justify-between gap-2">
         <div className={disabled ? 'opacity-50' : ''}>
-          <div className="text-xs text-secondary">盘中轮询间隔</div>
-          <div className="text-[10px] text-muted">范围 {range.lo}~{range.hi} 秒 · 涨跌停过多时系统自动放慢</div>
+          <div className="text-xs text-secondary">{tx('盘中轮询间隔')}</div>
+          <div className="text-[10px] text-muted">{tx('范围')} {range.lo}~{range.hi} {tx('秒 · 涨跌停过多时系统自动放慢')}</div>
         </div>
         <div className="flex items-center gap-1">
           <input
@@ -86,15 +88,15 @@ export function DepthConfigContent({ disabled }: { disabled?: boolean }) {
             }}
             className={inputCls}
           />
-          <span className="text-xs text-muted">秒</span>
+          <span className="text-xs text-muted">{tx('秒')}</span>
         </div>
       </div>
 
       {/* 盘后定版时间 */}
       <div className="flex items-center justify-between gap-2">
         <div className={disabled ? 'opacity-50' : ''}>
-          <div className="text-xs text-secondary">盘后定版时间</div>
-          <div className="text-[10px] text-muted">范围 15:01~18:00 · 收盘后拉取最终盘口定版</div>
+          <div className="text-xs text-secondary">{tx('盘后定版时间')}</div>
+          <div className="text-[10px] text-muted">{tx('范围 15:01~18:00 · 收盘后拉取最终盘口定版')}</div>
         </div>
         <div className="flex items-center gap-1">
           <input

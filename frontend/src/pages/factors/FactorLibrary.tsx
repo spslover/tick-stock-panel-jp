@@ -4,6 +4,7 @@ import { Archive, ArchiveRestore, ArrowRight, FlaskConical, PenLine, Search, Spa
 import { Modal } from '@/components/Modal'
 import { toast } from '@/components/Toast'
 import { api, type FactorLibraryItem } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { refreshResourceQueries } from '@/lib/importCenter'
 import { GenerateFactorStrategyDialog } from './GenerateFactorStrategyDialog'
@@ -29,6 +30,7 @@ const statusOf = (item: FactorLibraryItem) =>
   (item.status && STATUS_META[item.status]) || BUILTIN_STATUS
 
 export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: string) => void; onEdit?: (factorId: string) => void }) {
+  const { tx } = useI18n()
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState('all')
   const [group, setGroup] = useState('all')
@@ -56,10 +58,10 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
   const setArchived = useMutation({
     mutationFn: ({ id, archived }: { id: string; archived: boolean }) => api.factorArchive(id, archived),
     onSuccess: (_data, variables) => {
-      toast(variables.archived ? '已归档到档案库，可随时恢复' : '已恢复到因子库', 'success')
+      toast(variables.archived ? tx('已归档到档案库，可随时恢复') : tx('已恢复到因子库'), 'success')
       void refreshResourceQueries(queryClient)
     },
-    onError: (error: Error) => toast(`操作失败 · ${error.message}`, 'error'),
+    onError: (error: Error) => toast(tx('操作失败 · {msg}', { msg: error.message }), 'error'),
   })
 
   const filtered = useMemo(() => {
@@ -99,35 +101,35 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
             type="text"
             value={query}
             onChange={event => setQuery(event.target.value)}
-            placeholder="搜索因子 (id / 名称 / 公式)"
+            placeholder={tx('搜索因子 (id / 名称 / 公式)')}
             className={`${INPUT_CLS} w-56 pl-7`}
           />
         </div>
-        <select value={kind} onChange={event => setKind(event.target.value)} className={`${INPUT_CLS} w-24`} aria-label="因子类型">
-          <option value="all">全部类型</option>
-          <option value="base">基础</option>
-          <option value="virtual">虚拟</option>
-          <option value="composite">复合</option>
-          <option value="custom">自定义</option>
+        <select value={kind} onChange={event => setKind(event.target.value)} className={`${INPUT_CLS} w-24`} aria-label={tx('因子类型')}>
+          <option value="all">{tx('全部类型')}</option>
+          <option value="base">{tx('基础')}</option>
+          <option value="virtual">{tx('虚拟')}</option>
+          <option value="composite">{tx('复合')}</option>
+          <option value="custom">{tx('自定义')}</option>
         </select>
-        <select value={group} onChange={event => setGroup(event.target.value)} className={`${INPUT_CLS} w-28`} aria-label="因子分组">
-          <option value="all">全部分组</option>
+        <select value={group} onChange={event => setGroup(event.target.value)} className={`${INPUT_CLS} w-28`} aria-label={tx('因子分组')}>
+          <option value="all">{tx('全部分组')}</option>
           {groups.map(name => <option key={name} value={name}>{name}</option>)}
         </select>
-        <select value={status} onChange={event => setStatus(event.target.value)} className={`${INPUT_CLS} w-24`} aria-label="生命周期状态">
-          <option value="all">全部状态</option>
-          <option value="builtin">内置</option>
-          <option value="active">激活</option>
-          <option value="watch">观察</option>
-          <option value="draft">草稿</option>
-          <option value="retired">退役</option>
+        <select value={status} onChange={event => setStatus(event.target.value)} className={`${INPUT_CLS} w-24`} aria-label={tx('生命周期状态')}>
+          <option value="all">{tx('全部状态')}</option>
+          <option value="builtin">{tx('内置')}</option>
+          <option value="active">{tx('激活')}</option>
+          <option value="watch">{tx('观察')}</option>
+          <option value="draft">{tx('草稿')}</option>
+          <option value="retired">{tx('退役')}</option>
         </select>
-        <span className="ml-auto text-[10px] text-muted">{lib.isLoading ? '加载中…' : `${filtered.length} / ${factors.length} 个因子`}</span>
-        <div className="flex shrink-0 items-center rounded-btn border border-border p-0.5" role="tablist" aria-label="因子库视图">
-          {([['library', '因子库'], ['archive', `档案库 ${archivedCount}`]] as const).map(([id, label]) => (
+        <span className="ml-auto text-[10px] text-muted">{lib.isLoading ? tx('加载中…') : tx('{n} / {total} 个因子', { n: filtered.length, total: factors.length })}</span>
+        <div className="flex shrink-0 items-center rounded-btn border border-border p-0.5" role="tablist" aria-label={tx('因子库视图')}>
+          {([['library', '因子库'], ['archive', '档案库']] as const).map(([id]) => (
             <button key={id} type="button" role="tab" aria-selected={view === id} onClick={() => setView(id)}
               className={`rounded px-2 py-1 text-[11px] transition-colors ${view === id ? 'bg-accent/10 font-medium text-accent' : 'text-secondary hover:text-foreground'}`}>
-              {label}
+              {id === 'library' ? tx('因子库') : tx('档案库 {n}', { n: archivedCount })}
             </button>
           ))}
         </div>
@@ -140,13 +142,13 @@ export function FactorLibrary({ onInspect, onEdit }: { onInspect: (factorId: str
           </div>
         )}
         {lib.isLoading && (
-          <div className="p-6 text-center text-xs text-muted">因子库加载中…</div>
+          <div className="p-6 text-center text-xs text-muted">{tx('因子库加载中…')}</div>
         )}
         {!lib.isLoading && !lib.isError && filtered.length === 0 && (
           <div className="p-6 text-center text-xs text-muted">
             {view === 'archive'
-              ? (archivedCount > 0 ? '筛选条件下无归档因子' : '档案库为空。在因子详情里点「归档」收藏不用的因子，可随时恢复。')
-              : '无匹配因子'}
+              ? (archivedCount > 0 ? tx('筛选条件下无归档因子') : tx('档案库为空。在因子详情里点「归档」收藏不用的因子，可随时恢复。'))
+              : tx('无匹配因子')}
           </div>
         )}
         {!lib.isLoading && grouped.length > 0 && (
@@ -202,36 +204,37 @@ function FactorCard({
   /** 归档/恢复回调; 档案库视图给恢复, 因子库详情里给归档 (undefined 时隐藏) */
   onSetArchived?: (archived: boolean) => void
 }) {
+  const { tx } = useI18n()
   const assetLabel = item.asset_types.includes('stock') && item.asset_types.includes('etf')
-    ? '股票/ETF'
+    ? tx('股票/ETF')
     : item.asset_types.join('/')
   return (
     <div
       onClick={() => onOpen(item)}
-      title="点击查看完整详情"
+      title={tx('点击查看完整详情')}
       className="group flex cursor-pointer flex-col gap-2 rounded-card border border-border bg-base/40 p-3 transition-colors duration-150 ease-smooth hover:border-accent/40 hover:bg-elevated/30"
     >
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
         <span className="truncate text-xs font-medium text-foreground">{item.label}</span>
         <span className={`inline-flex shrink-0 rounded-btn px-1.5 py-0.5 text-[10px] font-medium ${KIND_META[item.kind].cls}`}>
-          {KIND_META[item.kind].label}
+          {tx(KIND_META[item.kind].label)}
         </span>
         {item.archived ? (
-          <span className="inline-flex shrink-0 rounded-btn bg-muted/15 px-1.5 py-0.5 text-[10px] font-medium text-muted">已归档</span>
+          <span className="inline-flex shrink-0 rounded-btn bg-muted/15 px-1.5 py-0.5 text-[10px] font-medium text-muted">{tx('已归档')}</span>
         ) : (
           <span className={`inline-flex shrink-0 rounded-btn px-1.5 py-0.5 text-[10px] font-medium ${statusOf(item).cls}`}>
-            {statusOf(item).label}
+            {tx(statusOf(item).label)}
           </span>
         )}
         {item.pit && (
-          <span className="shrink-0 text-[10px] text-amber-500" title="点时数据: 仅使用公告日不晚于当日的财务数据">点时</span>
+          <span className="shrink-0 text-[10px] text-amber-500" title={tx('点时数据: 仅使用公告日不晚于当日的财务数据')}>{tx('点时')}</span>
         )}
       </div>
       <div className="font-mono text-[10px] text-muted">{item.id}</div>
       <p className="break-all font-mono text-[11px] leading-relaxed text-secondary">{item.formula}</p>
       <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/50 pt-2">
-        <span className="min-w-0 truncate text-[10px] text-muted" title={`预热: ${item.warmup_bars > 1 ? `${item.warmup_bars} 个交易日` : '无需滚动窗口'} · 适用: ${assetLabel}`}>
-          {item.warmup_bars > 1 ? `预热 ${item.warmup_bars} 日` : '无预热'} · {assetLabel}
+        <span className="min-w-0 truncate text-[10px] text-muted" title={tx('预热: {warmup} · 适用: {asset}', { warmup: item.warmup_bars > 1 ? tx('{n} 个交易日', { n: item.warmup_bars }) : tx('无需滚动窗口'), asset: assetLabel })}>
+          {item.warmup_bars > 1 ? tx('预热 {n} 日', { n: item.warmup_bars }) : tx('无预热')} · {assetLabel}
         </span>
         <div className="flex shrink-0 items-center gap-0.5">
           {item.kind === 'custom' && onEdit && !item.archived && (
@@ -239,28 +242,27 @@ function FactorCard({
               type="button"
               onClick={event => { event.stopPropagation(); onEdit(item.id) }}
               className="rounded-btn px-2 py-1 text-[10px] text-secondary opacity-0 transition-opacity duration-150 ease-smooth hover:bg-elevated hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-              title="在编辑器中打开该公式"
+              title={tx('在编辑器中打开该公式')}
             >
-              编辑
-            </button>
+              {tx('编辑')}</button>
           )}
           {onSetArchived && (
             <button
               type="button"
               onClick={event => { event.stopPropagation(); onSetArchived(!item.archived) }}
               className="inline-flex items-center gap-0.5 rounded-btn px-2 py-1 text-[10px] text-secondary transition-colors hover:bg-warning/10 hover:text-warning"
-              title={item.archived ? '恢复到因子库 (归档可逆, 不影响计算)' : '归档到档案库 (可恢复, 不删除因子)'}
+              title={item.archived ? tx('恢复到因子库 (归档可逆, 不影响计算)') : tx('归档到档案库 (可恢复, 不删除因子)')}
             >
-              {item.archived ? <><ArchiveRestore className="h-3 w-3" />恢复</> : <><Archive className="h-3 w-3" />归档</>}
+              {item.archived ? <><ArchiveRestore className="h-3 w-3" />{tx('恢复')}</> : <><Archive className="h-3 w-3" />{tx('归档')}</>}
             </button>
           )}
           <button
             type="button"
             onClick={event => { event.stopPropagation(); onInspect(item.id) }}
             className="inline-flex items-center gap-0.5 rounded-btn px-2 py-1 text-[10px] text-accent transition-colors hover:bg-accent/10"
-            title="去检验该因子（切到发现页并只选它）"
+            title={tx('去检验该因子（切到发现页并只选它）')}
           >
-            去检验 <ArrowRight className="h-3 w-3" />
+            {tx('去检验')} <ArrowRight className="h-3 w-3" />
           </button>
         </div>
       </div>
@@ -279,24 +281,25 @@ function FactorDetailModal({
   onInspect: (factorId: string) => void
   onEdit?: (factorId: string) => void
 }) {
+  const { tx } = useI18n()
   const queryClient = useQueryClient()
   const setStatus = useMutation({
     mutationFn: (status: 'draft' | 'active' | 'watch' | 'retired') => api.factorSetStatus(item.id, status),
     onSuccess: data => {
-      toast(`${item.label} 状态已更新为 ${data.status}`, 'success')
+      toast(tx('{name} 状态已更新为 {status}', { name: item.label, status: data.status }), 'success')
       void queryClient.invalidateQueries({ queryKey: ['factors-library'] })
       onClose()
     },
-    onError: (error: Error) => toast(`状态更新失败 · ${error.message}`, 'error'),
+    onError: (error: Error) => toast(tx('状态更新失败 · {msg}', { msg: error.message }), 'error'),
   })
   const setArchived = useMutation({
     mutationFn: (archived: boolean) => api.factorArchive(item.id, archived),
     onSuccess: (_data, archived) => {
-      toast(archived ? `${item.label} 已归档，可在档案库恢复` : `${item.label} 已恢复到因子库`, 'success')
+      toast(archived ? tx('{name} 已归档，可在档案库恢复', { name: item.label }) : tx('{name} 已恢复到因子库', { name: item.label }), 'success')
       void refreshResourceQueries(queryClient)
       onClose()
     },
-    onError: (error: Error) => toast(`操作失败 · ${error.message}`, 'error'),
+    onError: (error: Error) => toast(tx('操作失败 · {msg}', { msg: error.message }), 'error'),
   })
   const isDynamic = item.kind === 'custom' || item.kind === 'composite'
   const [groupDraft, setGroupDraft] = useState(item.group)
@@ -309,8 +312,8 @@ function FactorDetailModal({
       const refs = data.removed_references ?? []
       toast(
         refs.length > 0
-          ? `${item.label} 已强制删除 · ${refs.length} 处引用需手动调整 (${refs.join('、')})`
-          : `${item.label} 已删除`,
+          ? tx('{name} 已强制删除 · {n} 处引用需手动调整 ({refs})', { name: item.label, n: refs.length, refs: refs.join('、') })
+          : tx('{name} 已删除', { name: item.label }),
         'success',
       )
       void queryClient.invalidateQueries({ queryKey: ['factors-library'] })
@@ -325,26 +328,26 @@ function FactorDetailModal({
           return
         }
       } catch { /* 非 JSON 报错, 走通用提示 */ }
-      toast(`删除失败 · ${error.message}`, 'error')
+      toast(tx('删除失败 · {msg}', { msg: error.message }), 'error')
     },
   })
   const setGroup = useMutation({
     mutationFn: () => api.factorSetGroup(item.id, groupDraft.trim()),
     onSuccess: data => {
-      toast(`${item.label} 分组已改为 ${data.group}`, 'success')
+      toast(tx('{name} 分组已改为 {group}', { name: item.label, group: data.group }), 'success')
       void queryClient.invalidateQueries({ queryKey: ['factors-library'] })
       onClose()
     },
-    onError: (error: Error) => toast(`分组修改失败 · ${error.message}`, 'error'),
+    onError: (error: Error) => toast(tx('分组修改失败 · {msg}', { msg: error.message }), 'error'),
   })
   const rows: [string, string][] = [
     ['标识', item.id],
     ['名称', item.label],
     ['分组', item.group],
-    ['类型', KIND_META[item.kind].label],
+    ['类型', tx(KIND_META[item.kind].label)],
     ['公式', item.formula],
     ['版本', `v${item.version}`],
-    ['预热', item.warmup_bars > 1 ? `${item.warmup_bars} 个交易日` : '无需滚动窗口'],
+    ['预热', item.warmup_bars > 1 ? tx('{n} 个交易日', { n: item.warmup_bars }) : tx('无需滚动窗口')],
     ['点时数据', item.pit ? '是（按公告日口径，不泄露未公告数据）' : '否'],
     ['适用资产', item.asset_types.join(' / ')],
     ['跨标的可比', item.scale_free ? '是（可直接截面排序）' : '否（原值受价格尺度影响）'],
@@ -362,13 +365,13 @@ function FactorDetailModal({
             <FlaskConical className="h-4 w-4 shrink-0 text-accent" />
             <span id="factor-detail-title" className="truncate text-sm font-semibold text-foreground">{item.label}</span>
             <span className={`inline-flex shrink-0 rounded-btn px-1.5 py-0.5 text-[10px] font-medium ${KIND_META[item.kind].cls}`}>
-              {KIND_META[item.kind].label}
+              {tx(KIND_META[item.kind].label)}
             </span>
             {item.archived ? (
-              <span className="inline-flex shrink-0 rounded-btn bg-muted/15 px-1.5 py-0.5 text-[10px] font-medium text-muted">已归档</span>
+              <span className="inline-flex shrink-0 rounded-btn bg-muted/15 px-1.5 py-0.5 text-[10px] font-medium text-muted">{tx('已归档')}</span>
             ) : (
               <span className={`inline-flex shrink-0 rounded-btn px-1.5 py-0.5 text-[10px] font-medium ${statusOf(item).cls}`}>
-                {statusOf(item).label}
+                {tx(statusOf(item).label)}
               </span>
             )}
           </div>
@@ -378,7 +381,7 @@ function FactorDetailModal({
           type="button"
           onClick={onClose}
           className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-muted transition-colors hover:text-foreground"
-          aria-label="关闭"
+          aria-label={tx('关闭')}
         >
           <X className="h-4 w-4" />
         </button>
@@ -394,16 +397,16 @@ function FactorDetailModal({
         </dl>
         {isDynamic && (
           <div className="mt-4 rounded-btn border border-border bg-base/40 p-3">
-            <div className="text-[11px] font-medium text-secondary">管理</div>
+            <div className="text-[11px] font-medium text-secondary">{tx('管理')}</div>
             <div className="mt-2 flex items-center gap-1.5">
-              <span className="w-10 shrink-0 text-[11px] text-muted" title="仅自定义/复合因子可改; 内置因子分组固定">分组</span>
+              <span className="w-10 shrink-0 text-[11px] text-muted" title={tx('仅自定义/复合因子可改; 内置因子分组固定')}>{tx('分组')}</span>
               <input
                 type="text"
                 value={groupDraft}
                 maxLength={24}
                 onChange={event => setGroupDraft(event.target.value)}
                 className="h-6 w-36 rounded-input border border-border bg-base/60 px-1.5 text-xs text-foreground focus:border-accent focus:outline-none"
-                aria-label="修改分组"
+                aria-label={tx('修改分组')}
               />
               <button
                 type="button"
@@ -411,11 +414,11 @@ function FactorDetailModal({
                 disabled={setGroup.isPending || !groupDraft.trim() || groupDraft.trim() === item.group}
                 className="rounded-btn border border-border px-2 py-0.5 text-[10px] text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-40"
               >
-                {setGroup.isPending ? '保存中…' : '保存'}
+                {setGroup.isPending ? tx('保存中…') : tx('保存')}
               </button>
             </div>
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-              <span className="w-10 shrink-0 text-[11px] text-muted">状态</span>
+              <span className="w-10 shrink-0 text-[11px] text-muted">{tx('状态')}</span>
               {(['active', 'watch', 'draft', 'retired'] as const).map(statusKey => (
                 <button
                   key={statusKey}
@@ -427,13 +430,13 @@ function FactorDetailModal({
                     : 'border-border text-secondary hover:border-accent/40 hover:text-accent'
                   }`}
                 >
-                  {statusKey === 'active' ? '激活' : statusKey === 'watch' ? '观察' : statusKey === 'retired' ? '退役' : '回草稿'}
+                  {statusKey === 'active' ? tx('激活') : statusKey === 'watch' ? tx('观察') : statusKey === 'retired' ? tx('退役') : tx('回草稿')}
                 </button>
               ))}
-              <span className="text-[10px] text-muted" title="生命周期语义">编辑公式后自动回草稿</span>
+              <span className="text-[10px] text-muted" title={tx('生命周期语义')}>{tx('编辑公式后自动回草稿')}</span>
             </div>
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-              <span className="w-10 shrink-0 text-[11px] text-muted">归档</span>
+              <span className="w-10 shrink-0 text-[11px] text-muted">{tx('归档')}</span>
               <button
                 type="button"
                 onClick={() => setArchived.mutate(!item.archived)}
@@ -442,38 +445,35 @@ function FactorDetailModal({
                   ? 'border-accent/60 bg-accent/10 font-medium text-accent'
                   : 'border-border text-secondary hover:border-warning/40 hover:text-warning'
                 }`}
-                title="归档可逆: 收进档案库, 不删除定义、不影响引用它的策略与评分列"
+                title={tx('归档可逆: 收进档案库, 不删除定义、不影响引用它的策略与评分列')}
               >
-                {item.archived ? <><ArchiveRestore className="h-3 w-3" />恢复到因子库</> : <><Archive className="h-3 w-3" />归档到档案库</>}
+                {item.archived ? <><ArchiveRestore className="h-3 w-3" />{tx('恢复到因子库')}</> : <><Archive className="h-3 w-3" />{tx('归档到档案库')}</>}
               </button>
-              {item.archived && <span className="text-[10px] text-muted">已归档 · 仍在参与计算, 引用方不受影响</span>}
+              {item.archived && <span className="text-[10px] text-muted">{tx('已归档 · 仍在参与计算, 引用方不受影响')}</span>}
             </div>
           </div>
         )}
         <div className="mt-4 rounded-btn border border-border bg-base/40 px-3 py-2 text-[11px] leading-relaxed text-muted">
-          方向说明：因子方向不预填，以最近一次检验的 IC 符号为准（IC 为正 = 值大看多）。到「发现」页运行后可查看。
-        </div>
+          {tx('方向说明：因子方向不预填，以最近一次检验的 IC 符号为准（IC 为正 = 值大看多）。到「发现」页运行后可查看。')}</div>
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
         <button
           type="button"
           onClick={() => setGenerateOpen(true)}
           className="inline-flex items-center gap-1 rounded-btn border border-accent/40 px-2.5 py-1.5 text-[11px] font-medium text-accent transition-colors hover:bg-accent/10"
-          title="按该因子生成单因子排名策略, 保存到自定义策略后可直接回测"
+          title={tx('按该因子生成单因子排名策略, 保存到自定义策略后可直接回测')}
         >
           <Sparkles className="h-3 w-3" />
-          生成策略
-        </button>
+          {tx('生成策略')}</button>
         {item.kind === 'custom' && onEdit && (
           <button
             type="button"
             onClick={() => { onClose(); onEdit(item.id) }}
             className="inline-flex items-center gap-1 rounded-btn border border-accent/40 px-2.5 py-1.5 text-[11px] font-medium text-accent transition-colors hover:bg-accent/10"
-            title="在编辑器中打开该公式, 修改后保存为新版本"
+            title={tx('在编辑器中打开该公式, 修改后保存为新版本')}
           >
             <PenLine className="h-3 w-3" />
-            编辑公式
-          </button>
+            {tx('编辑公式')}</button>
         )}
         {isDynamic && (
           confirmDelete ? (
@@ -484,26 +484,24 @@ function FactorDetailModal({
                 disabled={removeFactor.isPending}
                 className="inline-flex shrink-0 items-center gap-1 rounded-btn bg-danger px-2.5 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-danger/90 disabled:opacity-40"
               >
-                {removeFactor.isPending ? '删除中…' : '确认删除'}
+                {removeFactor.isPending ? tx('删除中…') : tx('确认删除')}
               </button>
               <button
                 type="button"
                 onClick={() => { setConfirmDelete(false); setBlockedRefs(null) }}
                 className="inline-flex shrink-0 items-center rounded-btn border border-border px-2.5 py-1.5 text-[11px] text-secondary transition-colors hover:text-foreground"
               >
-                取消
-              </button>
+                {tx('取消')}</button>
             </>
           ) : (
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
               className="inline-flex shrink-0 items-center gap-1 rounded-btn border border-danger/40 px-2.5 py-1.5 text-[11px] font-medium text-danger transition-colors hover:bg-danger/10"
-              title="删除该自定义/复合因子; 被策略或复合因子引用时需强制删除"
+              title={tx('删除该自定义/复合因子; 被策略或复合因子引用时需强制删除')}
             >
               <Trash2 className="h-3 w-3" />
-              删除
-            </button>
+              {tx('删除')}</button>
           )
         )}
         <button
@@ -511,11 +509,11 @@ function FactorDetailModal({
           onClick={() => { onClose(); onInspect(item.id) }}
           className="ml-auto inline-flex shrink-0 items-center gap-1 rounded-btn bg-accent px-2.5 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-accent/90"
         >
-          检验此因子 <ArrowRight className="h-3 w-3" />
+          {tx('检验此因子')} <ArrowRight className="h-3 w-3" />
         </button>
         {blockedRefs && (
           <div className="w-full rounded-btn border border-danger/40 bg-danger/10 px-3 py-2 text-[11px] leading-relaxed text-danger">
-            <div className="font-medium">该因子仍被以下对象引用，删除后相关策略/复合因子将无法计算：</div>
+            <div className="font-medium">{tx('该因子仍被以下对象引用，删除后相关策略/复合因子将无法计算：')}</div>
             <div className="mt-1 font-mono text-[10px] break-all text-danger/90">{blockedRefs.join('、')}</div>
             <div className="mt-2 flex items-center gap-2">
               <button
@@ -524,15 +522,14 @@ function FactorDetailModal({
                 disabled={removeFactor.isPending}
                 className="rounded-btn bg-danger px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-danger/90 disabled:opacity-40"
               >
-                {removeFactor.isPending ? '删除中…' : '仍要强制删除'}
+                {removeFactor.isPending ? tx('删除中…') : tx('仍要强制删除')}
               </button>
               <button
                 type="button"
                 onClick={() => setBlockedRefs(null)}
                 className="text-[11px] text-secondary underline-offset-2 transition-colors hover:text-foreground hover:underline"
               >
-                收起
-              </button>
+                {tx('收起')}</button>
             </div>
           </div>
         )}

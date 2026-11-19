@@ -9,6 +9,7 @@ import {
   useFinancialShares,
 } from '@/lib/useFinancials'
 import { fmtPrice, fmtBigNum, fmtDate } from '@/lib/format'
+import { tx, useI18n } from '@/lib/i18n'
 import { Skeleton } from '@/components/data/Skeleton'
 import { startAnalysis, findLatestHistoryReport, openHistoryReport } from '@/lib/aiReportStore'
 import { toast } from '@/components/Toast'
@@ -120,6 +121,7 @@ function formatValue(v: number | null | undefined, fmt: FmtType): string {
 }
 
 export function StockFinancialDetail({ symbol, name }: Props) {
+  const { tx } = useI18n()
   const [tab, setTab] = useState<TabKey>('metrics')
   // AI 分析:点击时检查历史,若已有同标的报告则二次确认
   const [checking, setChecking] = useState(false)
@@ -188,17 +190,16 @@ export function StockFinancialDetail({ symbol, name }: Props) {
             onClick={handleAiClick}
             disabled={checking}
             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-btn text-[11px] font-medium border border-purple-400/30 bg-purple-400/10 text-purple-300 hover:bg-purple-400/20 hover:border-purple-400/40 transition-all shrink-0 disabled:opacity-50"
-            title="AI 财务分析"
+            title={tx('AI 财务分析')}
           >
             {checking ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-            AI 财务分析
-          </button>
+            {tx('AI 财务分析')}</button>
           {latestPeriod && (
             <div className="flex items-center gap-1.5 text-xs text-secondary">
               <CalendarDays className="h-3.5 w-3.5" />
-              <span>报告期 <span className="font-mono">{latestPeriod}</span></span>
+              <span>{tx('报告期')} <span className="font-mono">{latestPeriod}</span></span>
               {latestAnnounce && (
-                <span className="text-muted">· 披露 {fmtDate(latestAnnounce)}</span>
+                <span className="text-muted">{tx('· 披露')} {fmtDate(latestAnnounce)}</span>
               )}
             </div>
           )}
@@ -221,7 +222,7 @@ export function StockFinancialDetail({ symbol, name }: Props) {
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
-              {t.label}
+              {tx(t.label)}
             </button>
           )
         })}
@@ -240,8 +241,7 @@ export function StockFinancialDetail({ symbol, name }: Props) {
           </div>
         ) : rows.length === 0 ? (
           <div className="py-10 text-center text-xs text-muted">
-            暂无{TABS.find(t => t.key === tab)?.label}数据 — 可点击顶部「全部同步」拉取
-          </div>
+            {tx('暂无')}{TABS.find(t => t.key === tab)?.label}{tx('数据 — 可点击顶部「全部同步」拉取')}</div>
         ) : (
           <div className="space-y-5">
             {/* 多期时为每期渲染一组;单期时只有一组 */}
@@ -250,7 +250,7 @@ export function StockFinancialDetail({ symbol, name }: Props) {
                 {rows.length > 1 && (
                   <div className="text-[11px] text-muted mb-2 flex items-center gap-1.5">
                     <CalendarDays className="h-3 w-3" />
-                    报告期 <span className="font-mono text-secondary">{row.period_end}</span>
+                    {tx('报告期')} <span className="font-mono text-secondary">{row.period_end}</span>
                   </div>
                 )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-0">
@@ -261,7 +261,7 @@ export function StockFinancialDetail({ symbol, name }: Props) {
                         key={def.key}
                         className="flex items-baseline justify-between gap-3 py-2 border-b border-border/40"
                       >
-                        <span className="text-xs text-secondary shrink-0">{def.label}</span>
+                        <span className="text-xs text-secondary shrink-0">{tx(def.label)}</span>
                         <span className="text-sm font-mono tabular-nums text-foreground text-right">
                           {formatValue(val, def.fmt)}
                         </span>
@@ -297,16 +297,13 @@ export function StockFinancialDetail({ symbol, name }: Props) {
                   <AlertTriangle className="h-5 w-5 text-purple-300" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h3 className="text-sm font-semibold text-foreground mb-1.5">该个股已有分析报告</h3>
+                  <h3 className="text-sm font-semibold text-foreground mb-1.5">{tx('该个股已有分析报告')}</h3>
                   <p className="text-xs text-secondary leading-relaxed">
                     <span className="font-medium text-foreground">{name}</span>
-                    <span className="font-mono text-muted"> {symbol}</span> 在
-                    <span className="text-purple-300 font-medium"> {fmtReportTime(confirmReport.created_at)} </span>
-                    已生成过 AI 财务分析报告。
-                  </p>
+                    <span className="font-mono text-muted"> {symbol}</span> {tx('在')}<span className="text-purple-300 font-medium"> {fmtReportTime(confirmReport.created_at)} </span>
+                    {tx('已生成过 AI 财务分析报告。')}</p>
                   <p className="mt-2 text-[11px] text-muted">
-                    您可以查看历史报告,或基于最新数据重新生成一份。
-                  </p>
+                    {tx('您可以查看历史报告,或基于最新数据重新生成一份。')}</p>
                 </div>
               </div>
               <div className="flex items-center justify-end gap-2 mt-5">
@@ -314,21 +311,18 @@ export function StockFinancialDetail({ symbol, name }: Props) {
                   onClick={() => setConfirmReport(null)}
                   className="px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:bg-elevated/80 text-xs transition-colors"
                 >
-                  取消
-                </button>
+                  {tx('取消')}</button>
                 <button
                   onClick={() => { if (confirmReport) openHistoryReport(confirmReport.id); setConfirmReport(null) }}
                   className="px-3 py-1.5 rounded-btn border border-border text-secondary hover:text-foreground text-xs font-medium transition-colors"
                 >
-                  查看历史报告
-                </button>
+                  {tx('查看历史报告')}</button>
                 <button
                   onClick={() => { doAnalysis(); setConfirmReport(null) }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-to-r from-purple-500/80 to-fuchsia-500/80 text-white text-xs font-medium hover:from-purple-500 hover:to-fuchsia-500 transition-all"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
-                  重新分析
-                </button>
+                  {tx('重新分析')}</button>
               </div>
             </motion.div>
           </div>
@@ -343,10 +337,10 @@ function fmtReportTime(iso: string): string {
   try {
     const t = new Date(iso).getTime()
     const diff = Date.now() - t
-    if (diff < 60_000) return '刚刚'
-    if (diff < 3600_000) return `${Math.floor(diff / 60_000)} 分钟前`
-    if (diff < 86400_000) return `${Math.floor(diff / 3600_000)} 小时前`
-    if (diff < 7 * 86400_000) return `${Math.floor(diff / 86400_000)} 天前`
+    if (diff < 60_000) return tx('刚刚')
+    if (diff < 3600_000) return tx('{n} 分钟前', { n: Math.floor(diff / 60_000) })
+    if (diff < 86400_000) return tx('{n} 小时前', { n: Math.floor(diff / 3600_000) })
+    if (diff < 7 * 86400_000) return tx('{n} 天前', { n: Math.floor(diff / 86400_000) })
     return new Date(iso).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
   } catch { return '' }
 }

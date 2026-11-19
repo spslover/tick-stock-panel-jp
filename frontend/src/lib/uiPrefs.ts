@@ -48,11 +48,12 @@ const SPECS: { ls: string; remote: string; codec: Codec }[] = [
   // 保留 JSON 文本，兼容后端界面偏好只接收标量的契约。
   { ls: 'strategy-pool', remote: 'strategy_pool', codec: 'string' },
   { ls: 'tf-theme', remote: 'theme', codec: 'string' },
+  { ls: 'tf-locale', remote: 'locale', codec: 'string' },
 ]
 
 const BY_LS = new Map(SPECS.map(s => [s.ls, s]))
 const BY_REMOTE = new Map(SPECS.map(s => [s.remote, s]))
-const REMOTE_FIRST = new Set(['strategy-pool', 'tf-theme'])
+const REMOTE_FIRST = new Set(['strategy-pool', 'tf-theme', 'tf-locale'])
 
 /** localStorage 原始文本 → 后端标量 */
 function toRemote(spec: { codec: Codec }, raw: string): unknown {

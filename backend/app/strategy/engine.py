@@ -6,12 +6,16 @@
 """
 from __future__ import annotations
 
+import ast
+import contextlib
 import importlib.util
 import logging
 import sys
 import threading
 import time
-from collections.abc import Callable, Mapping
+import types
+import uuid
+from collections.abc import Callable, Iterable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field, replace
 from datetime import date
@@ -238,18 +242,16 @@ class _RealtimeMatrixEntry:
     buffer: Any
 
 
-def _resolve_required_features(meta: dict, mod, filter_history_fn, path: Path) -> frozenset[str]:
+def _resolve_required_features_from_declared(
+    meta: dict,
+    declared: frozenset[str],
+    has_filter_history: bool,
+    path: Path,
+) -> frozenset[str]:
     """显式声明 (META/module REQUIRED_FEATURES) 优先; 缺失且存在动态
     filter_history 时, AST 推导列依赖兜底 — 推导不可证明则保持为空,
-    回测层继续走全量指标计算 (fail-closed)。
-
-    推导范围是整个策略文件 + 同目录 `_*.py` 依赖文件, 不只是 filter_history
-    函数体: 列引用在模块级辅助函数或依赖文件里硬编码时, 只看函数体会漏列,
-    回测帧缺列直接 ColumnNotFoundError。范围放宽只会多载列, 不会漏。"""
-    declared = frozenset(meta.get("required_features", []) or []) | frozenset(
-        getattr(mod, "REQUIRED_FEATURES", []) or []
-    )
-    if declared or filter_history_fn is None:
+    回测层继续走全量指标计算 (fail-closed)。"""
+    if declared or not has_filter_history:
         return declared
     from app.strategy.feature_deps import infer_features_from_sources
 
@@ -268,6 +270,277 @@ def _resolve_required_features(meta: dict, mod, filter_history_fn, path: Path) -
         len(inferred),
     )
     return inferred
+
+
+def _resolve_required_features(meta: dict, mod, filter_history_fn, path: Path) -> frozenset[str]:
+    declared = frozenset(meta.get("required_features", []) or []) | frozenset(
+        getattr(mod, "REQUIRED_FEATURES", []) or []
+    )
+    return _resolve_required_features_from_declared(
+        meta,
+        declared,
+        filter_history_fn is not None,
+        path,
+    )
+
+
+_TRUSTED_STRATEGY_DIRS = (
+    Path(__file__).resolve().parent / "research",
+)
+
+
+def _is_trusted_strategy_path(path: Path) -> bool:
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return False
+    return any(resolved.is_relative_to(d.resolve()) for d in _TRUSTED_STRATEGY_DIRS)
+
+
+def _make_digest_proxy_fn(source_digest: str, runner: Callable[..., Any]) -> Callable[..., Any]:
+    """Return a real FunctionType carrying source_digest in __code__.co_consts."""
+    def _proxy(*args: Any, **kwargs: Any) -> Any:
+        return runner(*args, **kwargs)
+
+    old_consts = _proxy.__code__.co_consts
+    code = _proxy.__code__.replace(co_consts=(*old_consts, f"tsp-sandbox:{source_digest}"))
+    return types.FunctionType(
+        code,
+        _proxy.__globals__,
+        name=f"_sandbox_{source_digest[:12]}",
+        closure=_proxy.__closure__,
+    )
+
+
+class _SandboxSessionHolder:
+    """Lazy thread-safe SandboxSession holder shared by one sandboxed StrategyDef."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._session: Any | None = None
+
+    def get(self):
+        from app.strategy.sandbox_runner import create_session
+
+        with self._lock:
+            if self._session is None:
+                self._session = create_session()
+            return self._session
+
+    def close(self) -> None:
+        with self._lock:
+            if self._session is not None:
+                self._session.close()
+                self._session = None
+
+
+class SandboxedMatrixStrategy:
+    """Out-of-process MatrixStrategy proxy keeping Protocol, metadata, and revision hash."""
+
+    def __init__(
+        self,
+        path: Path,
+        matrix_info: Mapping[str, Any],
+        source_digest: str,
+        session_holder: _SandboxSessionHolder,
+    ) -> None:
+        self._path = path
+        self._required_fields = frozenset(str(x) for x in (matrix_info.get("required_fields") or ()))
+        self._scoring = matrix_info.get("scoring")
+        self._directions = matrix_info.get("directions")
+        self._session_holder = session_holder
+        if matrix_info.get("has_required_fields_for_params"):
+            self.required_fields_for_params = self._required_fields_for_params_impl
+        self.compute_signals = _make_digest_proxy_fn(source_digest, self._compute_signals_impl)
+
+    def required_fields(self) -> frozenset[str]:
+        return self._required_fields
+
+    def required_warmup_bars(self, params: dict) -> int:
+        from app.strategy.sandbox_runner import run_matrix_required_warmup_bars
+
+        return run_matrix_required_warmup_bars(
+            self._path,
+            params,
+            session=self._session_holder.get(),
+        )
+
+    def _required_fields_for_params_impl(self, params: dict) -> frozenset[str]:
+        from app.strategy.sandbox_runner import run_matrix_required_fields_for_params
+
+        return run_matrix_required_fields_for_params(
+            self._path,
+            params,
+            session=self._session_holder.get(),
+        )
+
+    def _compute_signals_impl(self, market: Any, params: dict) -> Any:
+        from app.strategy.sandbox_runner import run_matrix_compute_signals
+
+        return run_matrix_compute_signals(
+            self._path,
+            market,
+            params,
+            session=self._session_holder.get(),
+        )
+
+    def close(self) -> None:
+        self._session_holder.close()
+
+
+def _close_strategy_sessions(strategies: Iterable[StrategyDef]) -> None:
+    for strategy in strategies:
+        for obj in (
+            strategy.filter_fn,
+            strategy.filter_history_fn,
+            strategy.filter_minute_history_fn,
+            strategy.matrix_strategy,
+        ):
+            holder = getattr(obj, "_sandbox_session_holder", None)
+            if holder is not None:
+                holder.close()
+            close_fn = getattr(obj, "close", None)
+            if callable(close_fn):
+                close_fn()
+
+
+def _infer_source_from_path(path: Path) -> str:
+    normalized_path = str(path).replace("\\", "/")
+    if "/ai/" in normalized_path:
+        return "ai"
+    if "/composite/" in normalized_path:
+        return "composite"
+    return "custom"
+
+
+def _normalize_meta_fields(meta: dict, path: Path) -> dict:
+    meta = dict(meta or {})
+    meta.setdefault("id", path.stem)
+    meta.setdefault("name", path.stem)
+    meta.setdefault("description", "")
+    meta.setdefault("tags", [])
+    meta.setdefault("params", [])
+    meta.setdefault("scoring", {})
+    meta.setdefault("order_by", "score")
+    meta.setdefault("descending", True)
+    meta.setdefault("limit", 100)
+    meta.setdefault("asset_types", ["stock"])
+    meta.setdefault("timeframes", ["1d"])
+    for field_name in ("asset_types", "timeframes"):
+        values = meta.get(field_name)
+        if (
+            not isinstance(values, (list, tuple))
+            or not values
+            or any(not isinstance(value, str) or not value for value in values)
+        ):
+            raise ValueError(f"META[{field_name!r}] must be a non-empty string list")
+        meta[field_name] = list(dict.fromkeys(values))
+    meta["params"] = _normalize_param_defs(meta.get("params"))
+    return meta
+
+
+def _try_load_composite_statically(path: Path, code: str) -> StrategyDef | None:
+    """Declarative composite strategies need zero code execution; parse safely via AST."""
+    tree = ast.parse(code)
+    top_literals: dict[str, Any] = {}
+    has_nonliteral_composite_field = False
+    has_exec_defs = False
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in {
+            "filter",
+            "filter_history",
+            "filter_minute_history",
+        }:
+            has_exec_defs = True
+        elif isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    if target.id == "MATRIX_STRATEGY":
+                        has_exec_defs = True
+                    elif target.id in {
+                        "META",
+                        "EXECUTION_BACKEND",
+                        "BASIC_FILTER",
+                        "ENTRY_SIGNALS",
+                        "EXIT_SIGNALS",
+                        "STOP_LOSS",
+                        "TAKE_PROFIT",
+                        "TRAILING_STOP",
+                        "TRAILING_TAKE_PROFIT_ACTIVATE",
+                        "TRAILING_TAKE_PROFIT_DRAWDOWN",
+                        "MAX_HOLD_DAYS",
+                        "LOOKBACK_DAYS",
+                        "SCORING",
+                        "REQUIRED_FEATURES",
+                    }:
+                        try:
+                            top_literals[target.id] = ast.literal_eval(node.value)
+                        except (ValueError, SyntaxError):
+                            has_nonliteral_composite_field = True
+        elif (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.value is not None
+            and node.target.id in {"META", "EXECUTION_BACKEND"}
+        ):
+            try:
+                top_literals[node.target.id] = ast.literal_eval(node.value)
+            except (ValueError, SyntaxError):
+                has_nonliteral_composite_field = True
+
+    raw_meta = top_literals.get("META")
+    exec_backend = top_literals.get("EXECUTION_BACKEND")
+    if exec_backend is None and isinstance(raw_meta, dict):
+        exec_backend = raw_meta.get("execution_backend")
+    if exec_backend != "composite":
+        return None
+    if has_nonliteral_composite_field or not isinstance(raw_meta, dict):
+        return None
+    if has_exec_defs:
+        raise ValueError(
+            "composite strategy must not declare filter, filter_history or MATRIX_STRATEGY"
+        )
+
+    meta = _normalize_meta_fields(raw_meta, path)
+    bf = {**DEFAULT_BASIC_FILTER}
+    if isinstance(top_literals.get("BASIC_FILTER"), dict):
+        bf.update(top_literals["BASIC_FILTER"])
+    if isinstance(meta.get("basic_filter"), dict):
+        bf.update(meta["basic_filter"])
+    composite_spec = _parse_composite_children(meta.get("children"))
+    module_scoring = top_literals.get("SCORING")
+    scoring_columns = (
+        tuple(str(k) for k in module_scoring)
+        if isinstance(module_scoring, dict) and module_scoring
+        else ()
+    )
+    required_features = frozenset(meta.get("required_features", []) or []) | frozenset(
+        top_literals.get("REQUIRED_FEATURES", []) or []
+    )
+    return StrategyDef(
+        meta=meta,
+        basic_filter=bf,
+        entry_signals=list(top_literals.get("ENTRY_SIGNALS") or []),
+        exit_signals=list(top_literals.get("EXIT_SIGNALS") or []),
+        stop_loss=top_literals.get("STOP_LOSS"),
+        take_profit=top_literals.get("TAKE_PROFIT"),
+        trailing_stop=top_literals.get("TRAILING_STOP"),
+        trailing_take_profit_activate=top_literals.get("TRAILING_TAKE_PROFIT_ACTIVATE"),
+        trailing_take_profit_drawdown=top_literals.get("TRAILING_TAKE_PROFIT_DRAWDOWN"),
+        max_hold_days=top_literals.get("MAX_HOLD_DAYS"),
+        filter_fn=None,
+        filter_history_fn=None,
+        required_features=required_features,
+        lookback_days=int(top_literals.get("LOOKBACK_DAYS", meta.get("lookback_days", 1)) or 1),
+        source=_infer_source_from_path(path),
+        file_path=path,
+        execution_backend="composite",
+        matrix_strategy=None,
+        composite=composite_spec,
+        filter_minute_history_fn=None,
+        minute_daily_bars=0,
+        scoring_columns=scoring_columns,
+    )
 
 
 class StrategyEngine:
@@ -358,9 +631,12 @@ class StrategyEngine:
 
         self._load_errors = errors
         if errors and retain_previous_on_error:
+            _close_strategy_sessions(candidates.values())
             return False
 
+        old_strategies = self._strategies
         self._strategies = candidates
+        _close_strategy_sessions(old_strategies.values())
         for strategy_id, strategy in candidates.items():
             logger.debug("loaded strategy: %s (%s)", strategy_id, strategy.source)
         return not errors
@@ -418,9 +694,7 @@ class StrategyEngine:
 
     @staticmethod
     def _load_file(path: Path) -> StrategyDef:
-        """从 Python 文件加载策略定义"""
-        # 纵深防御: 执行前再跑一次 AST 安全校验, 防止策略文件被直接篡改
-        # 绕过 API 校验后, 在 exec_module 时执行恶意代码。
+        """从 Python 文件加载策略定义 (H-03 UUID 命名空间 + C-01 沙箱子进程隔离)."""
         dependency_paths = [
             candidate
             for candidate in path.parent.glob("_*.py")
@@ -448,78 +722,63 @@ class StrategyEngine:
         except SyntaxError as e:
             raise ValueError(f"策略语法错误: 第 {e.lineno} 行, {e.msg}") from e
         except (OSError, UnicodeDecodeError) as e:
-            # fail-closed: 文件读不到/读不懂时不得放行到 exec_module,
+            # fail-closed: 文件读不到/读不懂时不得放行到后续加载,
             # 否则异常输入即可让校验静默跳过 (GH #475 同类逃逸)。
             raise ValueError(f"策略安全校验失败: {e}") from e
 
-        spec = importlib.util.spec_from_file_location(path.stem, path)
+        static_composite = _try_load_composite_statically(path, code)
+        if static_composite is not None:
+            return static_composite
+
+        if _is_trusted_strategy_path(path):
+            return StrategyEngine._load_trusted_file_in_process(path, dependency_names)
+        return StrategyEngine._load_untrusted_file_in_sandbox(path)
+
+    @staticmethod
+    def _load_trusted_file_in_process(
+        path: Path,
+        dependency_names: frozenset[str],
+    ) -> StrategyDef:
+        """加载仓库受信任研究策略 (UUID 命名空间 + 清理临时 sys.modules, 修复 H-03)."""
+        mod_name = f"_tsp_strategy_{uuid.uuid4().hex}"
+        spec = importlib.util.spec_from_file_location(mod_name, path)
         if spec is None or spec.loader is None:
             raise ValueError(f"cannot load module from {path}")
         mod = importlib.util.module_from_spec(spec)
         with StrategyEngine._module_load_lock:
-            previous_module = sys.modules.get(spec.name)
-            sys.modules[spec.name] = mod
+            previous_module = sys.modules.get(mod_name)
+            prior_deps = {
+                dep_name: sys.modules.get(dep_name)
+                for dep_name in dependency_names
+            }
+            sys.modules[mod_name] = mod
             inserted_path = str(path.parent)
             sys.path.insert(0, inserted_path)
             try:
                 for dependency_name in dependency_names:
                     sys.modules.pop(dependency_name, None)
                 spec.loader.exec_module(mod)
-            except Exception:
-                if previous_module is None:
-                    sys.modules.pop(spec.name, None)
-                else:
-                    sys.modules[spec.name] = previous_module
-                raise
             finally:
-                try:
+                if previous_module is None:
+                    sys.modules.pop(mod_name, None)
+                else:
+                    sys.modules[mod_name] = previous_module
+                for dep_name, prev_dep in prior_deps.items():
+                    if prev_dep is None:
+                        sys.modules.pop(dep_name, None)
+                    else:
+                        sys.modules[dep_name] = prev_dep
+                with contextlib.suppress(ValueError):
                     sys.path.remove(inserted_path)
-                except ValueError:
-                    pass
 
-        meta = dict(getattr(mod, "META", {}) or {})
-        meta.setdefault("id", path.stem)
-        meta.setdefault("name", path.stem)
-        meta.setdefault("description", "")
-        meta.setdefault("tags", [])
-        meta.setdefault("params", [])
-        meta.setdefault("scoring", {})
-        meta.setdefault("order_by", "score")
-        meta.setdefault("descending", True)
-        meta.setdefault("limit", 100)
-
-        # research/ 目录: 挖掘功能的研究模板 (research_only), 对外按 custom 口径。
-        source = "custom"
-        normalized_path = str(path).replace("\\", "/")
-        if "/ai/" in normalized_path:
-            source = "ai"
-        elif "/composite/" in normalized_path:
-            source = "composite"
-
-        meta.setdefault("asset_types", ["stock"])
-        meta.setdefault("timeframes", ["1d"])
-        for field_name in ("asset_types", "timeframes"):
-            values = meta.get(field_name)
-            if (
-                not isinstance(values, (list, tuple))
-                or not values
-                or any(not isinstance(value, str) or not value for value in values)
-            ):
-                raise ValueError(f"META[{field_name!r}] must be a non-empty string list")
-            meta[field_name] = list(dict.fromkeys(values))
-
-        # 归一化 params 为标准 list[dict]: custom/AI 策略的 META["params"] 可能是
-        # dict / list[str] 等非标准格式 (LLM 偶发漂移 / 用户手改), 不归一化的话会在
-        # _strategy_detail() 的 {p["id"]: p["default"] for p in params} 处抛 TypeError,
-        # 导致整个 /api/strategies 列表 500. 降级为空 list 而非崩溃, 策略仍可见可用.
-        meta["params"] = _normalize_param_defs(meta.get("params"))
+        meta = _normalize_meta_fields(dict(getattr(mod, "META", {}) or {}), path)
+        source = _infer_source_from_path(path)
 
         # 合并默认基础过滤
         bf = {**DEFAULT_BASIC_FILTER}
         strat_bf = getattr(mod, "BASIC_FILTER", None)
         if strat_bf:
             bf.update(strat_bf)
-        # meta 里的 basic_filter 也合并（优先级最高）
         meta_bf = meta.get("basic_filter")
         if meta_bf:
             bf.update(meta_bf)
@@ -545,9 +804,6 @@ class StrategyEngine:
             )
 
         matrix_strategy = getattr(mod, "MATRIX_STRATEGY", None)
-        # 因子排名类策略 (custom_factor_*) 把评分因子写在模块 SCORING 常量里交给
-        # MATRIX_STRATEGY 构造, 不进 META.scoring — 依赖闭包 (strategy_bundle) 需要
-        # 在加载期拿到它, 与 ENTRY_SIGNALS 等常量同一口径。
         module_scoring = getattr(mod, "SCORING", None)
         scoring_columns: tuple[str, ...] = ()
         if isinstance(module_scoring, dict) and module_scoring:
@@ -567,9 +823,6 @@ class StrategyEngine:
             if filter_fn is None or filter_history_fn is not None:
                 raise ValueError("polars_expr strategy must declare only filter")
         elif execution_backend == "composite":
-            # 叠加策略是声明式的: 不含业务代码, 仅通过 META["children"] 引用其他策略。
-            # 引用合法性(子策略存在/非嵌套/asset_types 一致/数量上限)延后到
-            # _load_all 两阶段校验 —— 因为此时注册表尚未加载完, 无法判断 child 是否存在。
             if (
                 filter_fn is not None
                 or filter_history_fn is not None
@@ -580,9 +833,6 @@ class StrategyEngine:
                 )
             composite_spec = _parse_composite_children(meta.get("children"))
         elif execution_backend == "minute_filter":
-            # 分钟形态策略: 只声明 filter_minute_history; 数据源是本地当日分钟K分区
-            # (由 ScreenerService.build_strategy_context 的 1m 分支注入), 因此 timeframes
-            # 必须且只能是 ["1m"] — 混入 1d 会让日线 context 走错数据路径。
             if (
                 filter_minute_history_fn is None
                 or filter_fn is not None
@@ -596,8 +846,6 @@ class StrategyEngine:
                 raise ValueError(
                     "minute_filter strategy must declare timeframes == ['1m']"
                 )
-            # 可选日线历史窗口: 声明 daily_history_bars 时 fn 必须接受 daily 关键字,
-            # 引擎会把 context.daily_history (enriched 日线窗口) 注入进来。
             minute_daily_bars = int(meta.get("daily_history_bars") or 0)
             if minute_daily_bars < 0 or minute_daily_bars > 250:
                 raise ValueError(
@@ -630,6 +878,190 @@ class StrategyEngine:
             filter_history_fn=filter_history_fn,
             required_features=_resolve_required_features(meta, mod, filter_history_fn, path),
             lookback_days=int(getattr(mod, "LOOKBACK_DAYS", meta.get("lookback_days", 1)) or 1),
+            source=source,
+            file_path=path,
+            execution_backend=execution_backend,
+            matrix_strategy=matrix_strategy,
+            composite=composite_spec,
+            filter_minute_history_fn=filter_minute_history_fn,
+            minute_daily_bars=minute_daily_bars,
+            scoring_columns=scoring_columns,
+        )
+
+    @staticmethod
+    def _load_untrusted_file_in_sandbox(path: Path) -> StrategyDef:
+        """在独立隔离沙箱子进程检查并封装自定义/AI 策略 (C-01 + H-03)."""
+        from app.strategy import sandbox_runner
+
+        info = sandbox_runner.inspect_strategy(path)
+        meta = _normalize_meta_fields(dict(info.get("meta") or {}), path)
+        source = _infer_source_from_path(path)
+
+        bf = {**DEFAULT_BASIC_FILTER}
+        strat_bf = info.get("basic_filter")
+        if isinstance(strat_bf, dict) and strat_bf:
+            bf.update(strat_bf)
+        meta_bf = meta.get("basic_filter")
+        if isinstance(meta_bf, dict) and meta_bf:
+            bf.update(meta_bf)
+
+        has_filter = bool(info.get("has_filter"))
+        has_filter_history = bool(info.get("has_filter_history"))
+        has_filter_minute_history = bool(info.get("has_filter_minute_history"))
+        has_matrix_strategy = bool(info.get("has_matrix_strategy"))
+
+        execution_backend = str(info.get("execution_backend") or "polars_expr")
+        valid_backends = {"polars_expr", "matrix_native", "python_history_legacy", "composite", "minute_filter"}
+        if execution_backend not in valid_backends:
+            raise ValueError(
+                f"unsupported execution backend {execution_backend!r}; "
+                f"expected one of {sorted(valid_backends)}"
+            )
+
+        scoring_columns = tuple(str(x) for x in (info.get("scoring_columns") or ()))
+        source_digest = str(info.get("source_digest") or "")
+        session_holder = _SandboxSessionHolder()
+
+        filter_fn: Callable[[pl.DataFrame, dict], pl.Expr] | None = None
+        filter_history_fn: Callable[[pl.DataFrame, dict], pl.DataFrame] | None = None
+        filter_minute_history_fn: Callable[..., pl.DataFrame] | None = None
+        matrix_strategy: SandboxedMatrixStrategy | None = None
+        composite_spec: CompositeSpec | None = None
+        minute_daily_bars = 0
+
+        if execution_backend == "matrix_native":
+            matrix_info = info.get("matrix_info")
+            if not has_matrix_strategy:
+                raise ValueError("matrix_native strategy must declare MATRIX_STRATEGY")
+            if not isinstance(matrix_info, dict):
+                raise TypeError("MATRIX_STRATEGY must implement MatrixStrategy")
+            if has_filter or has_filter_history:
+                raise ValueError("matrix_native strategy must not declare filter or filter_history")
+            matrix_strategy = SandboxedMatrixStrategy(
+                path,
+                matrix_info,
+                source_digest,
+                session_holder,
+            )
+        elif execution_backend == "polars_expr":
+            if not has_filter or has_filter_history:
+                raise ValueError("polars_expr strategy must declare only filter")
+
+            def _run_filter(df: pl.DataFrame, params: dict) -> pl.Expr:
+                return sandbox_runner.run_filter_expr(
+                    path,
+                    df,
+                    params,
+                    session=session_holder.get(),
+                )
+
+            filter_fn = _make_digest_proxy_fn(source_digest, _run_filter)
+            filter_fn._sandbox_session_holder = session_holder  # type: ignore[attr-defined]
+        elif execution_backend == "composite":
+            if has_filter or has_filter_history or has_matrix_strategy:
+                raise ValueError(
+                    "composite strategy must not declare filter, filter_history or MATRIX_STRATEGY"
+                )
+            composite_spec = _parse_composite_children(meta.get("children"))
+        elif execution_backend == "minute_filter":
+            if (
+                not has_filter_minute_history
+                or has_filter
+                or has_filter_history
+                or has_matrix_strategy
+            ):
+                raise ValueError(
+                    "minute_filter strategy must declare only filter_minute_history"
+                )
+            if meta.get("timeframes") != ["1m"]:
+                raise ValueError(
+                    "minute_filter strategy must declare timeframes == ['1m']"
+                )
+            minute_daily_bars = int(meta.get("daily_history_bars") or 0)
+            if minute_daily_bars < 0 or minute_daily_bars > 250:
+                raise ValueError(
+                    "minute_filter daily_history_bars must be within [0, 250]"
+                )
+            if minute_daily_bars > 0 and not info.get("minute_daily_param_ok"):
+                raise ValueError(
+                    "minute_filter daily_history_bars requires "
+                    "filter_minute_history to accept a 'daily' keyword"
+                )
+
+            def _run_minute(
+                history: pl.DataFrame,
+                params: dict,
+                *,
+                daily: pl.DataFrame | None = None,
+                _has_daily: bool = False,
+            ) -> pl.DataFrame:
+                return sandbox_runner.run_filter_minute_history(
+                    path,
+                    history,
+                    params,
+                    daily=daily,
+                    has_daily=minute_daily_bars > 0 or _has_daily,
+                    session=session_holder.get(),
+                )
+
+            if minute_daily_bars > 0:
+                def _run_minute_with_daily(
+                    history: pl.DataFrame,
+                    params: dict,
+                    *,
+                    daily: pl.DataFrame | None = None,
+                ) -> pl.DataFrame:
+                    return _run_minute(history, params, daily=daily, _has_daily=True)
+
+                filter_minute_history_fn = _make_digest_proxy_fn(
+                    source_digest,
+                    _run_minute_with_daily,
+                )
+            else:
+                def _run_minute_basic(history: pl.DataFrame, params: dict) -> pl.DataFrame:
+                    return _run_minute(history, params, _has_daily=False)
+
+                filter_minute_history_fn = _make_digest_proxy_fn(
+                    source_digest,
+                    _run_minute_basic,
+                )
+            filter_minute_history_fn._sandbox_session_holder = session_holder  # type: ignore[attr-defined]
+        else:
+            if not has_filter_history or has_filter:
+                raise ValueError("python_history_legacy strategy must declare only filter_history")
+
+            def _run_history(df: pl.DataFrame, params: dict) -> pl.DataFrame:
+                return sandbox_runner.run_filter_history(
+                    path,
+                    df,
+                    params,
+                    session=session_holder.get(),
+                )
+
+            filter_history_fn = _make_digest_proxy_fn(source_digest, _run_history)
+            filter_history_fn._sandbox_session_holder = session_holder  # type: ignore[attr-defined]
+
+        declared_features = frozenset(str(x) for x in (info.get("required_features") or ()))
+        return StrategyDef(
+            meta=meta,
+            basic_filter=bf,
+            entry_signals=list(info.get("entry_signals") or []),
+            exit_signals=list(info.get("exit_signals") or []),
+            stop_loss=info.get("stop_loss"),
+            take_profit=info.get("take_profit"),
+            trailing_stop=info.get("trailing_stop"),
+            trailing_take_profit_activate=info.get("trailing_take_profit_activate"),
+            trailing_take_profit_drawdown=info.get("trailing_take_profit_drawdown"),
+            max_hold_days=info.get("max_hold_days"),
+            filter_fn=filter_fn,
+            filter_history_fn=filter_history_fn,
+            required_features=_resolve_required_features_from_declared(
+                meta,
+                declared_features,
+                has_filter_history,
+                path,
+            ),
+            lookback_days=int(info.get("lookback_days") or 1),
             source=source,
             file_path=path,
             execution_backend=execution_backend,
@@ -687,8 +1119,9 @@ class StrategyEngine:
         if strategy_id not in self._strategies:
             return False
         strategies = dict(self._strategies)
-        strategies.pop(strategy_id)
+        removed = strategies.pop(strategy_id)
         self._strategies = strategies
+        _close_strategy_sessions([removed])
         self.definition_revision += 1
         with self._realtime_matrix_lock:
             self._realtime_matrices.clear()

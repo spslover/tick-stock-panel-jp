@@ -15,6 +15,7 @@ import {
   useCapabilities,
 } from '@/lib/useSharedQueries'
 import { useUpdateQuoteInterval, useToggleRealtimeQuotes } from '@/lib/useSharedMutations'
+import { useI18n } from '@/lib/i18n'
 import { api, type EmailSmtpConfig } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { useCardFlash, cardFlashCls } from '@/lib/useCardFlash'
@@ -45,6 +46,7 @@ const EMPTY_EMAIL_SMTP: EmailSmtpConfig = {
 // ===== 导出为 Panel 组件 (由 Settings.tsx 嵌入) =====
 
 export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = {}) {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const { data: prefs } = usePreferences()
   const { data: caps } = useCapabilities()
@@ -151,7 +153,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
     try {
       await api.updateRealtimeMonitorConfig(cfg)
       qc.invalidateQueries({ queryKey: QK.preferences })
-    } catch (e) {
+    } catch {
       // 忽略 — Toast 已在 request 层处理
     }
   }, [qc])
@@ -179,17 +181,17 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
     mutationFn: ({ url, secret }: { url: string; secret: string }) => api.updateFeishuWebhook(url, secret),
     onSuccess: () => {
       setFeishuError('')
-      toast('飞书 Webhook 已保存', 'success')
+      toast(tx('飞书 Webhook 已保存'), 'success')
       qc.invalidateQueries({ queryKey: QK.preferences })
     },
-    onError: (err: any) => setFeishuError(String(err?.message ?? '保存失败')),
+    onError: (err: any) => setFeishuError(String(err?.message ?? tx('保存失败'))),
   })
   const FEISHU_PREFIX = 'https://open.feishu.cn/open-apis/bot/v2/hook/'
   const submitFeishu = useCallback(() => {
     const url = feishuDraft.trim()
     const secret = feishuSecretDraft.trim()
     if (url && !url.startsWith(FEISHU_PREFIX)) {
-      setFeishuError('地址需以 ' + FEISHU_PREFIX + ' 开头')
+      setFeishuError(tx('地址需以 {p} 开头', { p: FEISHU_PREFIX }))
       return
     }
     saveFeishuWebhook.mutate({ url, secret })
@@ -199,17 +201,17 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
     mutationFn: (url: string) => api.updateWecomWebhook(url),
     onSuccess: () => {
       setWecomError('')
-      toast('企业微信 Webhook 已保存', 'success')
+      toast(tx('企业微信 Webhook 已保存'), 'success')
       qc.invalidateQueries({ queryKey: QK.preferences })
     },
-    onError: (err: any) => setWecomError(String(err?.message ?? '保存失败')),
+    onError: (err: any) => setWecomError(String(err?.message ?? tx('保存失败'))),
   })
   const WECOM_PREFIX = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send'
   const submitWecom = useCallback(() => {
     const url = wecomDraft.trim()
     // 允许完整 URL 或纯 key (36位UUID样式)
     if (url && !url.startsWith(WECOM_PREFIX) && url.length < 20) {
-      setWecomError('请输入完整 Webhook 地址或纯 key (至少 20 位)')
+      setWecomError(tx('请输入完整 Webhook 地址或纯 key (至少 20 位)'))
       return
     }
     saveWecomWebhook.mutate(url)
@@ -227,15 +229,15 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
     onSuccess: () => {
       setCustomError('')
       setCustomSecretDraft('')
-      toast('第三方 Webhook 已保存', 'success')
+      toast(tx('第三方 Webhook 已保存'), 'success')
       qc.invalidateQueries({ queryKey: QK.preferences })
     },
-    onError: (err: any) => setCustomError(String(err?.message ?? '保存失败')),
+    onError: (err: any) => setCustomError(String(err?.message ?? tx('保存失败'))),
   })
   const submitCustom = useCallback(() => {
     const url = customDraft.trim()
     if (url && !/^https?:\/\//i.test(url)) {
-      setCustomError('请输入完整的 HTTP(S) URL')
+      setCustomError(tx('请输入完整的 HTTP(S) URL'))
       return
     }
     saveCustomWebhook.mutate({
@@ -253,10 +255,10 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
     onSuccess: () => {
       setEmailError('')
       setEmailPasswordDraft('')
-      toast('邮件推送配置已保存', 'success')
+      toast(tx('邮件推送配置已保存'), 'success')
       qc.invalidateQueries({ queryKey: QK.preferences })
     },
-    onError: (err: any) => setEmailError(String(err?.message ?? '保存失败')),
+    onError: (err: any) => setEmailError(String(err?.message ?? tx('保存失败'))),
   })
   const submitEmail = useCallback(() => {
     saveEmailSmtp.mutate({
@@ -280,14 +282,14 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
       api.updateWecomBot(botId, secret, true),
     onSuccess: (data) => {
       setBotError('')
-      toast('智能机器人凭证已保存, 正在连接…', 'success')
+      toast(tx('智能机器人凭证已保存, 正在连接…'), 'success')
       setBotStatus({
         connected: data.wecom_bot_status?.connected ?? false,
         last_error: data.wecom_bot_status?.last_error ?? '',
       })
       qc.invalidateQueries({ queryKey: QK.preferences })
     },
-    onError: (err: any) => setBotError(String(err?.message ?? '保存失败')),
+    onError: (err: any) => setBotError(String(err?.message ?? tx('保存失败'))),
   })
   const submitBot = useCallback(() => {
     saveWecomBot.mutate({ botId: botIdDraft.trim(), secret: botSecretDraft.trim() })
@@ -312,7 +314,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
       // 修正后连板梯队数据变了, 刷新相关缓存
       qc.invalidateQueries({ queryKey: ['limit-ladder'] })
     },
-    onError: () => toast('修正请求失败', 'error'),
+    onError: () => toast(tx('修正请求失败'), 'error'),
   })
 
   useEffect(() => {
@@ -361,14 +363,14 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
       {/* ========== 左列 ========== */}
       <div className="space-y-6">
         {/* 行情状态 — 开关 + 间隔 */}
-        <Card icon={Activity} title="行情轮询" anchor="quotes">
+        <Card icon={Activity} title={tx('行情轮询')} anchor="quotes">
           <ToggleRow
-            label="实时行情"
+            label={tx('实时行情')}
             desc={
-              isPaused ? '数据同步运行中，已临时暂停'
-              : isRunning && isTrading ? '运行中'
-              : isRunning ? '运行中 (非交易时段)'
-              : '已关闭'
+              isPaused ? tx('数据同步运行中，已临时暂停')
+              : isRunning && isTrading ? tx('运行中')
+              : isRunning ? tx('运行中 (非交易时段)')
+              : tx('已关闭')
             }
             checked={realtimeEnabled}
             onChange={handleToggleQuote}
@@ -378,10 +380,9 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
           <div className="mt-3 pt-3 border-t border-border">
             <div className="flex items-center justify-between gap-4 py-1">
               <div className="min-w-0">
-                <div className="text-sm text-foreground">轮询间隔</div>
+                <div className="text-sm text-foreground">{tx('轮询间隔')}</div>
                 <div className="text-[11px] text-muted">
-                  每轮拉取全市场行情的时间间隔
-                </div>
+                  {tx('每轮拉取全市场行情的时间间隔')}</div>
               </div>
               <span className="text-[11px] font-mono text-foreground shrink-0 tabular-nums">
                 {intervalDraft < 1 ? intervalDraft.toFixed(1) : intervalDraft.toFixed(0)}s
@@ -398,23 +399,21 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                 className="flex-1 h-1 accent-accent cursor-pointer"
               />
               <span className="text-[10px] text-muted shrink-0">
-                {intervalDraft !== interval ? '2秒后保存' : `${minInterval}s — ${maxInterval}s`}
+                {intervalDraft !== interval ? tx('2秒后保存') : `${minInterval}s — ${maxInterval}s`}
               </span>
             </div>
           </div>
         </Card>
 
-        <Card icon={Wifi} title="页面实时刷新">
+        <Card icon={Wifi} title={tx('页面实时刷新')}>
           <p className="text-xs text-secondary mb-4">
-            选择哪些页面跟随 SSE 实时刷新数据。关闭的页面不会被推送，
-            但行情轮询和策略监控不受影响。
-          </p>
+            {tx('选择哪些页面跟随 SSE 实时刷新数据。关闭的页面不会被推送， 但行情轮询和策略监控不受影响。')}</p>
           <div className="space-y-2">
             {Object.entries(PAGE_LABELS).map(([key, label]) => (
               <ToggleRow
                 key={key}
-                label={label}
-                desc={`SSE 推送时刷新 ${label} 数据`}
+                label={tx(label)}
+                desc={tx('SSE 推送时刷新 {name} 数据', { name: tx(label) })}
                 checked={refreshPages[key] !== false}
                 onChange={(v) => save({ sse_refresh_pages: { ...refreshPages, [key]: v } })}
               />
@@ -423,20 +422,19 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
         </Card>
 
         {/* 自选列表分时图实时刷新 (默认关闭, 开启后盘中按设定间隔轮询刷新分时数据) */}
-        <Card icon={Activity} title="分时图刷新" anchor="intraday-refresh">
+        <Card icon={Activity} title={tx('分时图刷新')} anchor="intraday-refresh">
           <ToggleRow
-            label="自选/策略分时图实时刷新"
-            desc={`开启后自选与策略列表的分时图盘中每 ${intradayInterval} 秒自动刷新（依赖分钟K批量数据 + 实时行情运行）。关闭时仅打开页面时拉取一次, 可点表头刷新按钮手动更新。`}
+            label={tx('自选/策略分时图实时刷新')}
+            desc={tx('开启后自选与策略列表的分时图盘中每 {n} 秒自动刷新（依赖分钟K批量数据 + 实时行情运行）。关闭时仅打开页面时拉取一次, 可点表头刷新按钮手动更新。', { n: intradayInterval })}
             checked={prefs?.minute_intraday_refresh ?? false}
             onChange={(v) => save({ minute_intraday_refresh: v })}
           />
           <div className="mt-3 pt-3 border-t border-border">
             <div className="flex items-center justify-between gap-4 py-1">
               <div className="min-w-0">
-                <div className="text-sm text-foreground">刷新间隔</div>
+                <div className="text-sm text-foreground">{tx('刷新间隔')}</div>
                 <div className="text-[11px] text-muted">
-                  间隔越短更新越及时, 但越耗数据源配额 (rpm)
-                </div>
+                  {tx('间隔越短更新越及时, 但越耗数据源配额 (rpm)')}</div>
               </div>
               <span className="text-[11px] font-mono text-foreground shrink-0 tabular-nums">
                 {intradayIntervalDraft}s
@@ -453,7 +451,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                 className="flex-1 h-1 accent-accent cursor-pointer"
               />
               <span className="text-[10px] text-muted shrink-0">
-                {intradayIntervalDraft !== intradayInterval ? '2秒后保存' : '3s — 60s'}
+                {intradayIntervalDraft !== intradayInterval ? tx('2秒后保存') : '3s — 60s'}
               </span>
             </div>
           </div>
@@ -464,14 +462,14 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
       {/* ========== 右列 ========== */}
       <div className="space-y-6">
         {/* 全量分钟: 盘中全市场分钟落盘, 按能力路由 (TickFlow Expert 或声明 full_minute 的插件/自定义源) */}
-        <Card icon={Zap} title="全量分钟" anchor="minute-refresh">
+        <Card icon={Zap} title={tx('全量分钟')} anchor="minute-refresh">
           <ToggleRow
-            label="全量分钟落盘"
+            label={tx('全量分钟落盘')}
             desc={
-              !hasFullMinuteCap ? '需要全量分钟能力 (TickFlow Expert 或声明该能力的自定义源)'
-              : rs?.repair_only ? `服务运行中 · ${rs?.provider ?? '自定义源'} 无廉价增量端点, 按 ≥60s 全天批量节奏`
-              : rs?.running ? (rs?.in_trading_hours ? '服务运行中' : '运行中 · 非连续竞价时段暂停')
-              : '已关闭'
+              !hasFullMinuteCap ? tx('需要全量分钟能力 (TickFlow Expert 或声明该能力的自定义源)')
+              : rs?.repair_only ? tx('服务运行中 · {p} 无廉价增量端点, 按 ≥60s 全天批量节奏', { p: rs?.provider ?? tx('自定义源') })
+              : rs?.running ? (rs?.in_trading_hours ? tx('服务运行中') : tx('运行中 · 非连续竞价时段暂停'))
+              : tx('已关闭')
             }
             checked={prefs?.minute_refresh_enabled ?? false}
             onChange={(v) => save({ minute_refresh_enabled: v })}
@@ -480,10 +478,9 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
           <div className="mt-3 pt-3 border-t border-border">
             <div className="flex items-center justify-between gap-4 py-1">
               <div className="min-w-0">
-                <div className="text-sm text-foreground">刷新间隔</div>
+                <div className="text-sm text-foreground">{tx('刷新间隔')}</div>
                 <div className="text-[11px] text-muted">
-                  交易时段内全市场分钟K增量落盘的间隔; 稳态单请求增量, 冷启动/断档自动全天回补
-                </div>
+                  {tx('交易时段内全市场分钟K增量落盘的间隔; 稳态单请求增量, 冷启动/断档自动全天回补')}</div>
               </div>
               <span className="text-[11px] font-mono text-foreground shrink-0 tabular-nums">
                 {minuteRefreshIntervalDraft >= 60 && minuteRefreshIntervalDraft % 60 === 0 ? `${minuteRefreshIntervalDraft / 60}m` : `${minuteRefreshIntervalDraft}s`}
@@ -501,12 +498,12 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                 className="flex-1 h-1 accent-accent cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               />
               <span className="text-[10px] text-muted shrink-0">
-                {minuteRefreshIntervalDraft !== minuteRefreshInterval ? '2秒后保存' : '3s — 120s'}
+                {minuteRefreshIntervalDraft !== minuteRefreshInterval ? tx('2秒后保存') : '3s — 120s'}
               </span>
             </div>
             {rs?.available && rs.rounds != null && rs.rounds > 0 && (
               <div className="mt-2 text-[10px] text-muted">
-                已 {rs.rounds} 轮 · 最近 {rs.last_symbols} 标的 / {rs.last_rows} 行 / {rs.last_requests} 请求
+                {tx('已 {a} 轮 · 最近 {b} 标的 / {c} 行 / {d} 请求', { a: rs.rounds, b: rs.last_symbols ?? 0, c: rs.last_rows ?? 0, d: rs.last_requests ?? 0 })}
                 {rs.last_round_ms != null ? ` · ${(rs.last_round_ms / 1000).toFixed(1)}s` : ''}
                 {rs.last_error ? ` · ${rs.last_error}` : ''}
               </div>
@@ -517,9 +514,9 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
         {/* 连板梯队降级修正 */}
         <Card
           icon={Flame}
-          title="连板梯队降级修正"
+          title={tx('连板梯队降级修正')}
           anchor="depth-fix"
-          badge={!hasDepth ? '五档盘口不可用' : undefined}
+          badge={!hasDepth ? tx('五档盘口不可用') : undefined}
           right={hasDepth ? (
             <button
               onClick={() => runFix.mutate()}
@@ -529,26 +526,23 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                          disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Zap className="h-3 w-3" />
-              {runFix.isPending ? '修正中…' : '立即修正'}
+              {runFix.isPending ? tx('修正中…') : tx('立即修正')}
             </button>
           ) : undefined}
         >
           {hasDepth ? (
             <>
               <p className="text-xs text-secondary mb-4">
-                通过五档盘口实时修正真假涨停/跌停。真封板显示封单量,假涨停(收盘价=涨停价但卖一有量)归入炸板。
-                盘中按设定间隔轮询,收盘后自动定版。
-              </p>
+                {tx('通过五档盘口实时修正真假涨停/跌停。真封板显示封单量,假涨停(收盘价=涨停价但卖一有量)归入炸板。 盘中按设定间隔轮询,收盘后自动定版。')}</p>
               <ToggleRow
-                label="启用真假板修正"
-                desc="开启后盘中自动拉取五档盘口修正真假板"
+                label={tx('启用真假板修正')}
+                desc={tx('开启后盘中自动拉取五档盘口修正真假板')}
                 checked={limitLadderMonitor}
                 onChange={toggleLimitLadderMonitor}
               />
               <div className="mt-4 pt-3 border-t border-border">
                 <div className="text-[10px] uppercase tracking-widest text-muted mb-3">
-                  五档盘口配置
-                </div>
+                  {tx('五档盘口配置')}</div>
                 <DepthConfigContent disabled={!limitLadderMonitor} />
               </div>
             </>
@@ -560,11 +554,9 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
         {/* 推送通知 — 监控告警的外部推送渠道 (全局配置)。
             飞书 / 企业微信 / 第三方 Webhook / 邮件。
             每个渠道合并成一行: 勾选=新建规则默认推送, 点行展开地址配置。 */}
-        <Card icon={Webhook} title="推送通知" anchor="webhooks">
+        <Card icon={Webhook} title={tx('推送通知')} anchor="webhooks">
           <p className="text-xs text-secondary mb-3">
-            监控规则命中后,可把告警推送到外部。勾选渠道作为<b className="text-foreground/80">新建规则的默认推送</b>,
-            单条规则仍可在编辑页独立修改。
-          </p>
+            {tx('监控规则命中后,可把告警推送到外部。勾选渠道作为')}<b className="text-foreground/80">{tx('新建规则的默认推送')}</b>{tx(', 单条规则仍可在编辑页独立修改。')}</p>
 
           {/* 渠道列表 — 每行一个渠道, 勾选默认 + 点行展开地址配置 */}
           <div className="space-y-2">
@@ -579,16 +571,16 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                   checked={webhookDefaultChannels.includes('feishu')}
                   onChange={e => { e.stopPropagation(); toggleDefaultChannel('feishu', e.target.checked) }}
                   onClick={e => e.stopPropagation()}
-                  title="作为新建规则的默认推送渠道"
+                  title={tx('作为新建规则的默认推送渠道')}
                   className="h-3 w-3 accent-accent cursor-pointer"
                 />
-                <span className="text-[11px] font-medium text-foreground">飞书</span>
-                <span className="text-[9px] text-muted">群推送 Webhook</span>
+                <span className="text-[11px] font-medium text-foreground">{tx('飞书')}</span>
+                <span className="text-[9px] text-muted">{tx('群推送 Webhook')}</span>
                 {webhookDefaultChannels.includes('feishu') && (
-                  <span className="rounded bg-accent/15 px-1 py-px text-[9px] text-accent">默认</span>
+                  <span className="rounded bg-accent/15 px-1 py-px text-[9px] text-accent">{tx('默认')}</span>
                 )}
                 <span className={`ml-auto text-[9px] ${feishuWebhookUrl ? 'text-emerald-500' : 'text-warning'}`}>
-                  {feishuWebhookUrl ? '已配置' : '未配置'}
+                  {feishuWebhookUrl ? tx('已配置') : tx('未配置')}
                 </span>
                 <ChevronDown className={`h-3 w-3 text-muted transition-transform ${channelOpen ? 'rotate-180' : ''}`} />
               </div>
@@ -597,7 +589,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
               {channelOpen && (
                 <div className="border-t border-border/60 bg-base/30 p-3">
                   <label className="block space-y-1.5">
-                    <span className="text-[11px] text-muted">Webhook 地址</span>
+                    <span className="text-[11px] text-muted">{tx('Webhook 地址')}</span>
                     <input
                       value={feishuDraft}
                       onChange={e => { setFeishuDraft(e.target.value); if (!testFeishu.isPending) testFeishu.reset() }}
@@ -607,12 +599,12 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                   </label>
 
                   <label className="block mt-2 space-y-1.5">
-                    <span className="text-[11px] text-muted">签名密钥 (可选 · 启用签名校验时填)</span>
+                    <span className="text-[11px] text-muted">{tx('签名密钥 (可选 · 启用签名校验时填)')}</span>
                     <input
                       type="password"
                       value={feishuSecretDraft}
                       onChange={e => { setFeishuSecretDraft(e.target.value); if (!testFeishu.isPending) testFeishu.reset() }}
-                      placeholder="机器人未启用签名校验则留空"
+                      placeholder={tx('机器人未启用签名校验则留空')}
                       className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50"
                     />
                   </label>
@@ -627,29 +619,27 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                       disabled={saveFeishuWebhook.isPending || (feishuDraft.trim() === feishuWebhookUrl && feishuSecretDraft.trim() === feishuWebhookSecret)}
                       className="px-3 py-1.5 rounded-btn bg-accent text-white text-xs font-medium disabled:opacity-50 cursor-pointer hover:bg-accent/90 transition-colors"
                     >
-                      {saveFeishuWebhook.isPending ? '保存中…' : '保存'}
+                      {saveFeishuWebhook.isPending ? tx('保存中…') : tx('保存')}
                     </button>
                     <TestSendButton test={testFeishu} configured={!!feishuWebhookUrl} />
                     {feishuWebhookUrl && (
-                      <span className="text-[10px] text-emerald-500">● 已配置</span>
+                      <span className="text-[10px] text-emerald-500">{tx('● 已配置')}</span>
                     )}
                     <TestResult test={testFeishu} />
                   </div>
 
                   <details className="mt-3 text-[10px] text-muted">
-                    <summary className="cursor-pointer hover:text-secondary">如何获取飞书 Webhook 地址?</summary>
+                    <summary className="cursor-pointer hover:text-secondary">{tx('如何获取飞书 Webhook 地址?')}</summary>
                     <ol className="mt-1.5 space-y-1 pl-4 list-decimal leading-relaxed">
-                      <li>打开飞书,进入目标群聊 → 群设置 → <b>群推送 Webhook</b></li>
-                      <li>点击「添加机器人」→ 选择「<b>自定义机器人</b>」</li>
-                      <li>填写机器人名称后添加,复制生成的 Webhook 地址</li>
-                      <li>安全设置若启用了「<b>签名校验</b>」,把密钥一并复制填到「签名密钥」框</li>
-                      <li>粘贴到上方输入框并保存</li>
+                      <li>{tx('打开飞书,进入目标群聊 → 群设置 →')} <b>{tx('群推送 Webhook')}</b></li>
+                      <li>{tx('点击「添加机器人」→ 选择「')}<b>{tx('自定义机器人')}</b>」</li>
+                      <li>{tx('填写机器人名称后添加,复制生成的 Webhook 地址')}</li>
+                      <li>{tx('安全设置若启用了「')}<b>{tx('签名校验')}</b>{tx('」,把密钥一并复制填到「签名密钥」框')}</li>
+                      <li>{tx('粘贴到上方输入框并保存')}</li>
                     </ol>
                     <p className="mt-1.5 pl-4 text-muted/70">
-                      📖 官方文档:
-                      <a href="https://open.feishu.cn/document/client-docs/bot-v3/add-custom-bot?lang=zh-CN" target="_blank" rel="noreferrer" className="text-accent hover:text-accent/80">
-                        自定义机器人使用指南 ↗
-                      </a>
+                      {tx('📖 官方文档:')}<a href="https://open.feishu.cn/document/client-docs/bot-v3/add-custom-bot?lang=zh-CN" target="_blank" rel="noreferrer" className="text-accent hover:text-accent/80">
+                        {tx('自定义机器人使用指南 ↗')}</a>
                     </p>
                   </details>
                 </div>
@@ -667,16 +657,16 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                   checked={webhookDefaultChannels.includes('wecom')}
                   onChange={e => { e.stopPropagation(); toggleDefaultChannel('wecom', e.target.checked) }}
                   onClick={e => e.stopPropagation()}
-                  title="作为新建规则的默认推送渠道"
+                  title={tx('作为新建规则的默认推送渠道')}
                   className="h-3 w-3 accent-accent cursor-pointer"
                 />
-                <span className="text-[11px] font-medium text-foreground">企业微信</span>
-                <span className="text-[9px] text-muted">群推送 Webhook</span>
+                <span className="text-[11px] font-medium text-foreground">{tx('企业微信')}</span>
+                <span className="text-[9px] text-muted">{tx('群推送 Webhook')}</span>
                 {webhookDefaultChannels.includes('wecom') && (
-                  <span className="rounded bg-accent/15 px-1 py-px text-[9px] text-accent">默认</span>
+                  <span className="rounded bg-accent/15 px-1 py-px text-[9px] text-accent">{tx('默认')}</span>
                 )}
                 <span className={`ml-auto text-[9px] ${wecomWebhookUrl ? 'text-emerald-500' : 'text-warning'}`}>
-                  {wecomWebhookUrl ? '已配置' : '未配置'}
+                  {wecomWebhookUrl ? tx('已配置') : tx('未配置')}
                 </span>
                 <ChevronDown className={`h-3 w-3 text-muted transition-transform ${wecomOpen ? 'rotate-180' : ''}`} />
               </div>
@@ -684,11 +674,11 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
               {wecomOpen && (
                 <div className="border-t border-border/60 bg-base/30 p-3">
                   <label className="block space-y-1.5">
-                    <span className="text-[11px] text-muted">Webhook 地址 或 Key</span>
+                    <span className="text-[11px] text-muted">{tx('Webhook 地址 或 Key')}</span>
                     <input
                       value={wecomDraft}
                       onChange={e => { setWecomDraft(e.target.value); if (!testWecom.isPending) testWecom.reset() }}
-                      placeholder={WECOM_PREFIX + '?key=xxxxxxxx' + ' 或直接填 key'}
+                      placeholder={WECOM_PREFIX + '?key=xxxxxxxx' + ' ' + tx('或直接填 key')}
                       className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50"
                     />
                   </label>
@@ -703,29 +693,27 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                       disabled={saveWecomWebhook.isPending || wecomDraft.trim() === wecomWebhookUrl}
                       className="px-3 py-1.5 rounded-btn bg-accent text-white text-xs font-medium disabled:opacity-50 cursor-pointer hover:bg-accent/90 transition-colors"
                     >
-                      {saveWecomWebhook.isPending ? '保存中…' : '保存'}
+                      {saveWecomWebhook.isPending ? tx('保存中…') : tx('保存')}
                     </button>
                     <TestSendButton test={testWecom} configured={!!wecomWebhookUrl} />
                     {wecomWebhookUrl && (
-                      <span className="text-[10px] text-emerald-500">● 已配置</span>
+                      <span className="text-[10px] text-emerald-500">{tx('● 已配置')}</span>
                     )}
                     <TestResult test={testWecom} />
                   </div>
 
                   <details className="mt-3 text-[10px] text-muted">
-                    <summary className="cursor-pointer hover:text-secondary">如何获取企业微信 Webhook 地址?</summary>
+                    <summary className="cursor-pointer hover:text-secondary">{tx('如何获取企业微信 Webhook 地址?')}</summary>
                     <ol className="mt-1.5 space-y-1 pl-4 list-decimal leading-relaxed">
-                      <li>打开企业微信,进入目标群聊 → 右上角「...」→ <b>群推送 Webhook</b></li>
-                      <li>点击「添加」→ 选择「<b>消息推送</b>」→ 填写名字</li>
-                      <li>复制生成的 <b>Webhook 地址</b>(含 key 参数),粘贴到上方输入框</li>
-                      <li>也可只复制 key 参数部分(= 后面的内容)填入</li>
-                      <li>企业微信群的消息可同步到绑定的个人微信,实现"微信推送"</li>
+                      <li>{tx('打开企业微信,进入目标群聊 → 右上角「...」→')} <b>{tx('群推送 Webhook')}</b></li>
+                      <li>{tx('点击「添加」→ 选择「')}<b>{tx('消息推送')}</b>{tx('」→ 填写名字')}</li>
+                      <li>{tx('复制生成的')} <b>{tx('Webhook 地址')}</b>{tx('(含 key 参数),粘贴到上方输入框')}</li>
+                      <li>{tx('也可只复制 key 参数部分(= 后面的内容)填入')}</li>
+                      <li>{tx('企业微信群的消息可同步到绑定的个人微信,实现"微信推送"')}</li>
                     </ol>
                     <p className="mt-1.5 pl-4 text-muted/70">
-                      📖 官方文档:
-                      <a href="https://developer.work.weixin.qq.com/document/path/91770" target="_blank" rel="noreferrer" className="text-accent hover:text-accent/80">
-                        群推送 Webhook 使用指南 ↗
-                      </a>
+                      {tx('📖 官方文档:')}<a href="https://developer.work.weixin.qq.com/document/path/91770" target="_blank" rel="noreferrer" className="text-accent hover:text-accent/80">
+                        {tx('群推送 Webhook 使用指南 ↗')}</a>
                     </p>
                   </details>
                 </div>
@@ -743,16 +731,16 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                   checked={webhookDefaultChannels.includes('custom')}
                   onChange={e => { e.stopPropagation(); toggleDefaultChannel('custom', e.target.checked) }}
                   onClick={e => e.stopPropagation()}
-                  title="作为新建规则的默认推送渠道"
+                  title={tx('作为新建规则的默认推送渠道')}
                   className="h-3 w-3 accent-accent cursor-pointer"
                 />
-                <span className="text-[11px] font-medium text-foreground">第三方系统</span>
+                <span className="text-[11px] font-medium text-foreground">{tx('第三方系统')}</span>
                 <span className="text-[9px] text-muted">JSON Webhook</span>
                 {webhookDefaultChannels.includes('custom') && (
-                  <span className="rounded bg-accent/15 px-1 py-px text-[9px] text-accent">默认</span>
+                  <span className="rounded bg-accent/15 px-1 py-px text-[9px] text-accent">{tx('默认')}</span>
                 )}
                 <span className={`ml-auto text-[9px] ${customWebhookUrl ? 'text-emerald-500' : 'text-warning'}`}>
-                  {customWebhookUrl ? '已配置' : '未配置'}
+                  {customWebhookUrl ? tx('已配置') : tx('未配置')}
                 </span>
                 <ChevronDown className={`h-3 w-3 text-muted transition-transform ${customOpen ? 'rotate-180' : ''}`} />
               </div>
@@ -760,7 +748,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
               {customOpen && (
                 <div className="border-t border-border/60 bg-base/30 p-3">
                   <label className="block space-y-1.5">
-                    <span className="text-[11px] text-muted">接收端 URL</span>
+                    <span className="text-[11px] text-muted">{tx('接收端 URL')}</span>
                     <input
                       value={customDraft}
                       onChange={e => { setCustomDraft(e.target.value); if (!testCustom.isPending) testCustom.reset() }}
@@ -769,12 +757,12 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                     />
                   </label>
                   <label className="block mt-2 space-y-1.5">
-                    <span className="text-[11px] text-muted">签名密钥 (可选 · HMAC-SHA256)</span>
+                    <span className="text-[11px] text-muted">{tx('签名密钥 (可选 · HMAC-SHA256)')}</span>
                     <input
                       type="password"
                       value={customSecretDraft}
                       onChange={e => setCustomSecretDraft(e.target.value)}
-                      placeholder={customWebhookSecretSet ? '已保存；留空保持不变' : '留空则不签名'}
+                      placeholder={customWebhookSecretSet ? tx('已保存；留空保持不变') : tx('留空则不签名')}
                       className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50"
                     />
                   </label>
@@ -785,17 +773,15 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                       disabled={saveCustomWebhook.isPending || (customDraft.trim() === customWebhookUrl && !customSecretDraft)}
                       className="px-3 py-1.5 rounded-btn bg-accent text-white text-xs font-medium disabled:opacity-50 cursor-pointer hover:bg-accent/90 transition-colors"
                     >
-                      {saveCustomWebhook.isPending ? '保存中…' : '保存'}
+                      {saveCustomWebhook.isPending ? tx('保存中…') : tx('保存')}
                     </button>
                     <TestSendButton test={testCustom} configured={!!customWebhookUrl} />
                     <TestResult test={testCustom} />
                   </div>
                   <details className="mt-3 text-[10px] text-muted">
-                    <summary className="cursor-pointer hover:text-secondary">请求格式</summary>
+                    <summary className="cursor-pointer hover:text-secondary">{tx('请求格式')}</summary>
                     <p className="mt-1.5 leading-relaxed">
-                      POST JSON 包含 event、timestamp、title、body、data。配置密钥后会附带
-                      X-TickFlow-Timestamp 和 X-TickFlow-Signature 请求头。
-                    </p>
+                      {tx('POST JSON 包含 event、timestamp、title、body、data。配置密钥后会附带 X-TickFlow-Timestamp 和 X-TickFlow-Signature 请求头。')}</p>
                   </details>
                 </div>
               )}
@@ -812,16 +798,16 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                   checked={webhookDefaultChannels.includes('email')}
                   onChange={e => { e.stopPropagation(); toggleDefaultChannel('email', e.target.checked) }}
                   onClick={e => e.stopPropagation()}
-                  title="作为新建规则的默认推送渠道"
+                  title={tx('作为新建规则的默认推送渠道')}
                   className="h-3 w-3 accent-accent cursor-pointer"
                 />
-                <span className="text-[11px] font-medium text-foreground">邮件</span>
+                <span className="text-[11px] font-medium text-foreground">{tx('邮件')}</span>
                 <span className="text-[9px] text-muted">SMTP</span>
                 {webhookDefaultChannels.includes('email') && (
-                  <span className="rounded bg-accent/15 px-1 py-px text-[9px] text-accent">默认</span>
+                  <span className="rounded bg-accent/15 px-1 py-px text-[9px] text-accent">{tx('默认')}</span>
                 )}
                 <span className={`ml-auto text-[9px] ${emailConfigured ? 'text-emerald-500' : 'text-warning'}`}>
-                  {emailConfigured ? '已配置' : '未配置'}
+                  {emailConfigured ? tx('已配置') : tx('未配置')}
                 </span>
                 <ChevronDown className={`h-3 w-3 text-muted transition-transform ${emailOpen ? 'rotate-180' : ''}`} />
               </div>
@@ -830,44 +816,44 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                 <div className="border-t border-border/60 bg-base/30 p-3">
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_6rem_8rem]">
                     <label className="space-y-1.5">
-                      <span className="text-[11px] text-muted">SMTP 主机</span>
+                      <span className="text-[11px] text-muted">{tx('SMTP 主机')}</span>
                       <input value={emailDraft.host} onChange={e => setEmailDraft(d => ({ ...d, host: e.target.value }))} placeholder="smtp.example.com" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground" />
                     </label>
                     <label className="space-y-1.5">
-                      <span className="text-[11px] text-muted">端口</span>
+                      <span className="text-[11px] text-muted">{tx('端口')}</span>
                       <input type="number" min={1} max={65535} value={emailDraft.port} onChange={e => setEmailDraft(d => ({ ...d, port: Number(e.target.value) }))} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground" />
                     </label>
                     <label className="space-y-1.5">
-                      <span className="text-[11px] text-muted">加密</span>
+                      <span className="text-[11px] text-muted">{tx('加密')}</span>
                       <select value={emailDraft.security} onChange={e => setEmailDraft(d => ({ ...d, security: e.target.value as EmailSmtpConfig['security'] }))} className="h-9 w-full rounded-btn border border-border bg-base px-2 text-xs text-foreground">
                         <option value="ssl">SSL</option>
                         <option value="starttls">STARTTLS</option>
-                        <option value="none">无</option>
+                        <option value="none">{tx('无')}</option>
                       </select>
                     </label>
                   </div>
                   <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <label className="space-y-1.5">
-                      <span className="text-[11px] text-muted">登录用户名 (可选)</span>
+                      <span className="text-[11px] text-muted">{tx('登录用户名 (可选)')}</span>
                       <input value={emailDraft.username} onChange={e => setEmailDraft(d => ({ ...d, username: e.target.value }))} placeholder="bot@example.com" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground" />
                     </label>
                     <label className="space-y-1.5">
-                      <span className="text-[11px] text-muted">密码 / 授权码 (可选)</span>
-                      <input type="password" value={emailPasswordDraft} onChange={e => setEmailPasswordDraft(e.target.value)} placeholder={emailSmtpPasswordSet ? '已保存；留空保持不变' : '无认证服务器可留空'} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground" />
+                      <span className="text-[11px] text-muted">{tx('密码 / 授权码 (可选)')}</span>
+                      <input type="password" value={emailPasswordDraft} onChange={e => setEmailPasswordDraft(e.target.value)} placeholder={emailSmtpPasswordSet ? tx('已保存；留空保持不变') : tx('无认证服务器可留空')} className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground" />
                     </label>
                     <label className="space-y-1.5">
-                      <span className="text-[11px] text-muted">发件人</span>
+                      <span className="text-[11px] text-muted">{tx('发件人')}</span>
                       <input value={emailDraft.from_address} onChange={e => setEmailDraft(d => ({ ...d, from_address: e.target.value }))} placeholder="bot@example.com" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground" />
                     </label>
                     <label className="space-y-1.5">
-                      <span className="text-[11px] text-muted">收件人 (多个用逗号分隔)</span>
+                      <span className="text-[11px] text-muted">{tx('收件人 (多个用逗号分隔)')}</span>
                       <input value={emailDraft.to_addresses.join(', ')} onChange={e => setEmailDraft(d => ({ ...d, to_addresses: e.target.value.split(/[,;，；\n]/) }))} placeholder="alerts@example.com" className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground" />
                     </label>
                   </div>
                   {emailError && <div className="mt-2 text-[11px] text-danger">{emailError}</div>}
                   <div className="mt-2 flex items-center gap-2">
                     <button onClick={submitEmail} disabled={saveEmailSmtp.isPending} className="px-3 py-1.5 rounded-btn bg-accent text-white text-xs font-medium disabled:opacity-50 cursor-pointer hover:bg-accent/90 transition-colors">
-                      {saveEmailSmtp.isPending ? '保存中…' : '保存'}
+                      {saveEmailSmtp.isPending ? tx('保存中…') : tx('保存')}
                     </button>
                     <TestSendButton test={testEmail} configured={emailConfigured} />
                     <TestResult test={testEmail} />
@@ -888,13 +874,13 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                   onChange={e => { e.stopPropagation(); toggleBotConnection.mutate(e.target.checked) }}
                   onClick={e => e.stopPropagation()}
                   disabled={!wecomBotId || toggleBotConnection.isPending}
-                  title="开启后建立长连接保活, 关闭则断开"
+                  title={tx('开启后建立长连接保活, 关闭则断开')}
                   className="h-3 w-3 accent-accent cursor-pointer disabled:opacity-40"
                 />
-                <span className="text-[11px] font-medium text-foreground">企业微信</span>
-                <span className="text-[9px] text-muted">智能机器人</span>
+                <span className="text-[11px] font-medium text-foreground">{tx('企业微信')}</span>
+                <span className="text-[9px] text-muted">{tx('智能机器人')}</span>
                 <span className={`ml-auto text-[9px] ${wecomBotId ? (botStatus?.connected ? 'text-emerald-500' : 'text-warning') : 'text-muted'}`}>
-                  {wecomBotId ? (botStatus?.connected ? '已连接' : (wecomBotEnabled ? '连接中' : '已配置')) : '未配置'}
+                  {wecomBotId ? (botStatus?.connected ? tx('已连接') : (wecomBotEnabled ? tx('连接中') : tx('已配置'))) : tx('未配置')}
                 </span>
                 <ChevronDown className={`h-3 w-3 text-muted transition-transform ${botOpen ? 'rotate-180' : ''}`} />
               </div>
@@ -902,26 +888,24 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
               {botOpen && (
                 <div className="border-t border-border/60 bg-base/30 p-3">
                   <p className="mb-2.5 text-[10px] text-muted leading-relaxed">
-                    勾选卡片左侧开关可启用长连接保活(开启后后端持续保持与企业微信的
-                    WebSocket 连接)。保存凭证后需勾选才会连接, 取消勾选则立即断开。
-                  </p>
+                    {tx('勾选卡片左侧开关可启用长连接保活(开启后后端持续保持与企业微信的 WebSocket 连接)。保存凭证后需勾选才会连接, 取消勾选则立即断开。')}</p>
                   <label className="block space-y-1.5">
                     <span className="text-[11px] text-muted">BotID</span>
                     <input
                       value={botIdDraft}
                       onChange={e => setBotIdDraft(e.target.value)}
-                      placeholder="智能机器人的唯一标识"
+                      placeholder={tx('智能机器人的唯一标识')}
                       className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50"
                     />
                   </label>
 
                   <label className="block mt-2 space-y-1.5">
-                    <span className="text-[11px] text-muted">Secret (长连接专用密钥)</span>
+                    <span className="text-[11px] text-muted">{tx('Secret (长连接专用密钥)')}</span>
                     <input
                       type="password"
                       value={botSecretDraft}
                       onChange={e => setBotSecretDraft(e.target.value)}
-                      placeholder="开启长连接 API 模式后获取的密钥"
+                      placeholder={tx('开启长连接 API 模式后获取的密钥')}
                       className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs font-mono text-foreground focus:outline-none focus:border-accent/50"
                     />
                   </label>
@@ -931,7 +915,7 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                   )}
 
                   {botStatus?.last_error && !botError && (
-                    <div className="mt-2 text-[11px] text-warning">连接异常: {botStatus.last_error}</div>
+                    <div className="mt-2 text-[11px] text-warning">{tx('连接异常:')} {botStatus.last_error}</div>
                   )}
 
                   <div className="mt-2 flex items-center gap-2">
@@ -940,30 +924,26 @@ export function SettingsMonitoringPanel({ highlight }: { highlight?: string } = 
                       disabled={saveWecomBot.isPending || (botIdDraft.trim() === wecomBotId && botSecretDraft.trim() === wecomBotSecret)}
                       className="px-3 py-1.5 rounded-btn bg-accent text-white text-xs font-medium disabled:opacity-50 cursor-pointer hover:bg-accent/90 transition-colors"
                     >
-                      {saveWecomBot.isPending ? '保存中…' : '保存并连接'}
+                      {saveWecomBot.isPending ? tx('保存中…') : tx('保存并连接')}
                     </button>
                     {wecomBotId && (
-                      <span className="text-[10px] text-emerald-500">● 已配置</span>
+                      <span className="text-[10px] text-emerald-500">{tx('● 已配置')}</span>
                     )}
                   </div>
 
                   <details className="mt-3 text-[10px] text-muted">
-                    <summary className="cursor-pointer hover:text-secondary">如何获取 BotID 和 Secret?</summary>
+                    <summary className="cursor-pointer hover:text-secondary">{tx('如何获取 BotID 和 Secret?')}</summary>
                     <ol className="mt-1.5 space-y-1 pl-4 list-decimal leading-relaxed">
-                      <li>登录<b>企业微信管理后台</b> → 应用管理 → <b>智能机器人</b> → 创建机器人</li>
-                      <li>填写名称、头像后进入机器人配置页</li>
-                      <li>开启「<b>API 模式</b>」→ 选择「<b>长连接</b>」方式(另一项"回调URL"需公网IP)</li>
-                      <li>页面显示 <b>BotID</b> 和 <b>Secret</b>, 复制填到上方输入框</li>
+                      <li>{tx('登录')}<b>{tx('企业微信管理后台')}</b> {tx('→ 应用管理 →')} <b>{tx('智能机器人')}</b> {tx('→ 创建机器人')}</li>
+                      <li>{tx('填写名称、头像后进入机器人配置页')}</li>
+                      <li>{tx('开启「')}<b>{tx('API 模式')}</b>{tx('」→ 选择「')}<b>{tx('长连接')}</b>{tx('」方式(另一项"回调URL"需公网IP)')}</li>
+                      <li>{tx('页面显示')} <b>BotID</b> {tx('和')} <b>Secret</b>{tx(', 复制填到上方输入框')}</li>
                     </ol>
                     <p className="mt-1.5 pl-4 text-muted/70">
-                      💡 智能机器人支持 @交互和流式回复, 与群推送 Webhook(单向推送)互补。
-                      保存后后端会自动建立 WebSocket 长连接保活。
-                    </p>
+                      {tx('💡 智能机器人支持 @交互和流式回复, 与群推送 Webhook(单向推送)互补。 保存后后端会自动建立 WebSocket 长连接保活。')}</p>
                     <p className="mt-1.5 pl-4 text-muted/70">
-                      📖 官方文档:
-                      <a href="https://developer.work.weixin.qq.com/document/path/101463" target="_blank" rel="noreferrer" className="text-accent hover:text-accent/80">
-                        智能机器人长连接 ↗
-                      </a>
+                      {tx('📖 官方文档:')}<a href="https://developer.work.weixin.qq.com/document/path/101463" target="_blank" rel="noreferrer" className="text-accent hover:text-accent/80">
+                        {tx('智能机器人长连接 ↗')}</a>
                     </p>
                   </details>
                 </div>
@@ -985,14 +965,15 @@ function TestSendButton({ test, configured }: {
   test: { isPending: boolean; mutate: () => void }
   configured: boolean
 }) {
+  const { tx } = useI18n()
   return (
     <button
       onClick={() => test.mutate()}
       disabled={test.isPending || !configured}
-      title={!configured ? '请先完成该渠道配置' : '发送测试消息'}
+      title={!configured ? tx('请先完成该渠道配置') : tx('发送测试消息')}
       className="inline-flex items-center gap-1 px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:text-foreground text-xs disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
     >
-      {test.isPending ? '测试中…' : '测试'}
+      {test.isPending ? tx('测试中…') : tx('测试')}
     </button>
   )
 }
@@ -1000,6 +981,7 @@ function TestSendButton({ test, configured }: {
 function TestResult({ test }: {
   test: { data?: { ok: boolean; detail: string } | null; isError: boolean; error?: Error | null; reset: () => void }
 }) {
+  const { tx } = useI18n()
   // 成功结果 2 秒后自动消失; 失败保留, 便于阅读
   useEffect(() => {
     if (test.data?.ok) {
@@ -1011,7 +993,7 @@ function TestResult({ test }: {
   let text: string | null = null
   let tone = ''
   if (test.isError) {
-    text = String(test.error?.message ?? '发送失败')
+    text = String(test.error?.message ?? tx('发送失败'))
     tone = 'text-danger'
   } else if (test.data) {
     text = (test.data.ok ? '✓ ' : '✗ ') + test.data.detail

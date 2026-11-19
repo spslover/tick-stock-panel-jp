@@ -2,28 +2,47 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/uiPrefs', () => ({ hydrateUiPrefs: () => Promise.resolve(), setUiPref: vi.fn() }))
+vi.mock('@/lib/i18n', () => ({ getLocale: () => 'zh-CN' }))
 
-let requests: Array<{ messages: Array<Record<string, unknown>> }>
-let replies: Array<Array<Record<string, unknown>>>
+interface TestContext {
+  requests: Array<{ messages: Array<Record<string, unknown>> }>
+  replies: Array<Array<Record<string, unknown>>>
+  stores: Array<typeof import('./store')>
+}
+
+let ctx: TestContext
+
+async function waitForIdle(store: typeof import('./store'), expectedRequests: number) {
+  await vi.waitFor(() => {
+    expect(ctx.requests).toHaveLength(expectedRequests)
+    expect(store.activeSession()?.messages.some(m => m.role === 'assistant' && m.streaming)).toBe(false)
+  }, { interval: 5, timeout: 3000 })
+}
 
 beforeEach(() => {
   vi.resetModules()
   vi.useFakeTimers()
   localStorage.clear()
-  requests = []
-  replies = []
+  const localCtx: TestContext = { requests: [], replies: [], stores: [] }
+  ctx = localCtx
   vi.stubGlobal('fetch', vi.fn(async (url, init) => {
     if (url === '/api/custom/assistant/chat') {
-      requests.push(JSON.parse(init.body))
-      return new Response((replies.shift() ?? []).map(e => JSON.stringify(e)).join('\n'))
+      localCtx.requests.push(JSON.parse(init.body))
+      return new Response((localCtx.replies.shift() ?? []).map(e => JSON.stringify(e)).join('\n'))
     }
     return new Response(JSON.stringify({ sessions: [], activeId: '' }))
   }))
 })
-afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals() })
+afterEach(() => {
+  for (const s of ctx.stores) s.stopSending()
+  vi.clearAllTimers()
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+  localStorage.clear()
+})
 
 it.each(['模型推理', ''])('preserves reasoning across tools, reload, and the next question (%s)', async reasoning => {
-  replies.push([
+  ctx.replies.push([
     { type: 'delta', content: '查询中' },
     { type: 'assistant_context', reasoning_content: reasoning, reasoning_context: 'profile' },
     { type: 'tool_call', call_id: 'one', name: 'list_strategies', args: {} },
@@ -33,8 +52,9 @@ it.each(['模型推理', ''])('preserves reasoning across tools, reload, and the
     { type: 'done' },
   ])
   let store = await import('./store')
+  ctx.stores.push(store)
   store.sendMessage('查询策略')
-  await vi.waitFor(() => expect(store.activeSession()?.messages.some(m => m.role === 'assistant' && m.streaming)).toBe(false))
+  await waitForIdle(store, 1)
   const saved = JSON.parse(localStorage.getItem('assistant.sessions.v1')!)
   const answers = saved.sessions[0].messages.filter((m: { role: string }) => m.role === 'assistant')
   expect(answers.map((m: { reasoningContent: string }) => m.reasoningContent)).toEqual([reasoning, reasoning + '最终'])
@@ -43,16 +63,17 @@ it.each(['模型推理', ''])('preserves reasoning across tools, reload, and the
   vi.clearAllTimers()
   vi.resetModules()
   store = await import('./store')
-  replies.push([{ type: 'delta', content: '继续回答' }, { type: 'done' }])
+  ctx.stores.push(store)
+  ctx.replies.push([{ type: 'delta', content: '继续回答' }, { type: 'done' }])
   store.sendMessage('继续解释')
-  await vi.waitFor(() => expect(requests).toHaveLength(2))
-  expect(requests[1].messages).toEqual([
+  await waitForIdle(store, 2)
+  expect(ctx.requests[1].messages).toEqual([
     { role: 'user', content: '查询策略' },
     { role: 'assistant', content: '查询中', reasoning_content: reasoning, reasoning_context: 'profile' },
     { role: 'assistant', content: '完成', reasoning_content: reasoning + '最终', reasoning_context: 'profile' },
     { role: 'user', content: '继续解释' },
   ])
-})
+}, 30_000)
 
 it('keeps plain-model and old-session history compatible', async () => {
   localStorage.setItem('assistant.sessions.v1', JSON.stringify({ activeId: 'old', sessions: [{
@@ -61,11 +82,12 @@ it('keeps plain-model and old-session history compatible', async () => {
       { id: 'a', role: 'assistant', content: '旧回答', ts: 2, streaming: false },
     ],
   }] }))
-  replies.push([{ type: 'delta', content: '新回答' }, { type: 'done' }])
+  ctx.replies.push([{ type: 'delta', content: '新回答' }, { type: 'done' }])
   const store = await import('./store')
+  ctx.stores.push(store)
   store.sendMessage('继续')
-  await vi.waitFor(() => expect(requests).toHaveLength(1))
-  expect(requests[0].messages).toEqual([
+  await waitForIdle(store, 1)
+  expect(ctx.requests[0].messages).toEqual([
     { role: 'user', content: '旧问题' }, { role: 'assistant', content: '旧回答' },
     { role: 'user', content: '继续' },
   ])

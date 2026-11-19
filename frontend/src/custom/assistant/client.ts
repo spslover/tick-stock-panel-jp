@@ -91,6 +91,8 @@ export async function decideAssistantAction(callId: string, approve: boolean): P
 }
 
 /** 对话主入口: POST NDJSON, 逐行 yield 事件; signal 支持中断。 */
+import { getLocale } from '@/lib/i18n'
+
 export async function* assistantChatStream(
   body: { messages: ChatHistoryMessage[]; context?: AssistantContext },
   signal?: AbortSignal,
@@ -98,7 +100,7 @@ export async function* assistantChatStream(
   const res = await fetch('/api/custom/assistant/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ ...body, locale: getLocale() }),
     signal,
   })
   if (!res.ok) {

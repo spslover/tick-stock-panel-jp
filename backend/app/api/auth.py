@@ -16,14 +16,12 @@
 from __future__ import annotations
 
 import logging
-import time
-from collections import defaultdict
-from threading import Lock
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from app.services import auth
+from app.config import settings
+from app.services import api_gateway, auth
 from app.services.api_gateway import is_local_network as _is_local_network
 
 logger = logging.getLogger(__name__)
@@ -33,64 +31,71 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 COOKIE_NAME = "tf_session"
 _COOKIE_MAX_AGE = 30 * 24 * 3600  # 与 SESSION_TTL 一致
 
-# 限流: { ip: (fail_count, lock_until_ts) }
-_fail_counter: dict[str, tuple[int, float]] = defaultdict(lambda: (0, 0.0))
-_fail_lock = Lock()
 _MAX_FAILS = 5
 _LOCK_SECONDS = 300
 
 
 def _client_ip(request: Request) -> str:
-    """取真实客户端 IP。
+    """取真实客户端 IP (仅对 TRUSTED_PROXY_CIDRS 从右向左剥离 X-Forwarded-For)."""
+    return api_gateway.extract_client_ip(request)
 
-    安全关键: 仅当直连 peer(request.client.host)本身是回环/内网地址
-    (即请求确实经过同机/内网的可信反代)时, 才采信 X-Forwarded-For。
-    否则公网请求可伪造 `X-Forwarded-For: 127.0.0.1` 冒充内网, 绕过
-    「未设密码仅本机可访问」闸门、抢占 setup 端点、并绕过登录限流。
-    """
+
+def is_trusted_proxy_request(request: Request) -> bool:
+    """判断直连 socket peer 是否命中 TRUSTED_PROXY_CIDRS."""
     direct = request.client.host if request.client else ""
-    xff = request.headers.get("x-forwarded-for")
-    if xff and direct and _is_local_network(direct):
-        return xff.split(",")[0].strip()
-    return direct or "unknown"
+    if not direct:
+        return False
+    ip_obj = api_gateway.parse_ip(direct)
+    if ip_obj is None:
+        return False
+    return api_gateway.is_trusted_proxy_ip(ip_obj)
+
+
+def _should_set_secure_cookie(request: Request) -> bool:
+    """根据 AUTH_COOKIE_SECURE / HTTPS / 可信反代 X-Forwarded-Proto 决定 Secure 属性。"""
+    mode = settings.auth_cookie_secure
+    if isinstance(mode, bool):
+        return mode
+    if isinstance(mode, str):
+        norm = mode.strip().lower()
+        if norm in ("true", "1", "yes", "on"):
+            return True
+        if norm in ("false", "0", "no", "off"):
+            return False
+    if (request.url.scheme or "").lower() == "https":
+        return True
+    if is_trusted_proxy_request(request):
+        headers = request.headers
+        if hasattr(headers, "getlist"):
+            xfp_list = [v for v in headers.getlist("x-forwarded-proto") if v]
+            xfp = ",".join(xfp_list).strip()
+        else:
+            xfp = (headers.get("x-forwarded-proto") or "").strip()
+        if xfp:
+            rightmost = xfp.split(",")[-1].strip().lower()
+            if rightmost == "https":
+                return True
+    return False
 
 
 def _check_login_rate_limit(ip: str) -> None:
-    """登录失败限流检查, 触发则抛 429。锁定过期后重置计数(重新给 5 次机会)。"""
-    with _fail_lock:
-        count, until = _fail_counter.get(ip, (0, 0.0))
-        now = time.time()
-        if until > now:
-            wait = int(until - now)
-            raise HTTPException(
-                status_code=429,
-                detail=f"登录失败次数过多, 请 {wait} 秒后重试",
-            )
-        if until and until <= now:
-            # 锁定已过期: 清除旧计数, 否则之后每失败一次都会立刻再锁 5 分钟
-            _fail_counter.pop(ip, None)
+    """登录失败限流检查, 触发则抛 429。"""
+    wait = auth.check_login_rate_limit(ip)
+    if wait is not None:
+        raise HTTPException(
+            status_code=429,
+            detail=f"登录失败次数过多, 请 {wait} 秒后重试",
+        )
 
 
 def _record_login_fail(ip: str) -> None:
     """记录一次登录失败, 达阈值则锁定。"""
-    with _fail_lock:
-        # 防内存膨胀: 条目过多时清掉已过锁定期的记录
-        if len(_fail_counter) > 1000:
-            now = time.time()
-            for stale in [k for k, (_, u) in _fail_counter.items() if u <= now]:
-                _fail_counter.pop(stale, None)
-        count, until = _fail_counter.get(ip, (0, 0.0))
-        count += 1
-        if count >= _MAX_FAILS:
-            until = time.time() + _LOCK_SECONDS
-            logger.warning("auth login locked for %s after %d fails", ip, count)
-        _fail_counter[ip] = (count, until)
+    auth.record_login_fail(ip, max_fails=_MAX_FAILS, lock_seconds=_LOCK_SECONDS)
 
 
 def _clear_login_fails(ip: str) -> None:
     """登录成功后清除该 IP 的失败计数。"""
-    with _fail_lock:
-        _fail_counter.pop(ip, None)
+    auth.clear_login_fails(ip)
 
 
 # ================================================================
@@ -166,7 +171,7 @@ def login(req: LoginIn, request: Request, response: Response) -> dict:
         httponly=True,
         samesite="lax",
         path="/",
-        secure=False,  # 自托管可能无 HTTPS, 不强制 secure(建议反代加 HTTPS)
+        secure=_should_set_secure_cookie(request),
     )
     return {"ok": True, "authenticated": True}
 
@@ -177,12 +182,18 @@ def logout(request: Request, response: Response) -> dict:
     token = request.cookies.get(COOKIE_NAME)
     if token:
         auth.revoke_session(token)
-    response.delete_cookie(key=COOKIE_NAME, path="/")
+    response.delete_cookie(
+        key=COOKIE_NAME,
+        path="/",
+        httponly=True,
+        samesite="lax",
+        secure=_should_set_secure_cookie(request),
+    )
     return {"ok": True}
 
 
 @router.post("/change-password")
-def change_password(req: ChangePasswordIn, request: Request) -> dict:
+def change_password(req: ChangePasswordIn, request: Request, response: Response) -> dict:
     """修改密码: 需验证旧密码, 成功后所有会话失效(含当前, 需重新登录)。"""
     token = request.cookies.get(COOKIE_NAME)
     if not (token and auth.is_valid_session(token)):
@@ -191,15 +202,25 @@ def change_password(req: ChangePasswordIn, request: Request) -> dict:
     if not auth.is_configured():
         raise HTTPException(status_code=409, detail="尚未设置访问密码")
 
+    ip = _client_ip(request)
+    _check_login_rate_limit(ip)
+
     # 验证旧密码
     new_token = auth.verify_and_create_session(req.old_password)
     if not new_token:
-        ip = _client_ip(request)
         _record_login_fail(ip)
         raise HTTPException(status_code=401, detail="旧密码错误")
     # 临时 token 用完即弃
     auth.revoke_session(new_token)
+    _clear_login_fails(ip)
 
     # 改密码(set_password 会清空所有会话)
     auth.set_password(req.new_password)
+    response.delete_cookie(
+        key=COOKIE_NAME,
+        path="/",
+        httponly=True,
+        samesite="lax",
+        secure=_should_set_secure_cookie(request),
+    )
     return {"ok": True, "message": "密码已修改, 请重新登录"}

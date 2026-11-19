@@ -9,6 +9,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, Download, FileArchive, FlaskConical, RotateCcw, ShieldAlert, TriangleAlert, Upload } from 'lucide-react'
 import { api } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import type { ConfigBackupApplyResult, ConfigBackupInspect } from '@/lib/api'
 import { toast } from '@/components/Toast'
 import { Modal } from '@/components/Modal'
@@ -133,6 +134,7 @@ function CategoryCheck({ label, desc, checked, onChange, sensitive }: {
 }
 
 export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' | 'import' } = {}) {
+  const { tx } = useI18n()
   const qc = useQueryClient()
 
   // ── 导出 ──
@@ -177,7 +179,7 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
       setConfirming(false)
       const imported = r.categories.reduce((s, c) => s + c.imported, 0)
       const failed = r.categories.reduce((s, c) => s + c.failed.length, 0)
-      toast(failed > 0 ? `导入完成: ${imported} 项成功, ${failed} 项失败` : `导入完成: ${imported} 项`, failed > 0 ? 'error' : 'success')
+      toast(failed > 0 ? tx('导入完成: {ok} 项成功, {bad} 项失败', { ok: imported, bad: failed }) : tx('导入完成: {n} 项', { n: imported }), failed > 0 ? 'error' : 'success')
       INVALIDATE_KEYS.forEach((k) => qc.invalidateQueries({ queryKey: k }))
       notifyStrategyLibraryChanged()
     },
@@ -202,8 +204,8 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
       {mode !== 'import' && <div className="rounded-card border border-border bg-surface p-4">
         <CardHeader
           icon={<Download className="h-4 w-4" />}
-          title="导出配置备份"
-          subtitle="打包所选用户配置；外部扩展安装文件需单独保留"
+          title={tx('导出配置备份')}
+          subtitle={tx('打包所选用户配置；外部扩展安装文件需单独保留')}
         >
           <a
             href={exportSel.size > 0 ? api.configBackupExportUrl([...exportSel]) : undefined}
@@ -217,25 +219,22 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
             }`}
           >
             <Download className="h-3.5 w-3.5" />
-            导出 .zip
-          </a>
+            {tx('导出 .zip')}</a>
         </CardHeader>
 
         {!exportSel.has('secrets') && (
           <p role="status" className="mt-2.5 text-xs leading-relaxed text-secondary">
-            当前备份不含 API Key。换机恢复时，请勾选下方“密钥（API Key）”。
-          </p>
+            {tx('当前备份不含 API Key。换机恢复时，请勾选下方“密钥（API Key）”。')}</p>
         )}
 
         {/* 备份内容选择 */}
         <div className="mt-3 rounded-btn border border-border/70 bg-elevated/25 p-2.5">
           <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 px-0.5">
             <div className="flex items-center gap-2 text-[11px] font-medium text-secondary">
-              备份内容
-              <span className={`rounded-full px-1.5 py-px text-[10px] ${
+              {tx('备份内容')}<span className={`rounded-full px-1.5 py-px text-[10px] ${
                 exportSel.size > 0 ? 'bg-accent/10 text-accent' : 'bg-danger/10 text-danger'
               }`}>
-                已选 {exportSel.size} / {CATEGORY_OPTIONS.length}
+                {tx('已选')} {exportSel.size} / {CATEGORY_OPTIONS.length}
               </span>
             </div>
             <div className="flex shrink-0 items-center gap-2 text-[11px]">
@@ -243,23 +242,21 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
                 onClick={() => setExportSel(new Set(DEFAULT_EXPORT_KEYS))}
                 className="whitespace-nowrap text-muted transition-colors hover:text-accent"
               >
-                全选普通配置
-              </button>
+                {tx('全选普通配置')}</button>
               <span className="text-border">·</span>
               <button
                 onClick={() => setExportSel(new Set())}
                 className="text-muted transition-colors hover:text-accent"
               >
-               清空
-              </button>
+               {tx('清空')}</button>
             </div>
           </div>
           <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
             {CATEGORY_OPTIONS.filter((c) => !c.sensitive).map((c) => (
               <CategoryCheck
                 key={c.key}
-                label={c.label}
-                desc={c.desc}
+                label={tx(c.label)}
+                desc={tx(c.desc)}
                 checked={exportSel.has(c.key)}
                 onChange={() => setExportSel((s) => toggleSet(s, c.key))}
               />
@@ -269,8 +266,8 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
               {CATEGORY_OPTIONS.filter((c) => c.sensitive).map((c) => (
                 <CategoryCheck
                   key={c.key}
-                  label={c.label}
-                  desc={c.desc}
+                  label={tx(c.label)}
+                  desc={tx(c.desc)}
                   sensitive
                   checked={exportSel.has(c.key)}
                   onChange={() => setExportSel((s) => toggleSet(s, c.key))}
@@ -284,21 +281,18 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
           <div className="mt-2 flex items-start gap-2 rounded-btn border border-warning/25 bg-warning/[0.07] px-3 py-2 text-[11px] leading-relaxed text-warning">
             <ShieldAlert className="mt-px h-3.5 w-3.5 shrink-0" />
             <span>
-              已勾选敏感内容: 备份文件将包含明文密钥 (AI Key、数据源 Key、Webhook Secret)
-              和/或访问凭证 (密码哈希与会话), 新设备导入后无需重新填写。
-              请妥善保管, 切勿分享或上传到公开位置。
-            </span>
+              {tx('已勾选敏感内容: 备份文件将包含明文密钥 (AI Key、数据源 Key、Webhook Secret) 和/或访问凭证 (密码哈希与会话), 新设备导入后无需重新填写。 请妥善保管, 切勿分享或上传到公开位置。')}</span>
           </div>
         )}
-        <div className="mt-2.5 px-0.5 text-[11px] text-muted">{SCOPE_EXCLUDED}</div>
+        <div className="mt-2.5 px-0.5 text-[11px] text-muted">{tx(SCOPE_EXCLUDED)}</div>
       </div>}
 
       {/* ── 导入 ── */}
       {mode !== 'export' && <div className="rounded-card border border-border bg-surface p-4">
         <CardHeader
           icon={<Upload className="h-4 w-4" />}
-          title="导入配置备份"
-          subtitle="选择导出的备份文件, 预览确认后恢复到本机"
+          title={tx('导入配置备份')}
+          subtitle={tx('选择导出的备份文件, 预览确认后恢复到本机')}
         />
 
         <input
@@ -319,13 +313,13 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
             {inspectM.isPending ? (
               <>
                 <RotateCcw className="h-5 w-5 animate-spin text-accent" />
-                <span className="text-xs text-secondary">解析备份内容…</span>
+                <span className="text-xs text-secondary">{tx('解析备份内容…')}</span>
               </>
             ) : (
               <>
                 <FileArchive className="h-5 w-5 text-accent" />
-                <span className="text-xs text-secondary">点击选择备份文件 (.zip)</span>
-                <span className="text-[11px] text-muted">导入前会先解析预览, 不会直接写入</span>
+                <span className="text-xs text-secondary">{tx('点击选择备份文件 (.zip)')}</span>
+                <span className="text-[11px] text-muted">{tx('导入前会先解析预览, 不会直接写入')}</span>
               </>
             )}
           </button>
@@ -337,14 +331,12 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
               onClick={() => fileRef.current?.click()}
               className="shrink-0 text-[11px] text-muted transition-colors hover:text-accent"
             >
-              重新选择
-            </button>
+              {tx('重新选择')}</button>
           </div>
         )}
         {!inspect && (
           <div className="mt-2 px-0.5 text-[11px] leading-relaxed text-muted">
-            同名文件默认跳过 (可选择覆盖); 偏好与密钥按合并写入, 不会清掉本机已有内容
-          </div>
+            {tx('同名文件默认跳过 (可选择覆盖); 偏好与密钥按合并写入, 不会清掉本机已有内容')}</div>
         )}
 
         {/* 预览 + 类别勾选 */}
@@ -352,11 +344,11 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
           <div className="mt-3 space-y-2.5 rounded-btn border border-border/70 bg-elevated/25 p-3">
             <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
               <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-secondary">
-                备份时间 {fmtTime(inspect.created_at)}
+                {tx('备份时间')} {fmtTime(inspect.created_at)}
               </span>
               {inspect.app_version && (
                 <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-secondary">
-                  来源 v{inspect.app_version}
+                  {tx('来源 v')}{inspect.app_version}
                 </span>
               )}
               <span className={`rounded-full border px-2 py-0.5 ${
@@ -364,20 +356,19 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
                   ? 'border-warning/30 bg-warning/[0.08] text-warning'
                   : 'border-border bg-surface text-muted'
               }`}>
-                {inspect.has_secrets ? '包含密钥' : '不含密钥'}
+                {inspect.has_secrets ? tx('包含密钥') : tx('不含密钥')}
               </span>
               <span className="rounded-full border border-border bg-surface px-2 py-0.5 text-secondary">
-                共 {inspect.total_files} 个文件
-              </span>
+                {tx('共')} {inspect.total_files} {tx('个文件')}</span>
             </div>
 
             <table className="w-full text-[11px]">
               <thead>
                 <tr className="text-muted">
                   <th className="w-8 py-1 font-normal" />
-                  <th className="py-1 text-left font-normal">导入类别</th>
-                  <th className="py-1 text-right font-normal">条目</th>
-                  <th className="py-1 text-right font-normal">冲突</th>
+                  <th className="py-1 text-left font-normal">{tx('导入类别')}</th>
+                  <th className="py-1 text-right font-normal">{tx('条目')}</th>
+                  <th className="py-1 text-right font-normal">{tx('冲突')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -389,7 +380,7 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
                         checked={importSel.has(c.key)}
                         onChange={() => setImportSel((s) => toggleSet(s, c.key))}
                         className="rounded border-border"
-                        aria-label={`导入 ${c.label}`}
+                        aria-label={tx('导入 {name}', { name: tx(c.label) })}
                       />
                     </td>
                     <td className="py-1.5 text-foreground">
@@ -412,11 +403,9 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 text-xs text-foreground">
                     <TriangleAlert className="h-3.5 w-3.5 shrink-0 text-warning" />
-                    覆盖已存在的同名项
-                  </div>
+                    {tx('覆盖已存在的同名项')}</div>
                   <div className="text-[11px] text-muted">
-                    {inspect.conflict_files} 个同名文件默认跳过; 开启后用备份内容覆盖本机同名文件
-                  </div>
+                    {inspect.conflict_files} {tx('个同名文件默认跳过; 开启后用备份内容覆盖本机同名文件')}</div>
                 </div>
                 <button
                   onClick={() => setAllowOverwrite((v) => !v)}
@@ -436,7 +425,7 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
 
             <div className="flex items-center justify-between gap-3 pt-0.5">
               <div className="text-[11px] text-muted">
-                {importSel.size === 0 ? '请至少勾选一个类别' : '导入前请确认备份文件来源可信'}
+                {importSel.size === 0 ? tx('请至少勾选一个类别') : tx('导入前请确认备份文件来源可信')}
               </div>
               <button
                 onClick={() => setConfirming(true)}
@@ -444,8 +433,7 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
                 className="inline-flex shrink-0 items-center gap-1.5 rounded-btn border border-danger/30 bg-danger/10 px-3.5 py-1.5 text-xs font-medium text-danger transition-colors hover:bg-danger/20 disabled:opacity-50"
               >
                 <Upload className="h-3.5 w-3.5" />
-                导入所选 {importSel.size} 个类别
-              </button>
+                {tx('导入所选')} {importSel.size} {tx('个类别')}</button>
             </div>
           </div>
         )}
@@ -455,21 +443,20 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
           <div className="mt-3 space-y-2 rounded-btn border border-border/70 bg-elevated/25 p-3">
             <div className="flex items-center gap-2 text-sm text-foreground">
               <CheckCircle2 className={`h-4 w-4 ${applyResult.categories.some((c) => c.failed.length > 0) ? 'text-warning' : 'text-accent'}`} />
-              导入结果
-            </div>
+              {tx('导入结果')}</div>
             <table className="w-full text-[11px]">
               <thead>
                 <tr className="text-muted">
-                  <th className="py-1 text-left font-normal">类别</th>
-                  <th className="py-1 text-right font-normal">成功</th>
-                  <th className="py-1 text-right font-normal">跳过冲突</th>
-                  <th className="py-1 text-right font-normal">失败</th>
+                  <th className="py-1 text-left font-normal">{tx('类别')}</th>
+                  <th className="py-1 text-right font-normal">{tx('成功')}</th>
+                  <th className="py-1 text-right font-normal">{tx('跳过冲突')}</th>
+                  <th className="py-1 text-right font-normal">{tx('失败')}</th>
                 </tr>
               </thead>
               <tbody>
                 {applyResult.categories.map((c) => (
                   <tr key={c.key} className="border-t border-border/60">
-                    <td className="py-1.5 text-foreground">{c.label}</td>
+                    <td className="py-1.5 text-foreground">{tx(c.label)}</td>
                     <td className="py-1.5 text-right text-secondary">{c.imported}</td>
                     <td className="py-1.5 text-right text-muted">{c.skipped_conflict || '—'}</td>
                     <td className="py-1.5 text-right">
@@ -497,8 +484,7 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
               <div className="space-y-1.5 border-t border-border/60 pt-2">
                 <div className="flex items-center gap-1.5 text-[11px] font-medium text-secondary">
                   <FlaskConical className="h-3.5 w-3.5 text-accent" />
-                  导入冒烟
-                  <span className="font-normal text-muted">校验 → 编译 → 依赖可解析 (不跑回测)</span>
+                  {tx('导入冒烟')}<span className="font-normal text-muted">{tx('校验 → 编译 → 依赖可解析 (不跑回测)')}</span>
                 </div>
                 {applyResult.categories.flatMap((c) =>
                   (c.smoke ?? []).map((sm) => (
@@ -509,7 +495,7 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
                           : <TriangleAlert className="h-3 w-3 shrink-0 text-danger" />}
                         <span className="truncate font-mono text-muted" title={sm.file}>{sm.file}</span>
                         {sm.ok && sm.warmup_bars != null && (
-                          <span className="ml-auto shrink-0 text-muted">预热 {sm.warmup_bars} bars</span>
+                          <span className="ml-auto shrink-0 text-muted">{tx('预热')} {sm.warmup_bars} bars</span>
                         )}
                       </div>
                       {!sm.ok && sm.issues.map((i, idx) => (
@@ -525,38 +511,36 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
             {(applyResult.skipped_unselected > 0 || applyResult.out_of_scope_files > 0) && (
               <div className="space-y-0.5 text-[11px] text-muted">
                 {applyResult.skipped_unselected > 0 && (
-                  <div>{applyResult.skipped_unselected} 个条目属于未勾选的类别, 已跳过</div>
+                  <div>{applyResult.skipped_unselected} {tx('个条目属于未勾选的类别, 已跳过')}</div>
                 )}
                 {applyResult.out_of_scope_files > 0 && (
-                  <div>{applyResult.out_of_scope_files} 个条目不在当前版本支持的备份范围内, 已忽略</div>
+                  <div>{applyResult.out_of_scope_files} {tx('个条目不在当前版本支持的备份范围内, 已忽略')}</div>
                 )}
               </div>
             )}
             <div className="text-[11px] text-muted">
-              偏好与密钥按合并写入 (备份内容覆盖同名项, 本机新增项保留)
-            </div>
+              {tx('偏好与密钥按合并写入 (备份内容覆盖同名项, 本机新增项保留)')}</div>
           </div>
         )}
       </div>}
 
       {/* 二次确认 */}
       {confirming && inspect && (
-        <Modal onClose={closeConfirm} ariaLabel="确认导入配置备份">
+        <Modal onClose={closeConfirm} ariaLabel={tx('确认导入配置备份')}>
           <div className="p-5">
             <div className="flex items-center gap-2">
               <TriangleAlert className="h-4 w-4 text-warning" />
-              <div className="text-sm font-medium">确认导入配置备份?</div>
+              <div className="text-sm font-medium">{tx('确认导入配置备份?')}</div>
             </div>
             <div className="mt-2 space-y-1 text-[12px] text-muted">
-              <div>文件: {file?.name}</div>
+              <div>{tx('文件:')} {file?.name}</div>
               <div>
-                将导入 {importSel.size} 个类别
-                {allowOverwrite ? ', 并覆盖已存在的同名项' : ''}。
+                {tx('将导入')} {importSel.size} {tx('个类别')}{allowOverwrite ? tx(', 并覆盖已存在的同名项') : ''}。
               </div>
               {(importSel.has('secrets') || importSel.has('auth')) && (
-                <div className="text-warning">已勾选敏感内容, 导入后将覆盖本机同名密钥/访问凭证。</div>
+                <div className="text-warning">{tx('已勾选敏感内容, 导入后将覆盖本机同名密钥/访问凭证。')}</div>
               )}
-              <div>策略源码会在导入时执行安全校验, 无法通过校验的条目将被跳过。</div>
+              <div>{tx('策略源码会在导入时执行安全校验, 无法通过校验的条目将被跳过。')}</div>
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button
@@ -564,15 +548,14 @@ export function SettingsBackupPanel({ mode = 'all' }: { mode?: 'all' | 'export' 
                 disabled={applyM.isPending}
                 className="rounded-btn border border-border px-3 py-1.5 text-xs text-muted transition-colors hover:text-foreground disabled:opacity-50"
               >
-                取消
-              </button>
+                {tx('取消')}</button>
               <button
                 onClick={() => applyM.mutate()}
                 disabled={applyM.isPending}
                 className="inline-flex items-center gap-1.5 rounded-btn border border-danger/30 bg-danger/10 px-3 py-1.5 text-xs text-danger transition-colors hover:bg-danger/20 disabled:opacity-50"
               >
                 <Upload className="h-3.5 w-3.5" />
-                {applyM.isPending ? '导入中…' : '确认导入'}
+                {applyM.isPending ? tx('导入中…') : tx('确认导入')}
               </button>
             </div>
           </div>

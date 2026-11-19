@@ -168,3 +168,22 @@ def test_theme_rejects_invalid_modes(prefs_file, value):
     with pytest.raises(ValueError, match="theme"):
         preferences.set_ui_prefs({"theme": value})
     assert preferences.get_ui_prefs()["theme"] == "light"
+
+
+@pytest.mark.parametrize("locale", ["zh-CN", "en", "ja"])
+def test_locale_persists_across_preferences_reload(prefs_file, locale):
+    from app.api.settings import UiPrefsIn, get_preferences, update_ui_prefs
+
+    assert update_ui_prefs(UiPrefsIn(locale=locale))["ui_prefs"]["locale"] == locale
+    preferences._invalidate_cache()
+    assert get_preferences()["ui_prefs"]["locale"] == locale
+    preferences.set_ui_prefs({"locale": None})
+    assert "locale" not in preferences.get_ui_prefs()
+
+
+@pytest.mark.parametrize("value", ["zh", "en-US", "fr", "", True, 1, []])
+def test_locale_rejects_invalid_values(prefs_file, value):
+    preferences.set_ui_prefs({"locale": "ja"})
+    with pytest.raises(ValueError, match="locale"):
+        preferences.set_ui_prefs({"locale": value})
+    assert preferences.get_ui_prefs()["locale"] == "ja"

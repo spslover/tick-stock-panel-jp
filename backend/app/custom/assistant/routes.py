@@ -44,6 +44,7 @@ class AssistantContext(BaseModel):
 class ChatRequest(BaseModel):
     messages: list[HistoryMessage] = Field(min_length=1, max_length=200)
     context: AssistantContext | None = None
+    locale: str = "zh-CN"
 
 
 class ActionDecisionRequest(BaseModel):
@@ -77,6 +78,7 @@ def build_router() -> APIRouter:
             async for line in with_heartbeat(chat_stream(
                 history=[m.model_dump(exclude_none=True) for m in req.messages],
                 context=context,
+                locale=req.locale,
                 engine=engine,
                 data_dir=data_dir,
                 repo=repo,

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
 
@@ -41,6 +41,11 @@ export default defineConfig({
       '/health': backendTarget,
     },
   },
+  test: {
+    // 122 个测试文件并行时, 使用假定时器的用例在满载机器上会超过默认 5s。
+    testTimeout: 20_000,
+    hookTimeout: 20_000,
+  },
   build: {
     outDir: 'dist',
     sourcemap: false,
@@ -50,6 +55,7 @@ export default defineConfig({
         // 用函数形式按 node_modules 路径匹配, 比对象形式更可靠。
         manualChunks(id) {
           if (id.includes('node_modules')) {
+            if (id.includes('zrender')) return 'zrender'
             if (id.includes('echarts')) return 'echarts'
             if (id.includes('lightweight-charts')) return 'lightweight-charts'
           }

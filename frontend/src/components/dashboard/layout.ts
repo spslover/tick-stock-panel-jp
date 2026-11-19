@@ -88,8 +88,8 @@ export function normalizeLayout(
     seenTypes.add(t)
     const min = minSizeOf(t as WidgetType)
     let x = num(r.x, 0)
-    let w = Math.min(Math.max(num(r.w, min.w), min.w), GRID_COLS)
-    let h = Math.min(Math.max(num(r.h, min.h), min.h), MAX_H)
+    const w = Math.min(Math.max(num(r.w, min.w), min.w), GRID_COLS)
+    const h = Math.min(Math.max(num(r.h, min.h), min.h), MAX_H)
     x = Math.min(Math.max(x, 0), GRID_COLS - w)
     const y = Math.max(num(r.y, 0), 0)
     let item: DashboardItem = { i, t: t as WidgetType, x, y, w, h }

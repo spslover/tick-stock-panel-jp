@@ -23,6 +23,7 @@ import { QK } from '@/lib/queryKeys'
 import { storage } from '@/lib/storage'
 import { fmtBigNum, fmtPct, priceColorClass } from '@/lib/format'
 import { cn } from '@/lib/cn'
+import { tx, useI18n } from '@/lib/i18n'
 import { resolveDimension, type DimensionGroup, type StockRow } from '@/lib/analysis-adapter'
 import { SectorRotationCard } from '@/components/SectorRotationCard'
 
@@ -172,7 +173,7 @@ function enrichStock(stock: StockRow, marketMap: Map<string, MarketSnapshotRow>)
   return {
     ...merged,
     symbol: String(merged.symbol ?? stock.symbol ?? stock.code ?? ''),
-    name: merged.name ?? String(stock.name ?? stock['股票简称'] ?? ''),
+    name: merged.name ?? String(stock.name ?? stock[tx('股票简称')] ?? ''),
     leaderScore: ls.score,
     leaderParts: ls.parts,
   }
@@ -278,6 +279,7 @@ function groupByIndustryLevel(groups: DimensionGroup[], level: IndustryLevel): D
 // ===== 主页面 =====
 
 export function IndustryAnalysis() {
+  const { tx } = useI18n()
   const [fieldConfig, setFieldConfig] = useState<AnalysisFieldConfig>(loadConfig)
   const [showConfig, setShowConfig] = useState(false)
   const [search, setSearch] = useState('')
@@ -398,16 +400,16 @@ export function IndustryAnalysis() {
       <>
         <div className="flex h-full flex-col">
           <PageHeader
-            title="行业板块"
+            title={tx('行业板块')}
             right={
-              <button onClick={() => setShowConfig(true)} className="p-1.5 text-muted hover:bg-surface hover:text-accent" title="配置数据源">
+              <button onClick={() => setShowConfig(true)} className="p-1.5 text-muted hover:bg-surface hover:text-accent" title={tx('配置数据源')}>
                 <Settings2 className="h-4 w-4" />
               </button>
             }
           />
           <PresetFetchState
-            title="暂无行业数据"
-            hint="从同花顺获取行业分类数据后即可使用行业板块"
+            title={tx('暂无行业数据')}
+            hint={tx('从同花顺获取行业分类数据后即可使用行业板块')}
             isLoading={fetchMutation.isPending}
             error={fetchMutation.error}
             onFetch={() => fetchMutation.mutate()}
@@ -420,32 +422,32 @@ export function IndustryAnalysis() {
     )
   }
 
-  const industryLevelLabel = `${industryLevel}级行业`
+  const industryLevelLabel = tx('{level}级行业', { level: industryLevel })
 
   return (
     <>
       <PageHeader
-        title="行业板块"
-        subtitle={`${industryLevelLabel} · ${marketQuery.data?.as_of ?? rowsQuery.data?.date ?? '最新'} · ${stats.length} 个行业 · ${totalSymbols} 只标的`}
+        title={tx('行业板块')}
+        subtitle={`${industryLevelLabel} · ${marketQuery.data?.as_of ?? rowsQuery.data?.date ?? tx('最新')} · ${tx('{n} 个行业', { n: stats.length })} · ${tx('{n} 只标的', { n: totalSymbols })}`}
         right={
           <div className="flex items-center gap-1">
             {/* RPS 轮动: 打开行业涨幅轮动矩阵对话框 */}
             <button
               onClick={() => setShowRps(true)}
               className="inline-flex items-center gap-1 rounded-btn border border-amber-400/40 bg-amber-400/15 px-2.5 py-1.5 text-[11px] text-amber-400 font-medium transition-colors hover:bg-amber-400/25 hover:border-amber-400/60"
-              title="行业涨幅轮动矩阵"
+              title={tx('行业涨幅轮动矩阵')}
             >
-              <Repeat className="h-3.5 w-3.5" />涨幅RPS轮动分析
+              <Repeat className="h-3.5 w-3.5" />{tx('涨幅RPS轮动分析')}
             </button>
             <button
               onClick={() => { rowsQuery.refetch(); marketQuery.refetch() }}
               disabled={rowsQuery.isFetching || marketQuery.isFetching}
               className="p-1.5 text-muted hover:bg-surface disabled:opacity-50"
-              title="刷新"
+              title={tx('刷新')}
             >
               <RefreshCw className={cn('h-4 w-4', (rowsQuery.isFetching || marketQuery.isFetching) && 'animate-spin')} />
             </button>
-            <button onClick={() => setShowConfig(true)} className="p-1.5 text-muted hover:bg-surface hover:text-accent" title="配置数据源">
+            <button onClick={() => setShowConfig(true)} className="p-1.5 text-muted hover:bg-surface hover:text-accent" title={tx('配置数据源')}>
               <Settings2 className="h-4 w-4" />
             </button>
           </div>
@@ -492,17 +494,17 @@ export function IndustryAnalysis() {
               <IndustryFocus stat={selected} activeSymbol={previewSymbol} onStockClick={handleStockClick} />
             </div>
           ) : rowsQuery.isLoading ? (
-            <div className="rounded-2xl border border-border bg-surface px-6 py-16 text-center text-sm text-muted">正在计算行业强度...</div>
+            <div className="rounded-2xl border border-border bg-surface px-6 py-16 text-center text-sm text-muted">{tx('正在计算行业强度...')}</div>
           ) : needsIndustryFetch ? (
             <PresetFetchState
-              title="未获取行业数据"
-              hint="内置行业数据源已就绪,点击下方按钮从同花顺获取行业分类数据"
+              title={tx('未获取行业数据')}
+              hint={tx('内置行业数据源已就绪,点击下方按钮从同花顺获取行业分类数据')}
               isLoading={fetchMutation.isPending}
               error={fetchMutation.error}
               onFetch={() => fetchMutation.mutate()}
             />
           ) : (
-            <EmptyState icon={Layers3} title="未匹配到行业数据" hint={resolved.hint || '请检查扩展数据是否包含行业/板块相关字段'} />
+            <EmptyState icon={Layers3} title={tx('未匹配到行业数据')} hint={resolved.hint || tx('请检查扩展数据是否包含行业/板块相关字段')} />
           )}
         </div>
       </div>
@@ -538,19 +540,20 @@ function HeroPanel({
   activeIndustry?: IndustryStat | null
   industryBreadth: { up: number; down: number; flat: number }
 }) {
+  const { tx } = useI18n()
   return (
     <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-      <HeroMetric icon={TrendingUp} label="最强行业" value={leading?.key ?? '—'} hint={leading?.avgPct != null ? <span className={priceColorClass(leading.avgPct)}>{fmtPct(leading.avgPct)}</span> : '等待行情'} tone="up" />
-      <HeroMetric icon={TrendingDown} label="最大风险" value={falling?.key ?? '—'} hint={falling?.avgPct != null ? <span className={priceColorClass(falling.avgPct)}>{fmtPct(falling.avgPct)}</span> : '等待行情'} tone="down" />
+      <HeroMetric icon={TrendingUp} label={tx('最强行业')} value={leading?.key ?? '—'} hint={leading?.avgPct != null ? <span className={priceColorClass(leading.avgPct)}>{fmtPct(leading.avgPct)}</span> : tx('等待行情')} tone="up" />
+      <HeroMetric icon={TrendingDown} label={tx('最大风险')} value={falling?.key ?? '—'} hint={falling?.avgPct != null ? <span className={priceColorClass(falling.avgPct)}>{fmtPct(falling.avgPct)}</span> : tx('等待行情')} tone="down" />
       <HeroMetric
         icon={Activity}
-        label="涨跌行业"
+        label={tx('涨跌行业')}
         value={<><span className="text-bull">{industryBreadth.up}</span><span className="mx-1 text-muted">/</span><span className="text-bear">{industryBreadth.down}</span></>}
-        hint={<><span className="text-bull">上涨</span><span className="mx-1 text-muted">/</span><span className="text-bear">下跌</span>{industryBreadth.flat ? <span className="text-muted"> · 平 {industryBreadth.flat}</span> : null}</>}
+        hint={<><span className="text-bull">{tx('上涨')}</span><span className="mx-1 text-muted">/</span><span className="text-bear">{tx('下跌')}</span>{industryBreadth.flat ? <span className="text-muted"> {tx('· 平')} {industryBreadth.flat}</span> : null}</>}
         tone="blue"
       />
-      <HeroMetric icon={Activity} label="资金活跃" value={activeIndustry?.key ?? '—'} hint={activeIndustry ? fmtBigNum(activeIndustry.totalAmount) : '等待行情'} tone="blue" />
-      <HeroMetric icon={Crown} label="龙头算法" value="6 因子" hint="强势 + 承接 + 容量" tone="gold" />
+      <HeroMetric icon={Activity} label={tx('资金活跃')} value={activeIndustry?.key ?? '—'} hint={activeIndustry ? fmtBigNum(activeIndustry.totalAmount) : tx('等待行情')} tone="blue" />
+      <HeroMetric icon={Crown} label={tx('龙头算法')} value={tx('6 因子')} hint={tx('强势 + 承接 + 容量')} tone="gold" />
     </div>
   )
 }
@@ -603,10 +606,11 @@ function MarketPulse({
   onStockClick: (symbol: string, name?: string, navList?: NavItem[]) => void
   activeSymbol: string | null
 }) {
+  const { tx } = useI18n()
   return (
     <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-      <PulseList title="领涨主线" items={leading} mode="up" selectedKey={selectedKey} onSelect={onSelect} onStockClick={onStockClick} activeSymbol={activeSymbol} />
-      <PulseList title="领跌方向" items={falling} mode="down" selectedKey={selectedKey} onSelect={onSelect} onStockClick={onStockClick} activeSymbol={activeSymbol} />
+      <PulseList title={tx('领涨主线')} items={leading} mode="up" selectedKey={selectedKey} onSelect={onSelect} onStockClick={onStockClick} activeSymbol={activeSymbol} />
+      <PulseList title={tx('领跌方向')} items={falling} mode="down" selectedKey={selectedKey} onSelect={onSelect} onStockClick={onStockClick} activeSymbol={activeSymbol} />
     </div>
   )
 }
@@ -628,6 +632,7 @@ function PulseList({
   onStockClick: (symbol: string, name?: string, navList?: NavItem[]) => void
   activeSymbol: string | null
 }) {
+  const { tx } = useI18n()
   const toneText = mode === 'up' ? 'text-bull' : 'text-bear'
   const toneBorder = mode === 'up' ? 'border-bull/20' : 'border-bear/20'
   const toneBg = mode === 'up' ? 'bg-bull/10' : 'bg-bear/10'
@@ -667,10 +672,8 @@ function PulseList({
                       <div className="flex min-w-0 items-center gap-2">
                         <span className="truncate text-xs font-medium text-foreground">{item.key}</span>
                         <span className="shrink-0 text-[10px] text-muted">
-                          <span className="text-bull">{item.upCount}</span>涨
-                          <span className="mx-0.5 text-muted/40">/</span>
-                          <span className="text-bear">{item.downCount}</span>跌
-                        </span>
+                          <span className="text-bull">{item.upCount}</span>{tx('涨')}<span className="mx-0.5 text-muted/40">/</span>
+                          <span className="text-bear">{item.downCount}</span>{tx('跌')}</span>
                         <span className={cn('ml-auto shrink-0 font-mono text-[10px] tabular-nums', priceColorClass(item.avgPct))}>{item.avgPct != null ? fmtPct(item.avgPct) : '—'}</span>
                       </div>
                     </div>
@@ -724,20 +727,21 @@ function IndustryRail({
   onSort: (v: SortMode) => void
   onSelect: (v: string) => void
 }) {
+  const { tx } = useI18n()
   return (
     <section className="rounded-2xl border border-border bg-surface p-2.5">
       <div className="px-1 pb-2.5">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-foreground">行业矩阵</h3>
+          <h3 className="text-sm font-semibold text-foreground">{tx('行业矩阵')}</h3>
           <span className="text-[10px] text-muted">Top {stats.length}</span>
         </div>
         <div className="mt-2 relative">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted" />
-          <input value={search} onChange={e => onSearch(e.target.value)} placeholder="搜索行业" className="h-8 w-full rounded-lg border border-border bg-base pl-8 pr-3 text-xs text-foreground outline-none focus:border-accent/50" />
+          <input value={search} onChange={e => onSearch(e.target.value)} placeholder={tx('搜索行业')} className="h-8 w-full rounded-lg border border-border bg-base pl-8 pr-3 text-xs text-foreground outline-none focus:border-accent/50" />
         </div>
         <div className="mt-2 grid grid-cols-5 overflow-hidden rounded-lg border border-border text-[10px]">
           {([
-            ['heat', '强度'], ['avgPct', '涨幅'], ['leader', '龙头'], ['amount', '成交'], ['down', '跌幅'],
+            ['heat', tx('强度')], ['avgPct', tx('涨幅')], ['leader', tx('龙头')], ['amount', tx('成交')], ['down', tx('跌幅')],
           ] as [SortMode, string][]).map(([key, label]) => (
             <button key={key} onClick={() => onSort(key)} className={cn('py-1.5 transition-colors', sortMode === key ? 'bg-amber-500/15 text-amber-400' : 'bg-base text-muted hover:text-foreground')}>{label}</button>
           ))}
@@ -753,10 +757,10 @@ function IndustryRail({
                 <span className={cn('font-mono text-xs', priceColorClass(item.avgPct))}>{item.avgPct != null ? fmtPct(item.avgPct) : '—'}</span>
               </div>
               <div className="mt-1 flex items-center gap-2 text-[10px] text-muted">
-                <span>{item.count}只</span>
-                <span className="text-bull">{item.upCount}涨</span>
-                <span className="text-bear">{item.downCount}跌</span>
-                <span className="ml-auto">强度 {item.heatScore.toFixed(0)}</span>
+                <span>{item.count}{tx('只')}</span>
+                <span className="text-bull">{item.upCount}{tx('涨')}</span>
+                <span className="text-bear">{item.downCount}{tx('跌')}</span>
+                <span className="ml-auto">{tx('强度')} {item.heatScore.toFixed(0)}</span>
               </div>
             </button>
           )
@@ -769,6 +773,7 @@ function IndustryRail({
 // ===== IndustryFocus（右侧聚焦面板） =====
 
 function IndustryFocus({ stat, onStockClick, activeSymbol }: { stat: IndustryStat | null; onStockClick: (symbol: string, name?: string, navList?: NavItem[]) => void; activeSymbol: string | null }) {
+  const { tx } = useI18n()
   if (!stat) return null
   const stocks = [...stat.stocks].sort((a, b) => b.leaderScore - a.leaderScore).slice(0, MAX_RENDERED_STOCKS)
   const topLeaders = stocks.slice(0, 3)
@@ -780,22 +785,22 @@ function IndustryFocus({ stat, onStockClick, activeSymbol }: { stat: IndustrySta
           <div className="min-w-0">
             <div className="flex items-center gap-3">
               <h3 className="truncate text-xl font-semibold text-foreground">{stat.key}</h3>
-              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-400">强度 {stat.heatScore.toFixed(0)}</span>
+              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-400">{tx('强度')} {stat.heatScore.toFixed(0)}</span>
             </div>
             <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-              <span>{stat.count} 只成分</span>
-              <span className={priceColorClass(stat.avgPct)}>平均 {stat.avgPct != null ? fmtPct(stat.avgPct) : '—'}</span>
-              <span>上涨占比 {(stat.upRate * 100).toFixed(0)}%</span>
-              <span>成交额 {fmtBigNum(stat.totalAmount)}</span>
-              {stat.avgTurnover != null && <span>均换手 {stat.avgTurnover.toFixed(2)}%</span>}
+              <span>{stat.count} {tx('只成分')}</span>
+              <span className={priceColorClass(stat.avgPct)}>{tx('平均')} {stat.avgPct != null ? fmtPct(stat.avgPct) : '—'}</span>
+              <span>{tx('上涨占比')} {(stat.upRate * 100).toFixed(0)}%</span>
+              <span>{tx('成交额')} {fmtBigNum(stat.totalAmount)}</span>
+              {stat.avgTurnover != null && <span>{tx('均换手')} {stat.avgTurnover.toFixed(2)}%</span>}
             </div>
           </div>
           <div className="grid grid-cols-5 gap-2 lg:w-[520px]">
-            <MiniStat label="均涨" value={stat.avgPct != null ? fmtPct(stat.avgPct) : '—'} cls={priceColorClass(stat.avgPct)} />
-            <MiniStat label="中位" value={stat.medianPct != null ? fmtPct(stat.medianPct) : '—'} cls={priceColorClass(stat.medianPct)} />
-            <MiniStat label="强势" value={`${stat.strongCount}`} cls="text-bull" />
-            <MiniStat label="弱势" value={`${stat.weakCount}`} cls="text-bear" />
-            <MiniStat label="量比" value={stat.avgVolRatio != null ? stat.avgVolRatio.toFixed(2) : '—'} cls="text-foreground" />
+            <MiniStat label={tx('均涨')} value={stat.avgPct != null ? fmtPct(stat.avgPct) : '—'} cls={priceColorClass(stat.avgPct)} />
+            <MiniStat label={tx('中位')} value={stat.medianPct != null ? fmtPct(stat.medianPct) : '—'} cls={priceColorClass(stat.medianPct)} />
+            <MiniStat label={tx('强势')} value={`${stat.strongCount}`} cls="text-bull" />
+            <MiniStat label={tx('弱势')} value={`${stat.weakCount}`} cls="text-bear" />
+            <MiniStat label={tx('量比')} value={stat.avgVolRatio != null ? stat.avgVolRatio.toFixed(2) : '—'} cls="text-foreground" />
           </div>
         </div>
       </div>
@@ -809,14 +814,14 @@ function IndustryFocus({ stat, onStockClick, activeSymbol }: { stat: IndustrySta
         <table className="min-w-full text-left text-xs">
           <thead className="bg-elevated/60 text-[11px] text-muted">
             <tr>
-              <th className="px-4 py-2 font-medium">排名</th>
-              <th className="px-4 py-2 font-medium">股票</th>
-              <th className="px-4 py-2 font-medium">涨跌幅</th>
-              <th className="px-4 py-2 font-medium">换手率</th>
-              <th className="px-4 py-2 font-medium">成交额</th>
-              <th className="px-4 py-2 font-medium">流通市值</th>
-              <th className="px-4 py-2 font-medium">量比</th>
-              <th className="px-4 py-2 font-medium">龙头分</th>
+              <th className="px-4 py-2 font-medium">{tx('排名')}</th>
+              <th className="px-4 py-2 font-medium">{tx('股票')}</th>
+              <th className="px-4 py-2 font-medium">{tx('涨跌幅')}</th>
+              <th className="px-4 py-2 font-medium">{tx('换手率')}</th>
+              <th className="px-4 py-2 font-medium">{tx('成交额')}</th>
+              <th className="px-4 py-2 font-medium">{tx('流通市值')}</th>
+              <th className="px-4 py-2 font-medium">{tx('量比')}</th>
+              <th className="px-4 py-2 font-medium">{tx('龙头分')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/70">
@@ -843,7 +848,7 @@ function IndustryFocus({ stat, onStockClick, activeSymbol }: { stat: IndustrySta
           </tbody>
         </table>
       </div>
-      {stat.stocks.length > MAX_RENDERED_STOCKS && <div className="shrink-0 border-t border-border px-4 py-2 text-center text-[11px] text-muted">仅展示龙头分前 {MAX_RENDERED_STOCKS} 只，共 {stat.stocks.length} 只</div>}
+      {stat.stocks.length > MAX_RENDERED_STOCKS && <div className="shrink-0 border-t border-border px-4 py-2 text-center text-[11px] text-muted">{tx('仅展示龙头分前')} {MAX_RENDERED_STOCKS} {tx('只，共')} {stat.stocks.length} {tx('只')}</div>}
     </section>
   )
 }
@@ -853,18 +858,18 @@ function MiniStat({ label, value, cls }: { label: string; value: string; cls: st
 }
 
 function LeaderStage({ stocks, onStockClick, activeSymbol }: { stocks: EnrichedStock[]; onStockClick: (symbol: string, name?: string) => void; activeSymbol: string | null }) {
-  if (!stocks.length) return <div className="rounded-xl border border-border/60 bg-surface p-4 text-sm text-muted">暂无龙头候选</div>
+  const { tx } = useI18n()
+  if (!stocks.length) return <div className="rounded-xl border border-border/60 bg-surface p-4 text-sm text-muted">{tx('暂无龙头候选')}</div>
   return (
     <div className="rounded-xl border border-border/60 bg-surface p-3">
       <div className="mb-2 flex items-center gap-2 text-xs font-medium text-amber-300">
         <Crown className="h-3.5 w-3.5" />
-        本行业三龙头
-      </div>
+        {tx('本行业三龙头')}</div>
       <div className="grid gap-2 md:grid-cols-3">
         {stocks.map((stock, idx) => (
           <div key={stock.symbol} onClick={() => onStockClick(stock.symbol, stock.name || undefined)} className={cn('rounded-lg border p-3 cursor-pointer hover:brightness-110 transition-all', idx === 0 ? 'border-amber-400/25 bg-amber-400/[0.06]' : 'border-border/60 bg-base/35', stock.symbol === activeSymbol && 'ring-1 ring-accent/60')}>
             <div className="flex items-center justify-between gap-2">
-              <span className={cn('text-[10px] font-medium', idx === 0 ? 'text-amber-300' : 'text-muted')}>{idx === 0 ? '主龙头' : `辅龙 ${idx}`}</span>
+              <span className={cn('text-[10px] font-medium', idx === 0 ? 'text-amber-300' : 'text-muted')}>{idx === 0 ? tx('主龙头') : tx('辅龙 {n}', { n: idx })}</span>
               <span className="font-mono text-[11px] text-amber-300">{stock.leaderScore.toFixed(0)}</span>
             </div>
             <div className="mt-2 truncate text-sm font-medium text-foreground">{stock.name || stock.symbol}</div>
@@ -880,21 +885,22 @@ function LeaderStage({ stocks, onStockClick, activeSymbol }: { stocks: EnrichedS
 }
 
 function ScoreExplain({ stock }: { stock?: EnrichedStock }) {
-  if (!stock) return <div className="rounded-xl border border-border/60 bg-surface p-4 text-sm text-muted">暂无评分拆解</div>
+  const { tx } = useI18n()
+  if (!stock) return <div className="rounded-xl border border-border/60 bg-surface p-4 text-sm text-muted">{tx('暂无评分拆解')}</div>
   const parts = stock.leaderParts
   return (
     <div className="rounded-xl border border-border/60 bg-surface p-3">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-medium text-foreground">主龙头评分拆解</span>
-        <span className="text-[11px] text-muted">涨幅 / 换手 / 成交 / 市值 / 量比 / 连板</span>
+        <span className="text-xs font-medium text-foreground">{tx('主龙头评分拆解')}</span>
+        <span className="text-[11px] text-muted">{tx('涨幅 / 换手 / 成交 / 市值 / 量比 / 连板')}</span>
       </div>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-        <Part label="动能" value={parts.momentum} cls="bg-rose-400" />
-        <Part label="换手" value={parts.turnover} cls="bg-orange-400" />
-        <Part label="成交" value={parts.amount} cls="bg-blue-400" />
-        <Part label="市值" value={parts.cap} cls="bg-cyan-400" />
-        <Part label="量比" value={parts.volume} cls="bg-purple-400" />
-        <Part label="连板" value={parts.boards} cls="bg-amber-300" />
+        <Part label={tx('动能')} value={parts.momentum} cls="bg-rose-400" />
+        <Part label={tx('换手')} value={parts.turnover} cls="bg-orange-400" />
+        <Part label={tx('成交')} value={parts.amount} cls="bg-blue-400" />
+        <Part label={tx('市值')} value={parts.cap} cls="bg-cyan-400" />
+        <Part label={tx('量比')} value={parts.volume} cls="bg-purple-400" />
+        <Part label={tx('连板')} value={parts.boards} cls="bg-amber-300" />
       </div>
     </div>
   )

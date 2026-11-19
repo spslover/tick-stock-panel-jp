@@ -32,6 +32,7 @@ import {
 } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/cn'
+import { tx, useI18n } from '@/lib/i18n'
 import { api } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/useSharedQueries'
@@ -131,6 +132,7 @@ function DrawerPanel({
   sending: boolean
   messages: DrawerMessages
 }) {
+  const { tx } = useI18n()
   const { sessions, activeId } = useAssistantStore()
   const [status, setStatus] = useState<AssistantStatus | null>(null)
   const [suggests, setSuggests] = useState<QuickSuggest[]>([])
@@ -184,7 +186,7 @@ function DrawerPanel({
         'bg-surface/95 shadow-2xl backdrop-blur-xl',
       )}
       role="complementary"
-      aria-label="AI 助手"
+      aria-label={tx('AI 助手')}
     >
       <DrawerHeader status={status} sessions={sessions} activeId={activeId} sending={sending} />
       <MessageList messages={messages} sending={sending} status={status} suggests={suggests} />
@@ -194,13 +196,13 @@ function DrawerPanel({
       <div
         role="separator"
         aria-orientation="vertical"
-        aria-label="调整宽度"
+        aria-label={tx('调整宽度')}
         onPointerDown={onHandlePointerDown}
         onPointerMove={onHandlePointerMove}
         onPointerUp={onHandlePointerEnd}
         onLostPointerCapture={onHandlePointerEnd}
         className="group/handle absolute inset-y-0 left-0 z-10 w-1.5 cursor-col-resize touch-none"
-        title="拖拽调整宽度"
+        title={tx('拖拽调整宽度')}
       >
         <span className="absolute left-1/2 top-1/2 h-10 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent/50 opacity-0 transition-opacity duration-150 ease-smooth group-hover/handle:opacity-100" />
       </div>
@@ -213,6 +215,7 @@ function DrawerPanel({
  * 点 X 后一周(7 天)内不再显示 —— 时间戳持久化到 localStorage; DrawerPanel 随抽屉
  * 开合挂载/卸载, 每次点开对话框重新检查是否已到期, 到期后自动恢复。 */
 function RhPromoBanner() {
+  const { tx } = useI18n()
   const [dismissed, setDismissed] = useState(() => {
     try {
       const ts = Number(localStorage.getItem(RH_PROMO_DISMISS_KEY))
@@ -236,11 +239,11 @@ function RhPromoBanner() {
       className="flex shrink-0 items-center gap-1 pr-8 text-[10px] leading-relaxed text-secondary transition-colors hover:text-foreground"
     >
       <span className="font-medium text-amber-600 dark:text-amber-400">Claude、ChatGPT、Gemini</span>
-      <span>等国际模型直连稳定不掉线，</span>
+      <span>{tx('等国际模型直连稳定不掉线，')}</span>
       <span className="font-medium text-amber-600 dark:text-amber-400">DeepSeek v4.1 Flash {range}</span>
       <span>，</span>
-      <span>邀请链接注册享</span>
-      <span className="font-medium text-amber-600 dark:text-amber-400">首充满减</span>
+      <span>{tx('邀请链接注册享')}</span>
+      <span className="font-medium text-amber-600 dark:text-amber-400">{tx('首充满减')}</span>
       <span>🎁</span>
     </a>
   )
@@ -257,8 +260,8 @@ function RhPromoBanner() {
       </div>
       <button
         onClick={snooze}
-        title="关闭推广 (一周内不再显示)"
-        aria-label="关闭推广 (一周内不再显示)"
+        title={tx('关闭推广 (一周内不再显示)')}
+        aria-label={tx('关闭推广 (一周内不再显示)')}
         className="shrink-0 rounded-btn p-0.5 text-muted transition-colors hover:bg-elevated hover:text-foreground"
       >
         <X className="h-3 w-3" />
@@ -278,17 +281,18 @@ function DrawerHeader({
   activeId: string
   sending: boolean
 }) {
+  const { tx } = useI18n()
   const [menuOpen, setMenuOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   return (
     <div className="relative flex h-14 shrink-0 items-center gap-2 border-b border-border px-4">
       <Sparkles className="h-4 w-4 shrink-0 text-accent" />
-      <span className="shrink-0 text-sm font-semibold text-foreground">AI 助手</span>
+      <span className="shrink-0 text-sm font-semibold text-foreground">{tx('AI 助手')}</span>
       {status?.model && (
         <span
           className="min-w-0 truncate rounded-btn bg-elevated px-1.5 py-0.5 font-mono text-[10px] text-muted"
-          title={`模型: ${status.model}\n供应商: ${status.provider ?? '-'}`}
+          title={`${tx('模型')}: ${status.model}\n${tx('供应商')}: ${status.provider ?? '-'}`}
         >
           {status.model}
         </span>
@@ -296,21 +300,21 @@ function DrawerHeader({
       <RhPromoBanner />
       <div className="ml-auto flex shrink-0 items-center gap-0.5">
         <div className="relative">
-          <IconButton title="助手设置" onClick={() => { setSettingsOpen(v => !v); setMenuOpen(false) }} disabled={sending}>
+          <IconButton title={tx('助手设置')} onClick={() => { setSettingsOpen(v => !v); setMenuOpen(false) }} disabled={sending}>
             <SlidersHorizontal className="h-4 w-4" />
           </IconButton>
           {settingsOpen && <AssistantSettingsMenu onDone={() => setSettingsOpen(false)} />}
         </div>
         <div className="relative">
-          <IconButton title="历史会话" onClick={() => { setMenuOpen(v => !v); setSettingsOpen(false) }} disabled={sending}>
+          <IconButton title={tx('历史会话')} onClick={() => { setMenuOpen(v => !v); setSettingsOpen(false) }} disabled={sending}>
             <History className="h-4 w-4" />
           </IconButton>
           {menuOpen && <SessionMenu sessions={sessions} activeId={activeId} onDone={() => setMenuOpen(false)} />}
         </div>
-        <IconButton title="新对话" onClick={() => { newSession(); setMenuOpen(false); setSettingsOpen(false) }} disabled={sending}>
+        <IconButton title={tx('新对话')} onClick={() => { newSession(); setMenuOpen(false); setSettingsOpen(false) }} disabled={sending}>
           <Plus className="h-4 w-4" />
         </IconButton>
-        <IconButton title="关闭 (Esc)" onClick={closeAssistant}>
+        <IconButton title={tx('关闭 (Esc)')} onClick={closeAssistant}>
           <X className="h-4 w-4" />
         </IconButton>
       </div>
@@ -326,6 +330,7 @@ function DrawerHeader({
  * 弹确认卡, 直接执行。偏好存后端 preferences, 与设置页同源。
  */
 function AssistantSettingsMenu({ onDone }: { onDone: () => void }) {
+  const { tx } = useI18n()
   const prefs = usePreferences()
   const qc = useQueryClient()
   const enabled = prefs.data?.assistant_auto_approve_actions ?? false
@@ -343,16 +348,15 @@ function AssistantSettingsMenu({ onDone }: { onDone: () => void }) {
     <div className="absolute right-0 top-9 z-20 w-72 rounded-card border border-border bg-surface p-3 shadow-xl">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-xs font-medium text-foreground">动作工具免确认</div>
+          <div className="text-xs font-medium text-foreground">{tx('动作工具免确认')}</div>
           <div className="mt-1 text-[11px] leading-relaxed text-muted">
-            打开后创建信号/策略、回测、加自选、数据补全不再逐次弹确认卡, 直接执行。
-          </div>
+            {tx('打开后创建信号/策略、回测、加自选、数据补全不再逐次弹确认卡, 直接执行。')}</div>
         </div>
         <button
           type="button"
           role="switch"
           aria-checked={enabled}
-          aria-label="动作工具免确认"
+          aria-label={tx('动作工具免确认')}
           disabled={save.isPending}
           onClick={() => save.mutate(!enabled)}
           className={cn(
@@ -370,21 +374,19 @@ function AssistantSettingsMenu({ onDone }: { onDone: () => void }) {
       </div>
       {enabled && (
         <div className="mt-2 rounded-btn bg-warning/10 px-2 py-1.5 text-[10px] leading-relaxed text-warning">
-          已开启: 助手会不经确认直接写入。轮次检查点仍然有效 (防止单轮无限调用)。
-        </div>
+          {tx('已开启: 助手会不经确认直接写入。轮次检查点仍然有效 (防止单轮无限调用)。')}</div>
       )}
       <div className="mt-3 flex items-start justify-between gap-2 border-t border-border/50 pt-3">
         <div className="min-w-0">
-          <div className="text-xs font-medium text-foreground">毛玻璃遮罩</div>
+          <div className="text-xs font-medium text-foreground">{tx('毛玻璃遮罩')}</div>
           <div className="mt-1 text-[11px] leading-relaxed text-muted">
-            打开时页面盖毛玻璃遮罩, 点击遮罩处关闭助手; 关闭后非模态, 可边看行情边问。
-          </div>
+            {tx('打开时页面盖毛玻璃遮罩, 点击遮罩处关闭助手; 关闭后非模态, 可边看行情边问。')}</div>
         </div>
         <button
           type="button"
           role="switch"
           aria-checked={maskEnabled}
-          aria-label="毛玻璃遮罩"
+          aria-label={tx('毛玻璃遮罩')}
           disabled={saveMask.isPending}
           onClick={() => saveMask.mutate(!maskEnabled)}
           className={cn(
@@ -401,14 +403,13 @@ function AssistantSettingsMenu({ onDone }: { onDone: () => void }) {
         </button>
       </div>
       <div className="mt-2 flex items-center justify-between border-t border-border/50 pt-2">
-        <span className="text-[10px] text-muted">更多 AI 配置在设置页</span>
+        <span className="text-[10px] text-muted">{tx('更多 AI 配置在设置页')}</span>
         <button
           type="button"
           onClick={onDone}
           className="cursor-pointer rounded-btn px-2 py-0.5 text-[10px] text-muted transition-colors hover:bg-elevated hover:text-foreground"
         >
-          关闭
-        </button>
+          {tx('关闭')}</button>
       </div>
     </div>
   )
@@ -419,9 +420,9 @@ function formatSessionTime(ts: number): string {
   const d = new Date(ts)
   const now = new Date()
   const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-  if (d.toDateString() === now.toDateString()) return `今天 ${hm}`
+  if (d.toDateString() === now.toDateString()) return tx('今天 {hm}', { hm })
   const yesterday = new Date(now.getTime() - 86_400_000)
-  if (d.toDateString() === yesterday.toDateString()) return `昨天 ${hm}`
+  if (d.toDateString() === yesterday.toDateString()) return tx('昨天 {hm}', { hm })
   const md = `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   return d.getFullYear() === now.getFullYear() ? `${md} ${hm}` : `${d.getFullYear()}-${md}`
 }
@@ -435,12 +436,13 @@ function SessionMenu({
   activeId: string
   onDone: () => void
 }) {
+  const { tx } = useI18n()
   return (
     <>
       <div className="fixed inset-0 z-[61]" onClick={onDone} />
       <div className="absolute right-0 top-full z-[62] mt-1 max-h-72 w-60 overflow-y-auto rounded-card border border-border bg-surface p-1 shadow-xl">
         {sessions.length === 0 && (
-          <div className="px-2 py-1.5 text-xs text-muted">暂无历史会话</div>
+          <div className="px-2 py-1.5 text-xs text-muted">{tx('暂无历史会话')}</div>
         )}
         {sessions.map(session => (
           <div
@@ -456,7 +458,7 @@ function SessionMenu({
               onClick={() => { selectSession(session.id); onDone() }}
               title={session.title}
             >
-              <span className="block truncate">{session.title || '新对话'}</span>
+              <span className="block truncate">{session.title || tx('新对话')}</span>
               <span className="block text-[10px] leading-tight text-muted">
                 {formatSessionTime(session.createdAt)}
               </span>
@@ -465,7 +467,7 @@ function SessionMenu({
               type="button"
               className="hidden cursor-pointer text-muted transition-colors duration-150 ease-smooth hover:text-danger group-hover:block"
               onClick={() => deleteSession(session.id)}
-              title="删除会话"
+              title={tx('删除会话')}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
@@ -512,6 +514,7 @@ function MessageList({
   status: AssistantStatus | null
   suggests: QuickSuggest[]
 }) {
+  const { tx } = useI18n()
   const scrollRef = useRef<HTMLDivElement>(null)
   const pinnedRef = useRef(true)
   const [showJump, setShowJump] = useState(false)
@@ -555,7 +558,7 @@ function MessageList({
             transition={{ duration: 0.15, ease: EASE_SMOOTH }}
             onClick={jumpToBottom}
             className="absolute bottom-3 left-1/2 flex h-7 w-7 -translate-x-1/2 cursor-pointer items-center justify-center rounded-full border border-border bg-elevated text-secondary shadow-md transition-colors duration-150 ease-smooth hover:text-foreground"
-            title="回到底部"
+            title={tx('回到底部')}
           >
             <ArrowDown className="h-3.5 w-3.5" />
           </motion.button>
@@ -574,6 +577,7 @@ const SUGGEST_GROUP_ICONS: Record<string, typeof TrendingUp> = {
 }
 
 function EmptyState({ status, suggests }: { status: AssistantStatus | null; suggests: QuickSuggest[] }) {
+  const { tx } = useI18n()
   const navigate = useNavigate()
 
   if (status && !status.configured) {
@@ -581,16 +585,14 @@ function EmptyState({ status, suggests }: { status: AssistantStatus | null; sugg
       <div className="rounded-card border border-warning/30 bg-warning/5 p-4 text-sm">
         <div className="flex items-center gap-1.5 font-medium text-warning">
           <Settings2 className="h-4 w-4" />
-          AI 未配置
-        </div>
-        <p className="mt-1.5 text-secondary">AI 助手需要先配置 AI 供应商和 API Key 才能对话。</p>
+          {tx('AI 未配置')}</div>
+        <p className="mt-1.5 text-secondary">{tx('AI 助手需要先配置 AI 供应商和 API Key 才能对话。')}</p>
         <button
           type="button"
           onClick={() => navigate('/settings?tab=ai')}
           className="mt-2 cursor-pointer rounded-btn bg-accent px-3 py-1.5 text-xs text-white transition-colors duration-150 ease-smooth hover:bg-accent/90"
         >
-          去设置页配置
-        </button>
+          {tx('去设置页配置')}</button>
       </div>
     )
   }
@@ -600,18 +602,15 @@ function EmptyState({ status, suggests }: { status: AssistantStatus | null; sugg
       <div className="rounded-card border border-warning/30 bg-warning/5 p-4 text-sm">
         <div className="flex items-center gap-1.5 font-medium text-warning">
           <Settings2 className="h-4 w-4" />
-          当前供应商不支持工具调用
-        </div>
+          {tx('当前供应商不支持工具调用')}</div>
         <p className="mt-1.5 text-secondary">
-          AI 助手依赖工具调用能力({status.provider} 不支持), 请在设置页切换为 OpenAI 兼容模型。
-        </p>
+          {tx('AI 助手依赖工具调用能力(')}{status.provider} {tx('不支持), 请在设置页切换为 OpenAI 兼容模型。')}</p>
         <button
           type="button"
           onClick={() => navigate('/settings?tab=ai')}
           className="mt-2 cursor-pointer rounded-btn bg-accent px-3 py-1.5 text-xs text-white transition-colors duration-150 ease-smooth hover:bg-accent/90"
         >
-          去设置页调整
-        </button>
+          {tx('去设置页调整')}</button>
       </div>
     )
   }
@@ -619,15 +618,14 @@ function EmptyState({ status, suggests }: { status: AssistantStatus | null; sugg
   if (!suggests.length) {
     return (
       <p className="pt-8 text-center text-xs text-muted">
-        问我任何关于行情、个股、策略、扩展数据或数据能力的问题。
-      </p>
+        {tx('问我任何关于行情、个股、策略、扩展数据或数据能力的问题。')}</p>
     )
   }
 
   // 按后端 group 字段分区, 保持原始顺序; 未分组的建议归入「更多」。
   const groups = new Map<string, QuickSuggest[]>()
   for (const suggest of suggests) {
-    const key = suggest.group || '更多'
+    const key = suggest.group || tx('更多')
     groups.set(key, [...(groups.get(key) ?? []), suggest])
   }
 
@@ -637,8 +635,8 @@ function EmptyState({ status, suggests }: { status: AssistantStatus | null; sugg
         <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-full bg-accent/15 text-accent">
           <Bot className="h-4.5 w-4.5" />
         </div>
-        <p className="mt-2 text-sm font-medium text-foreground">有什么可以帮你？</p>
-        <p className="mt-1 text-xs text-muted">基于本地真实数据回答 · 每次取数都可展开核对</p>
+        <p className="mt-2 text-sm font-medium text-foreground">{tx('有什么可以帮你？')}</p>
+        <p className="mt-1 text-xs text-muted">{tx('基于本地真实数据回答 · 每次取数都可展开核对')}</p>
       </div>
 
       {[...groups.entries()].map(([group, items]) => {
@@ -668,18 +666,16 @@ function EmptyState({ status, suggests }: { status: AssistantStatus | null; sugg
       <div className="rounded-card border border-dashed border-border bg-base/40 px-3.5 py-3 text-xs">
         <div className="flex items-center gap-1.5 font-medium text-foreground">
           <Puzzle className="h-3.5 w-3.5 text-accent" />
-          扩展内容同样可以问
-        </div>
+          {tx('扩展内容同样可以问')}</div>
         <p className="mt-1 leading-relaxed text-secondary">
-          扩展数据表、自定义策略与信号等扩展内容都能问答互动, 比如「我的扩展数据表里有什么」「看看最新一张的数据」。
-          AI 助手本身也是一个 custom 扩展模块。
-        </p>
+          {tx('扩展数据表、自定义策略与信号等扩展内容都能问答互动, 比如「我的扩展数据表里有什么」「看看最新一张的数据」。 AI 助手本身也是一个 custom 扩展模块。')}</p>
       </div>
     </div>
   )
 }
 
 function InputArea({ sending, blocked }: { sending: boolean; blocked: boolean }) {
+  const { tx } = useI18n()
   const [text, setText] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -721,7 +717,7 @@ function InputArea({ sending, blocked }: { sending: boolean; blocked: boolean })
           value={text}
           rows={1}
           disabled={blocked}
-          placeholder={blocked ? '请先在设置页配置 AI' : '问点什么…'}
+          placeholder={blocked ? tx('请先在设置页配置 AI') : tx('问点什么…')}
           onChange={e => { setText(e.target.value); autoGrow() }}
           onKeyDown={onKeyDown}
           className="max-h-36 min-h-[40px] flex-1 resize-none rounded-btn bg-transparent px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted/80 disabled:cursor-not-allowed"
@@ -730,8 +726,8 @@ function InputArea({ sending, blocked }: { sending: boolean; blocked: boolean })
           <button
             type="button"
             onClick={stopSending}
-            title="停止生成"
-            aria-label="停止生成"
+            title={tx('停止生成')}
+            aria-label={tx('停止生成')}
             className="mr-0.5 mb-0.5 flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border bg-elevated text-secondary transition-all duration-150 ease-smooth hover:border-danger/40 hover:text-danger active:scale-95"
           >
             <Square className="h-3 w-3 fill-current" />
@@ -741,8 +737,8 @@ function InputArea({ sending, blocked }: { sending: boolean; blocked: boolean })
             type="button"
             onClick={submit}
             disabled={!canSend}
-            title="发送"
-            aria-label="发送"
+            title={tx('发送')}
+            aria-label={tx('发送')}
             className={cn(
               'mr-0.5 mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-150 ease-smooth active:scale-95',
               canSend
@@ -757,11 +753,9 @@ function InputArea({ sending, blocked }: { sending: boolean; blocked: boolean })
       </div>
       <div className="mt-2 flex items-center justify-between gap-2 px-1">
         <p className="text-[10px] leading-relaxed text-muted">
-          回答基于本地数据, 不构成投资建议
-        </p>
+          {tx('回答基于本地数据, 不构成投资建议')}</p>
         <span className="shrink-0 text-[10px] text-muted/70">
-          Enter 发送 · ⌘K 呼出 · 左缘拖拽调宽
-        </span>
+          {tx('Enter 发送 · ⌘K 呼出 · 左缘拖拽调宽')}</span>
       </div>
     </div>
   )

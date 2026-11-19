@@ -23,6 +23,10 @@ import { StockPreviewDialog } from '@/components/StockPreviewDialog'
 import { toNavItems, type NavItem } from '@/lib/listNav'
 import { DimensionMembersDialog, type DimensionKind, type DimensionMembersTarget } from '@/components/DimensionMembersDialog'
 import { usePreferences, useQuoteStatus } from '@/lib/useSharedQueries'
+import { useI18n } from '@/lib/i18n'
+
+/** 消息方向「移出」: 出现在策略消息文案里, 提取后用于配色判断 —— 稳定中文键, 比较时不翻译 */
+const DIRECTION_EXIT = '移出'
 
 const TYPE_LABEL: Record<string, string> = {
   signal: '信号', price: '价格/涨跌', market: '市场异动', strategy: '策略监控', sector: '板块监控',
@@ -61,7 +65,7 @@ function renderMessage(source: string, message: string) {
       <span className="text-foreground/80">{pre}</span>
       <span className="text-amber-400 font-medium">{strategyName}</span>
       <span className="text-foreground/80">{mid}</span>
-      <span className={direction === '移出' ? 'text-bear font-medium' : 'text-danger font-medium'}>{direction}</span>
+      <span className={direction === DIRECTION_EXIT ? 'text-bear font-medium' : 'text-danger font-medium'}>{direction}</span>
       <span className="text-foreground/80">{post}</span>
     </>
   )
@@ -77,7 +81,7 @@ function getExtTags(ev: Record<string, unknown>, item: MonitorExtFieldItem | nul
   if (v == null) return []
   const str = String(v)
   if (!str) return []
-  let tags = str.split(/[、,，;；\-]/).map(s => s.trim()).filter(Boolean)
+  let tags = str.split(/[、,，;；-]/).map(s => s.trim()).filter(Boolean)
   const maxTags = item.maxTags ?? 0
   if (maxTags > 0) tags = tags.slice(0, maxTags)
   const hidden = item.hiddenIndices
@@ -119,6 +123,7 @@ function AlertExtTags({ ev, fields, onTagClick }: {
 }
 
 export function Monitor() {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const [editorOpen, setEditorOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<MonitorRule | null>(null)
@@ -199,19 +204,19 @@ export function Monitor() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="监控中心" subtitle="实时信号与规则管理" />
+      <PageHeader title={tx('监控中心')} subtitle={tx('实时信号与规则管理')} />
       {realtimeUnavailable && (
         <div className="px-5 pb-1">
           <div className="mx-auto flex max-w-7xl items-center gap-2.5 rounded-xl border border-warning/30 bg-warning/[0.06] px-4 py-2.5">
             <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
             <span className="text-xs leading-relaxed text-secondary">
-              实时行情当前不可用 — 监控与预警收不到最新价。可接入提供实时行情的数据源。
+              {tx('实时行情当前不可用 — 监控与预警收不到最新价。可接入提供实时行情的数据源。')}
             </span>
             <Link
               to="/settings?tab=data-sources"
               className="ml-auto shrink-0 rounded-btn bg-warning/15 px-2.5 py-1 text-[11px] font-medium text-warning hover:bg-warning/25 transition-colors"
             >
-              前往数据源配置
+              {tx('前往数据源配置')}
             </Link>
           </div>
         </div>
@@ -221,7 +226,7 @@ export function Monitor() {
           {/* 左栏: 触发记录 */}
           <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-surface/40 shadow-lg shadow-black/5">
             <div className="flex items-center gap-3 border-b border-border/60 bg-surface/60 px-4 py-2.5">
-              <SectionHeader icon={BellRing} title="触发记录" />
+              <SectionHeader icon={BellRing} title={tx('触发记录')} />
               {/* 过滤标签 — 单行横向滚动, 不折行 (缩放/窄窗口下保持一行) */}
               <div className="flex min-w-0 flex-nowrap items-center gap-0.5 overflow-x-auto [&>button]:shrink-0">
                 {(['all', 'strategy', 'signal', 'price', 'market', 'sector', 'abnormal', 'volume_delta', 'date'] as const).map(f => (
@@ -233,7 +238,7 @@ export function Monitor() {
                       filter === f ? 'bg-accent/15 text-accent' : 'text-muted hover:bg-elevated/60 hover:text-secondary',
                     )}
                   >
-                    {f === 'all' ? '全部' : TYPE_LABEL[f]}
+                    {f === 'all' ? tx('全部') : tx(TYPE_LABEL[f])}
                   </button>
                 ))}
               </div>
@@ -241,7 +246,7 @@ export function Monitor() {
               <div className="ml-auto flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => setExtConfigOpen(true)}
-                  title="配置行业/概念标签"
+                  title={tx('配置行业/概念标签')}
                   className={cn(
                     'inline-flex h-6 w-6 items-center justify-center rounded-lg border transition-all cursor-pointer',
                     extConfigOpen ? 'border-accent/40 text-accent' : 'border-border/60 bg-surface text-muted hover:border-accent/40 hover:text-accent',
@@ -255,8 +260,7 @@ export function Monitor() {
                     onClick={() => setConfirmClear(true)}
                     className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-muted transition-colors hover:bg-danger/10 hover:text-danger cursor-pointer"
                   >
-                    <Trash2 className="h-2.5 w-2.5" />清空
-                  </button>
+                    <Trash2 className="h-2.5 w-2.5" />{tx('清空')}</button>
                 )}
               </div>
             </div>
@@ -268,12 +272,12 @@ export function Monitor() {
           {/* 右栏: 监控规则 */}
           <section className="flex min-h-0 w-full flex-col overflow-hidden rounded-xl border border-border bg-surface/40 shadow-lg shadow-black/5 lg:w-[400px] lg:shrink-0">
             <div className="flex items-center gap-3 border-b border-border/60 bg-surface/60 px-4 py-2.5">
-              <SectionHeader icon={ListChecks} title="监控规则" />
+              <SectionHeader icon={ListChecks} title={tx('监控规则')} />
               <span className="rounded-md bg-elevated/50 px-1.5 py-0.5 text-[10px] font-medium text-muted">{rulesCount}</span>
               <div className="ml-auto flex items-center gap-1">
                 <button
                   onClick={() => { setEditingRule(null); setEditorPreset(null); setEditorOpen(true) }}
-                  title="新建规则"
+                  title={tx('新建规则')}
                   className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-border/60 bg-surface text-muted transition-all hover:border-accent/40 hover:text-accent hover:shadow-sm cursor-pointer"
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -281,7 +285,7 @@ export function Monitor() {
                 <button
                   onClick={() => setConfirmClearRules(true)}
                   disabled={rulesCount === 0}
-                  title="清除全部规则"
+                  title={tx('清除全部规则')}
                   className="inline-flex h-6 w-6 items-center justify-center rounded-lg border border-border/60 bg-surface text-muted transition-all hover:border-danger/40 hover:text-danger disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -307,9 +311,9 @@ export function Monitor() {
 
       <ConfirmDialog
         open={confirmClearRules}
-        title="清除全部监控规则?"
-        message={`将删除全部 ${rulesCount} 条规则,此操作不可撤销。`}
-        confirmText="清除"
+        title={tx('清除全部监控规则?')}
+        message={tx('将删除全部 {n} 条规则,此操作不可撤销。', { n: rulesCount })}
+        confirmText={tx('清除')}
         danger
         onCancel={() => setConfirmClearRules(false)}
         onConfirm={() => clearRulesMut.mutate()}
@@ -343,6 +347,7 @@ function AlertsList({ alertsQuery, confirmClear, setConfirmClear, total, enterTs
   enterTs: number
   monitorExtFields: { concept: MonitorExtFieldItem | null; industry: MonitorExtFieldItem | null }
 }) {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const navigate = useNavigate()
   const [confirmTs, setConfirmTs] = useState<number | null>(null)
@@ -405,16 +410,16 @@ function AlertsList({ alertsQuery, confirmClear, setConfirmClear, total, enterTs
         </div>
       ) : alertsQuery.isError ? (
         <ErrorState
-          title="触发记录加载失败"
-          hint="告警接口暂时不可用，请重试；持续失败请检查数据源配置与网络。"
+          title={tx('触发记录加载失败')}
+          hint={tx('告警接口暂时不可用，请重试；持续失败请检查数据源配置与网络。')}
           retrying={alertsQuery.isFetching}
           onRetry={() => alertsQuery.refetch()}
         />
       ) : events.length === 0 ? (
         <EmptyState
           icon={Bell}
-          title="暂无触发记录"
-          hint="监控规则命中后,触发记录会出现在这里。可在右侧配置规则,或在标的详情页加入监控。"
+          title={tx('暂无触发记录')}
+          hint={tx('监控规则命中后,触发记录会出现在这里。可在右侧配置规则,或在标的详情页加入监控。')}
         />
       ) : (
         <div className="space-y-2">
@@ -455,7 +460,7 @@ function AlertsList({ alertsQuery, confirmClear, setConfirmClear, total, enterTs
                               <button
                                 onClick={() => handlePreviewEvent(ev)}
                                 className="inline-flex items-center gap-1.5 rounded hover:bg-elevated/50 px-1 -mx-1 transition-colors cursor-pointer"
-                                title="点击查看日K"
+                                title={tx('点击查看日K')}
                               >
                                 <span className="font-mono text-xs font-medium text-foreground hover:text-accent">{ev.symbol}</span>
                                 {board && (
@@ -520,7 +525,7 @@ function AlertsList({ alertsQuery, confirmClear, setConfirmClear, total, enterTs
                               }
                             }}
                             className="inline-flex items-center gap-1.5 rounded px-1 -mx-1 text-xs font-medium text-foreground transition-colors hover:bg-elevated/50 hover:text-accent cursor-pointer"
-                            title={ev.sector_kind === 'index' ? '打开指数详情' : '查看成分股'}
+                            title={ev.sector_kind === 'index' ? tx('打开指数详情') : tx('查看成分股')}
                           >
                             <Tags className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-300" />
                             <span>{ev.sector_name ?? ev.name}</span>
@@ -533,7 +538,7 @@ function AlertsList({ alertsQuery, confirmClear, setConfirmClear, total, enterTs
                             <button
                               onClick={() => handlePreviewEvent(ev)}
                               className="inline-flex items-center gap-1.5 rounded hover:bg-elevated/50 px-1 -mx-1 transition-colors cursor-pointer"
-                              title="点击查看日K"
+                              title={tx('点击查看日K')}
                             >
                               <span className="font-mono text-xs font-medium text-foreground hover:text-accent">{ev.symbol}</span>
                               {board && (
@@ -561,31 +566,31 @@ function AlertsList({ alertsQuery, confirmClear, setConfirmClear, total, enterTs
                             // 优先用规则名 (如 "策略监控 · 空中加油" → "空中加油"); 退回到 type 标签
                             const rn = ev.rule_name ?? ''
                             const dotIdx = rn.indexOf(' · ')
-                            return dotIdx >= 0 ? rn.slice(dotIdx + 3) : (rn || (TYPE_LABEL[ev.source] ?? ev.source))
+                            return dotIdx >= 0 ? rn.slice(dotIdx + 3) : (rn || tx(TYPE_LABEL[ev.source] ?? ev.source))
                           })()}
                         </span>
                       </div>
                       {/* 详情行: 实际命中信号为主 (有 signals 时); 无 truth 命中则回退条件摘要 */}
                       {ev.signals && ev.signals.length > 0 ? (
                         <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px]">
-                          <span className="text-muted">命中</span>
+                          <span className="text-muted">{tx('命中')}</span>
                           {ev.signals.map((s: string, j: number) => (
                             <span key={j} className="rounded bg-accent/10 px-1.5 py-0.5 text-[10px] font-medium text-accent">{cnSignal(s, customNames)}</span>
                           ))}
                           {ev.price != null && (
                             <>
                               <span className="text-muted">·</span>
-                              <span className="text-muted">现价</span>
+                              <span className="text-muted">{tx('现价')}</span>
                               <span className="font-mono text-foreground/90">{fmtPrice(ev.price)}</span>
                             </>
                           )}
                         </div>
                       ) : (ev.conditions && ev.conditions.length > 0) ? (
                         <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px]">
-                          <span className="text-muted">命中</span>
+                          <span className="text-muted">{tx('命中')}</span>
                           {ev.conditions.map((c: MonitorCondition, ci: number) => (
                             <span key={ci} className="inline-flex items-center gap-0.5">
-                              {ci > 0 && <span className="text-secondary">{ev.logic === 'or' ? '或' : '且'}</span>}
+                              {ci > 0 && <span className="text-secondary">{ev.logic === 'or' ? tx('或') : tx('且')}</span>}
                               {c.op === 'truth' ? (
                                 <span className="text-accent/80">{cnSignal(c.field, customNames)}</span>
                               ) : (
@@ -596,7 +601,7 @@ function AlertsList({ alertsQuery, confirmClear, setConfirmClear, total, enterTs
                           {ev.price != null && (
                             <>
                               <span className="text-muted">·</span>
-                              <span className="text-muted">现价</span>
+                              <span className="text-muted">{tx('现价')}</span>
                               <span className="font-mono text-foreground/90">{fmtPrice(ev.price)}</span>
                             </>
                           )}
@@ -609,10 +614,10 @@ function AlertsList({ alertsQuery, confirmClear, setConfirmClear, total, enterTs
                       {/* 规则全量条件 (次要灰字): 已有命中信号主行时展示, 供回溯规则定义 */}
                       {ev.signals && ev.signals.length > 0 && ev.conditions && ev.conditions.length > 0 && (
                         <div className="mt-1 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[10px] text-muted/70">
-                          <span>规则</span>
+                          <span>{tx('规则')}</span>
                           {ev.conditions.map((c: MonitorCondition, ci: number) => (
                             <span key={ci} className="inline-flex items-center gap-0.5">
-                              {ci > 0 && <span>{ev.logic === 'or' ? '或' : '且'}</span>}
+                              {ci > 0 && <span>{ev.logic === 'or' ? tx('或') : tx('且')}</span>}
                               {c.op === 'truth' ? (
                                 <span>{cnSignal(c.field, customNames)}</span>
                               ) : (
@@ -640,16 +645,15 @@ function AlertsList({ alertsQuery, confirmClear, setConfirmClear, total, enterTs
                     // 确认态: 红色实心按钮 (原删除图标位置), 再点确认删除
                     <button
                       onClick={() => handleClickDelete(ev.ts)}
-                      title="再次点击确认删除"
+                      title={tx('再次点击确认删除')}
                       className="inline-flex items-center gap-1 rounded-md bg-danger/15 px-1.5 py-0.5 text-[10px] font-medium text-danger border border-danger/30 animate-pulse cursor-pointer"
                     >
-                      <Trash2 className="h-2.5 w-2.5" />确认
-                    </button>
+                      <Trash2 className="h-2.5 w-2.5" />{tx('确认')}</button>
                   ) : (
                     <button
                       onClick={() => handleClickDelete(ev.ts)}
                       disabled={delMut.isPending}
-                      title="删除"
+                      title={tx('删除')}
                       className="rounded p-1 text-muted/0 transition-colors group-hover:text-muted/40 hover:!text-danger hover:bg-danger/10 cursor-pointer"
                     >
                       <Trash2 className="h-3 w-3" />
@@ -664,9 +668,9 @@ function AlertsList({ alertsQuery, confirmClear, setConfirmClear, total, enterTs
 
       <ConfirmDialog
         open={confirmClear}
-        title="清空全部触发记录?"
-        message={`将删除全部 ${total} 条记录,此操作不可撤销。`}
-        confirmText="清空"
+        title={tx('清空全部触发记录?')}
+        message={tx('将删除全部 {n} 条记录,此操作不可撤销。', { n: total })}
+        confirmText={tx('清空')}
         danger
         onCancel={() => setConfirmClear(false)}
         onConfirm={() => clearMut.mutate()}
@@ -706,6 +710,7 @@ function RulesList({ rulesQuery, onEdit }: {
   rulesQuery: ReturnType<typeof useQuery>
   onEdit: (rule: MonitorRule) => void
 }) {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [previewSymbol, setPreviewSymbol] = useState<string | null>(null)
@@ -797,16 +802,16 @@ function RulesList({ rulesQuery, onEdit }: {
         </div>
       ) : rulesQuery.isError ? (
         <ErrorState
-          title="监控规则加载失败"
-          hint="规则接口暂时不可用，请重试；规则配置本身不受影响。"
+          title={tx('监控规则加载失败')}
+          hint={tx('规则接口暂时不可用，请重试；规则配置本身不受影响。')}
           retrying={rulesQuery.isFetching}
           onRetry={() => rulesQuery.refetch()}
         />
       ) : rules.length === 0 ? (
         <EmptyState
           icon={RadioTower}
-          title="暂无监控规则"
-          hint="点击标题栏「+」新建规则,或在标的详情页点「加监控」快速添加。"
+          title={tx('暂无监控规则')}
+          hint={tx('点击标题栏「+」新建规则,或在标的详情页点「加监控」快速添加。')}
         />
       ) : (
         rules.map(r => {
@@ -833,20 +838,20 @@ function RulesList({ rulesQuery, onEdit }: {
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className={cn('shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold', SOURCE_BADGE_STYLE[r.type] ?? 'bg-elevated text-muted')}>
-                    {TYPE_LABEL[r.type]}
+                    {tx(TYPE_LABEL[r.type])}
                   </span>
                   {r.lot_id && (
-                    <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold bg-emerald-400/10 text-emerald-500" title="由「持仓提醒」页托管, 请在持仓提醒页修改或删除">批次</span>
+                    <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold bg-emerald-400/10 text-emerald-500" title={tx('由「持仓提醒」页托管, 请在持仓提醒页修改或删除')}>{tx('批次')}</span>
                   )}
                   {r.asset_type === 'index' && (
-                    <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold bg-sky-500/10 text-sky-400">指数</span>
+                    <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold bg-sky-500/10 text-sky-400">{tx('指数')}</span>
                   )}
                   {/* 个股类型: 直接显示可点击的代码+名称; 分组类型: 分组chip跳自选页; 其他类型显示规则名 */}
                   {r.scope === 'symbols' && r.symbols.length > 0 ? (
                     <button
                       onClick={() => setPreviewSymbol(r.symbols[0])}
                       className="inline-flex items-center gap-1 min-w-0 hover:bg-elevated/50 rounded px-0.5 transition-colors cursor-pointer"
-                      title={`查看 ${r.symbols[0]} 日K`}
+                      title={tx('查看 {symbol} 日K', { symbol: r.symbols[0] })}
                     >
                       <span className="font-mono text-xs font-medium text-foreground hover:text-accent">{r.symbols[0]}</span>
                       {symbolNames[r.symbols[0]] && <span className="text-xs text-secondary truncate">{symbolNames[r.symbols[0]]}</span>}
@@ -855,39 +860,38 @@ function RulesList({ rulesQuery, onEdit }: {
                     (() => {
                       const meta = groupMeta[r.group_id]
                       if (!meta) {
-                        return <span className="text-xs text-warning truncate" title={r.name}>分组已删除</span>
+                        return <span className="text-xs text-warning truncate" title={r.name}>{tx('分组已删除')}</span>
                       }
                       return (
                         <Link
                           to={`/watchlist?group=${r.group_id}`}
                           className="inline-flex min-w-0 items-center gap-1.5 rounded px-0.5 transition-colors hover:bg-elevated/50 cursor-pointer"
-                          title={`「${meta.name}」分组 · 当前 ${meta.count} 只 · 点击查看分组`}
+                          title={tx('「{name}」分组 · 当前 {count} 只 · 点击查看分组', { name: meta.name, count: meta.count })}
                         >
                           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${resolveWatchlistGroupColor(meta.color).dot}`} />
                           <span className="truncate text-xs font-medium text-foreground hover:text-accent">{meta.name}</span>
-                          <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted">{meta.count}只</span>
-                          <span className="shrink-0 text-[9px] text-muted/60">· 分组作用域</span>
+                          <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted">{meta.count}{tx('只')}</span>
+                          <span className="shrink-0 text-[9px] text-muted/60">{tx('· 分组作用域')}</span>
                         </Link>
                       )
                     })()
                   ) : (
                     <h3 className={cn('text-xs font-medium truncate', r.enabled ? 'text-foreground' : 'text-muted')}>{displayName}</h3>
                   )}
-                  {!r.enabled && <span className="shrink-0 text-[9px] text-secondary">· 停用</span>}
+                  {!r.enabled && <span className="shrink-0 text-[9px] text-secondary">{tx('· 停用')}</span>}
                 </div>
                 <div className="flex items-center gap-0.5 shrink-0">
                   {r.lot_id ? (
                     <span
                       className="inline-flex items-center rounded-md border border-border/60 bg-elevated/60 px-1.5 py-0.5 text-[9px] text-secondary"
-                      title="由「持仓提醒」页生成的规则, 该页托管; 启停/修改/删除请到持仓提醒页"
+                      title={tx('由「持仓提醒」页生成的规则, 该页托管; 启停/修改/删除请到持仓提醒页')}
                     >
-                      批次托管
-                    </span>
+                      {tx('批次托管')}</span>
                   ) : (
                     <>
                       <button
                         onClick={() => toggleEnabled(r)}
-                        title={r.enabled ? '停用' : '启用'}
+                        title={r.enabled ? tx('停用') : tx('启用')}
                         className={cn(
                           'p-1 rounded-md transition-all cursor-pointer',
                           r.enabled ? 'text-accent hover:bg-accent/10' : 'text-muted hover:bg-elevated hover:text-accent',
@@ -898,24 +902,23 @@ function RulesList({ rulesQuery, onEdit }: {
                       <button
                         onClick={() => onEdit(r)}
                         className="p-1 rounded-md text-secondary transition-all hover:bg-accent/10 hover:text-accent cursor-pointer"
-                        title="编辑"
+                        title={tx('编辑')}
                       >
                         <Settings2 className="h-3.5 w-3.5" />
                       </button>
                       {confirmId === r.id ? (
                         <button
                           onClick={() => handleClickDelete(r.id)}
-                          title="再次点击确认删除"
+                          title={tx('再次点击确认删除')}
                           className="inline-flex items-center gap-1 rounded-md bg-danger/15 px-1.5 py-0.5 text-[9px] font-medium text-danger border border-danger/30 animate-pulse cursor-pointer"
                         >
-                          <Trash2 className="h-2.5 w-2.5" />确认
-                        </button>
+                          <Trash2 className="h-2.5 w-2.5" />{tx('确认')}</button>
                       ) : (
                         <button
                           onClick={() => handleClickDelete(r.id)}
                           disabled={del.isPending}
                           className="p-1 rounded-md text-secondary transition-all hover:bg-danger/10 hover:text-danger cursor-pointer"
-                          title="删除"
+                          title={tx('删除')}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
@@ -945,41 +948,40 @@ function RulesList({ rulesQuery, onEdit }: {
                   )}
                   <span className="text-[9px] text-secondary">·</span>
                   <span className="text-[9px] text-secondary">
-                    {r.sector_trigger === 'momentum' ? `${r.window_minutes ?? 5}分钟异动` : '涨跌幅'}
+                    {r.sector_trigger === 'momentum' ? tx('{n}分钟异动', { n: r.window_minutes ?? 5 }) : tx('涨跌幅')}
                     {r.direction === 'down' ? ' ≤ -' : ' ≥ '}{r.threshold_pct ?? 1}%
                   </span>
                 </div>
               ) : r.type === 'abnormal' ? (
                 <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1 pl-0.5">
                   <span className="rounded bg-orange-500/8 px-1.5 py-0.5 text-[9px] text-orange-500 dark:text-orange-400">
-                    接近度 ≥ {r.threshold_pct ?? 70}%
+                    {tx('接近度 ≥')} {r.threshold_pct ?? 70}%
                   </span>
                   <span className="rounded bg-elevated px-1.5 py-0.5 text-[9px] text-secondary">
-                    {r.abnormal_window && r.abnormal_window !== 'any' ? `${r.abnormal_window.toUpperCase()} 窗口` : '全部窗口'}
+                    {r.abnormal_window && r.abnormal_window !== 'any' ? tx('{w} 窗口', { w: r.abnormal_window.toUpperCase() }) : tx('全部窗口')}
                   </span>
                   <span className="rounded bg-elevated px-1.5 py-0.5 text-[9px] text-secondary">
-                    {r.direction === 'up' ? '涨势偏离' : r.direction === 'down' ? '跌势偏离' : '涨跌双向'}
+                    {r.direction === 'up' ? tx('涨势偏离') : r.direction === 'down' ? tx('跌势偏离') : tx('涨跌双向')}
                   </span>
                 </div>
               ) : r.type === 'date' ? (
                 <div className="mt-1 flex items-center gap-1 pl-0.5 text-[9px] text-secondary">
-                  <span>提醒 {r.remind_date ?? ''}</span>
-                  {(r.lead_days ?? 0) > 0 && <span>· 提前{r.lead_days}天</span>}
-                  <span>· 仅交易日盘中评估</span>
+                  <span>{tx('提醒')} {r.remind_date ?? ''}</span>
+                  {(r.lead_days ?? 0) > 0 && <span>{tx('· 提前')}{r.lead_days}{tx('天')}</span>}
+                  <span>{tx('· 仅交易日盘中评估')}</span>
                 </div>
               ) : r.type === 'volume_delta' ? (
                 <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1 pl-0.5">
                   <span className="rounded bg-rose-500/8 px-1.5 py-0.5 text-[9px] font-mono text-rose-500 dark:text-rose-300">
                     {r.metric === 'amount'
-                      ? `单轮增量 ≥ ${Math.round((r.threshold_amount ?? 1e6) / 1e4).toLocaleString()} 万元`
-                      : `单轮增量 ≥ ${(r.threshold_volume ?? 9000).toLocaleString()} 手`}
+                      ? tx('单轮增量 ≥ {amount} 万元', { amount: Math.round((r.threshold_amount ?? 1e6) / 1e4).toLocaleString() })
+                      : tx('单轮增量 ≥ {volume} 手', { volume: (r.threshold_volume ?? 9000).toLocaleString() })}
                   </span>
                   <span className="rounded bg-elevated px-1.5 py-0.5 text-[9px] text-secondary">
-                    冷却 {Math.round((r.cooldown_seconds ?? 300) / 60)} 分钟
-                  </span>
+                    {tx('冷却')} {Math.round((r.cooldown_seconds ?? 300) / 60)} {tx('分钟')}</span>
                   {r.basic_filter && Object.values(r.basic_filter).some(v => v !== null && v !== false) && (
                     <span className="rounded bg-elevated px-1.5 py-0.5 text-[9px] text-secondary">
-                      基础过滤{r.basic_filter.exclude_st ? ' · 剔除ST' : ''}
+                      {tx('基础过滤')}{r.basic_filter.exclude_st ? tx(' · 剔除ST') : ''}
                     </span>
                   )}
                 </div>
@@ -987,7 +989,7 @@ function RulesList({ rulesQuery, onEdit }: {
                 <div className="mt-1 flex flex-wrap items-center gap-1 pl-0.5">
                   {(r.score_min != null || r.score_max != null) && (
                     <span className="rounded bg-amber-400/10 px-1.5 py-0.5 text-[9px] font-mono text-amber-500 dark:text-amber-300">
-                      评分 {r.score_min ?? 0}–{r.score_max ?? 100}
+                      {tx('评分')} {r.score_min ?? 0}–{r.score_max ?? 100}
                     </span>
                   )}
                   {(r.notify_events ?? LEGACY_STRATEGY_NOTIFY_EVENTS).map(event => {
@@ -1001,11 +1003,11 @@ function RulesList({ rulesQuery, onEdit }: {
                 </div>
               ) : r.conditions.length > 0 && (
                 <div className="mt-0.5 flex items-center gap-1 pl-0.5">
-                  <span className="text-[9px] text-secondary shrink-0">条件</span>
+                  <span className="text-[9px] text-secondary shrink-0">{tx('条件')}</span>
                   <span className="min-w-0 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[9px]">
                     {r.conditions.slice(0, 3).map((c, i) => (
                       <span key={i} className="inline-flex items-center gap-0.5">
-                        {i > 0 && <span className="text-secondary">{r.logic === 'and' ? '且' : '或'}</span>}
+                        {i > 0 && <span className="text-secondary">{r.logic === 'and' ? tx('且') : tx('或')}</span>}
                         {c.op === 'truth' ? (
                           <span className="text-accent/80">{cnSignal(c.field, customNames)}</span>
                         ) : (
@@ -1083,6 +1085,7 @@ function ConfirmDialog({ open, title, message, confirmText, danger, pending, onC
   onCancel: () => void
   onConfirm: () => void
 }) {
+  const { tx } = useI18n()
   return (
     <AnimatePresence>
       {open && (
@@ -1104,7 +1107,7 @@ function ConfirmDialog({ open, title, message, confirmText, danger, pending, onC
             <h3 className="text-sm font-medium text-foreground">{title}</h3>
             <p className="mt-1.5 text-xs text-muted">{message}</p>
             <div className="mt-4 flex justify-end gap-2">
-              <button onClick={onCancel} className="px-3 py-1.5 rounded-btn bg-elevated text-secondary text-xs cursor-pointer">取消</button>
+              <button onClick={onCancel} className="px-3 py-1.5 rounded-btn bg-elevated text-secondary text-xs cursor-pointer">{tx('取消')}</button>
               <button
                 onClick={onConfirm}
                 disabled={pending}
@@ -1113,7 +1116,7 @@ function ConfirmDialog({ open, title, message, confirmText, danger, pending, onC
                   danger ? 'bg-danger text-white' : 'bg-accent text-white',
                 )}
               >
-                {confirmText ?? '确定'}
+                {confirmText ?? tx('确定')}
               </button>
             </div>
           </motion.div>
@@ -1129,6 +1132,7 @@ function MonitorExtConfigDialog({ open, fields, onClose }: {
   fields: { concept: MonitorExtFieldItem | null; industry: MonitorExtFieldItem | null }
   onClose: () => void
 }) {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const [concept, setConcept] = useState<MonitorExtFieldItem | null>(fields.concept)
   const [industry, setIndustry] = useState<MonitorExtFieldItem | null>(fields.industry)
@@ -1173,16 +1177,16 @@ function MonitorExtConfigDialog({ open, fields, onClose }: {
           >
             <div className="flex items-center gap-2 mb-4">
               <Tags className="h-4 w-4 text-accent" />
-              <h3 className="text-sm font-medium text-foreground">个股通知标签配置</h3>
+              <h3 className="text-sm font-medium text-foreground">{tx('个股通知标签配置')}</h3>
             </div>
-            <p className="text-[11px] text-muted mb-4">选择在触发记录和推送通知中显示的行业/概念字段,留空则不显示。</p>
+            <p className="text-[11px] text-muted mb-4">{tx('选择在触发记录和推送通知中显示的行业/概念字段,留空则不显示。')}</p>
             <div className="space-y-4">
-              <ExtFieldSection label="行业字段" value={industry} onChange={setIndustry} groups={groups} loading={schema.isLoading} />
-              <ExtFieldSection label="概念字段" value={concept} onChange={setConcept} groups={groups} loading={schema.isLoading} />
+              <ExtFieldSection label={tx('行业字段')} value={industry} onChange={setIndustry} groups={groups} loading={schema.isLoading} />
+              <ExtFieldSection label={tx('概念字段')} value={concept} onChange={setConcept} groups={groups} loading={schema.isLoading} />
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <button onClick={onClose} className="px-3 py-1.5 rounded-btn text-xs text-secondary hover:text-foreground transition-colors cursor-pointer">取消</button>
-              <button onClick={handleSave} className="px-3 py-1.5 rounded-btn text-xs font-medium bg-accent text-white cursor-pointer">保存</button>
+              <button onClick={onClose} className="px-3 py-1.5 rounded-btn text-xs text-secondary hover:text-foreground transition-colors cursor-pointer">{tx('取消')}</button>
+              <button onClick={handleSave} className="px-3 py-1.5 rounded-btn text-xs font-medium bg-accent text-white cursor-pointer">{tx('保存')}</button>
             </div>
           </motion.div>
         </motion.div>
@@ -1199,6 +1203,7 @@ function ExtFieldSection({ label, value, onChange, groups, loading }: {
   groups: { group: string; options: { value: string; label: string }[] }[]
   loading: boolean
 }) {
+  const { tx } = useI18n()
   const field = value?.field ?? ''
   const maxTags = value?.maxTags ?? 0
   const hidden = value?.hiddenIndices ?? []
@@ -1225,7 +1230,7 @@ function ExtFieldSection({ label, value, onChange, groups, loading }: {
           disabled={loading}
           className="flex-1 min-w-0 h-8 bg-elevated border border-border rounded text-xs text-foreground px-2 focus:outline-none focus:border-accent/50"
         >
-          <option value="">不显示</option>
+          <option value="">{tx('不显示')}</option>
           {groups.map(g => (
             <optgroup key={g.group} label={g.group}>
               {g.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -1233,27 +1238,27 @@ function ExtFieldSection({ label, value, onChange, groups, loading }: {
           ))}
         </select>
         {field && (
-          <button onClick={() => onChange(null)} title="清除" className="shrink-0 p-1 rounded text-muted hover:text-danger transition-colors cursor-pointer">
+          <button onClick={() => onChange(null)} title={tx('清除')} className="shrink-0 p-1 rounded text-muted hover:text-danger transition-colors cursor-pointer">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
       {field && (
         <div className="flex items-center gap-2 pl-0.5">
-          <span className="text-[10px] text-muted shrink-0">显示前N个</span>
+          <span className="text-[10px] text-muted shrink-0">{tx('显示前N个')}</span>
           <input
             type="number" min={0} max={20}
             value={maxTags || ''}
             onChange={e => setMaxTags(e.target.value ? Number(e.target.value) : 0)}
-            placeholder="不限"
+            placeholder={tx('不限')}
             className="w-14 h-6 bg-elevated border border-border rounded text-[11px] text-foreground px-1.5 focus:outline-none focus:border-accent/50"
           />
-          <span className="text-[10px] text-muted/60">留空=全部</span>
+          <span className="text-[10px] text-muted/60">{tx('留空=全部')}</span>
         </div>
       )}
       {field && maxTags > 0 && (
         <div className="flex items-center gap-2 pl-0.5">
-          <span className="text-[10px] text-muted shrink-0">隐藏位置</span>
+          <span className="text-[10px] text-muted shrink-0">{tx('隐藏位置')}</span>
           <div className="flex flex-wrap gap-1">
             {Array.from({ length: maxTags }, (_, i) => (
               <button
@@ -1265,7 +1270,7 @@ function ExtFieldSection({ label, value, onChange, groups, loading }: {
               >{i + 1}</button>
             ))}
           </div>
-          <span className="text-[10px] text-muted/60">点数字划掉=隐藏该位置</span>
+          <span className="text-[10px] text-muted/60">{tx('点数字划掉=隐藏该位置')}</span>
         </div>
       )}
     </div>

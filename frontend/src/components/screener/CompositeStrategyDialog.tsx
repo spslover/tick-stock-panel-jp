@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { X, Layers, Plus, Loader2, Search, Settings2 } from 'lucide-react'
 import { api, type ScreenerStrategy } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { selectableStrategies, strategyOptionLabel } from '@/lib/strategyLibrary'
 import { toPercentages, normalizeWeights } from '@/lib/weights'
@@ -28,6 +29,7 @@ const BADGE_CLS: Record<string, string> = {
 }
 
 export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategyId }: Props) {
+  const { tx } = useI18n()
   const isEdit = !!editStrategyId
   const [name, setName] = useState('')
   // 用户手动编辑过名称后停止自动生成(子策略名用 + 连接)
@@ -132,11 +134,11 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
   const handleSave = async () => {
     setError('')
     if (!name.trim()) {
-      setError('请输入策略名称')
+      setError(tx('请输入策略名称'))
       return
     }
     if (children.length === 0) {
-      setError('请至少选择一个子策略')
+      setError(tx('请至少选择一个子策略'))
       return
     }
     setSaving(true)
@@ -154,7 +156,7 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
       await onSavedId?.(result.strategy_id)
       setTimeout(() => onClose(), 800)
     } catch (e: any) {
-      setError(String(e?.message ?? '保存失败'))
+      setError(String(e?.message ?? tx('保存失败')))
     }
     setSaving(false)
   }
@@ -187,11 +189,10 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
             <div className="flex items-center gap-2 border-b border-border px-4 py-3">
               <Layers className="h-4 w-4 text-teal-400" />
               <span className="text-sm font-semibold text-foreground">
-                {isEdit ? '编辑叠加策略' : '创建叠加策略'}
+                {isEdit ? tx('编辑叠加策略') : tx('创建叠加策略')}
               </span>
               <span className="text-[10px] text-muted/60">
-                引用多个子策略, 合并策略与回测信号
-              </span>
+                {tx('引用多个子策略, 合并策略与回测信号')}</span>
               <button onClick={onClose} className="ml-auto text-muted hover:text-foreground">
                 <X className="h-4 w-4" />
               </button>
@@ -202,7 +203,7 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
               {/* 基本信息 */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs text-muted">策略 ID（自动生成）</label>
+                  <label className="mb-1 block text-xs text-muted">{tx('策略 ID（自动生成）')}</label>
                   <input
                     value={strategyId}
                     readOnly
@@ -212,21 +213,21 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-muted">策略名称</label>
+                  <label className="mb-1 block text-xs text-muted">{tx('策略名称')}</label>
                   <input
                     value={name}
                     onChange={e => { setName(e.target.value); setNameDirty(true) }}
-                    placeholder="我的叠加策略"
+                    placeholder={tx('我的叠加策略')}
                     className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 text-xs text-foreground placeholder:text-muted/40"
                   />
                 </div>
               </div>
               <div>
-                <label className="mb-1 block text-xs text-muted">描述（可选）</label>
+                <label className="mb-1 block text-xs text-muted">{tx('描述（可选）')}</label>
                 <input
                   value={description}
                   onChange={e => setDescription(e.target.value)}
-                  placeholder="说明这个叠加策略的意图"
+                  placeholder={tx('说明这个叠加策略的意图')}
                   className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 text-xs text-foreground placeholder:text-muted/40"
                 />
               </div>
@@ -234,18 +235,18 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
               {/* 合并模式 */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs text-muted">合并模式</label>
+                  <label className="mb-1 block text-xs text-muted">{tx('合并模式')}</label>
                   <select
                     value={mergeMode}
                     onChange={e => setMergeMode(e.target.value as 'union' | 'intersect')}
                     className="w-full rounded-btn border border-border bg-elevated px-2 py-1.5 text-xs text-foreground"
                   >
-                    <option value="intersect">交集（至少 N 个子策略同时命中）</option>
-                    <option value="union">并集（任一子策略命中即入选）</option>
+                    <option value="intersect">{tx('交集（至少 N 个子策略同时命中）')}</option>
+                    <option value="union">{tx('并集（任一子策略命中即入选）')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs text-muted">交集最少确认数（0=全部）</label>
+                  <label className="mb-1 block text-xs text-muted">{tx('交集最少确认数（0=全部）')}</label>
                   <input
                     type="number"
                     min={0}
@@ -261,23 +262,21 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
                   <label className="text-xs font-medium text-foreground">
-                    子策略（{children.length}）
+                    {tx('子策略（')}{children.length}）
                   </label>
                   <span className="text-[10px] text-muted flex items-center gap-1.5">
-                    权重
-                    <span className={`font-mono ${children.length > 0 && totalPct !== 100 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    {tx('权重')}<span className={`font-mono ${children.length > 0 && totalPct !== 100 ? 'text-amber-400' : 'text-emerald-400'}`}>
                       {totalPct}%
                     </span>
                     {children.length > 0 && totalPct !== 100 && (
-                      <span className="text-amber-400/60">(保存时自动按比例归一)</span>
+                      <span className="text-amber-400/60">{tx('(保存时自动按比例归一)')}</span>
                     )}
                   </span>
                 </div>
                 <div className="space-y-1.5">
                   {children.length === 0 && (
                     <div className="rounded-btn border border-dashed border-border px-3 py-4 text-center text-xs text-muted">
-                      从下方列表选择子策略
-                    </div>
+                      {tx('从下方列表选择子策略')}</div>
                   )}
                   {children.map(c => {
                     const s = available.find(a => a.id === c.strategy_id)
@@ -286,7 +285,7 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
                         <button
                           type="button"
                           onClick={() => setEditingChildId(c.strategy_id)}
-                          title="点击编辑该子策略的配置"
+                          title={tx('点击编辑该子策略的配置')}
                           className="flex min-w-0 flex-1 items-center gap-1 text-left text-xs text-foreground transition-colors hover:text-accent cursor-pointer"
                         >
                           <span className="truncate">{s ? strategyOptionLabel(s) : c.strategy_id}</span>
@@ -294,7 +293,7 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
                         </button>
                         {s?.source && (
                           <span className={`rounded border px-1 text-[8px] ${BADGE_CLS[s.source] ?? ''}`}>
-                            {SRC_MAP[s.source] ?? s.source}
+                            {tx(SRC_MAP[s.source] ?? s.source)}
                           </span>
                         )}
                         <input
@@ -305,7 +304,7 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
                           value={c.weight}
                           onChange={e => updateWeight(c.strategy_id, parseInt(e.target.value) || 0)}
                           className="h-1 w-24 cursor-pointer accent-teal-400"
-                          aria-label={`${s?.name ?? c.strategy_id}权重`}
+                          aria-label={tx('{name}权重', { name: s?.name ?? c.strategy_id })}
                         />
                         <span className="w-9 shrink-0 text-right font-mono text-[10px] text-muted">{Math.round(c.weight)}%</span>
                         <button onClick={() => removeChild(c.strategy_id)} className="text-danger/60 hover:text-danger">
@@ -319,24 +318,23 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
 
               {/* 可选子策略 */}
               <div>
-                <label className="mb-1.5 block text-xs font-medium text-foreground">可选策略</label>
+                <label className="mb-1.5 block text-xs font-medium text-foreground">{tx('可选策略')}</label>
                 <div className="relative mb-1.5">
                   <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted/50" />
                   <input
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    placeholder="搜索策略名称或 ID"
+                    placeholder={tx('搜索策略名称或 ID')}
                     className="w-full rounded-btn border border-border bg-elevated py-1.5 pl-7 pr-2 text-xs text-foreground placeholder:text-muted/40"
                   />
                 </div>
                 <div className="max-h-72 space-y-1 overflow-y-auto rounded-btn border border-border bg-elevated p-1.5">
                   {loadingList && (
                     <div className="flex items-center justify-center gap-1.5 py-3 text-xs text-muted">
-                      <Loader2 className="h-3 w-3 animate-spin" /> 加载中
-                    </div>
+                      <Loader2 className="h-3 w-3 animate-spin" /> {tx('加载中')}</div>
                   )}
                   {!loadingList && filteredAvailable.length === 0 && (
-                    <div className="py-3 text-center text-xs text-muted">无可用策略</div>
+                    <div className="py-3 text-center text-xs text-muted">{tx('无可用策略')}</div>
                   )}
                   {filteredAvailable.map(s => (
                     <button
@@ -348,7 +346,7 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
                       <span className="flex-1 truncate">{s.name}</span>
                       {s.source && (
                         <span className={`rounded border px-1 text-[8px] ${BADGE_CLS[s.source] ?? ''}`}>
-                          {SRC_MAP[s.source] ?? s.source}
+                          {tx(SRC_MAP[s.source] ?? s.source)}
                         </span>
                       )}
                       <span className="font-mono text-[9px] text-muted/50">{s.id}</span>
@@ -370,15 +368,14 @@ export function CompositeStrategyDialog({ open, onClose, onSavedId, editStrategy
                 onClick={onClose}
                 className="rounded-btn border border-border px-3 py-1.5 text-xs text-muted hover:text-foreground"
               >
-                取消
-              </button>
+                {tx('取消')}</button>
               <button
                 onClick={handleSave}
                 disabled={saving}
                 className="inline-flex items-center gap-1.5 rounded-btn bg-teal-500/15 px-3 py-1.5 text-xs font-medium text-teal-400 border border-teal-500/30 hover:bg-teal-500/25 disabled:opacity-50"
               >
                 {saving && <Loader2 className="h-3 w-3 animate-spin" />}
-                {isEdit ? '保存修改' : '创建'}
+                {isEdit ? tx('保存修改') : tx('创建')}
               </button>
             </div>
           </motion.div>

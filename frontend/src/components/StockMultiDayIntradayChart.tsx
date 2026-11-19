@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, Loader2, RefreshCw } from 'lucide-react'
 import { api, type MinuteKlineSession } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { mergeMinuteRows } from '@/lib/minuteBatchIncremental'
 import { klineMinuteQueryOptions, klineMinuteRangeQueryOptions, minuteRefetchInterval } from '@/lib/kline'
@@ -22,7 +23,7 @@ interface Props {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : '分钟数据获取失败'
+  return error instanceof Error ? error.message : tx('分钟数据获取失败')
 }
 
 export function StockMultiDayIntradayChart({
@@ -87,7 +88,7 @@ export function StockMultiDayIntradayChart({
       if (msg.includes('403') || msg.includes('Pro')) {
         toast('分钟K(批量)数据不可用', 'error')
       } else {
-        toast(`补齐数据失败: ${msg}`, 'error')
+        toast(tx('补齐数据失败: {v}', { v: msg }), 'error')
       }
     },
   })
@@ -160,7 +161,7 @@ export function StockMultiDayIntradayChart({
           </>
         ) : (
           <>
-            <span className="text-muted">{isIndex ? '指数暂无分钟数据' : '本地暂无可展示的分钟数据'}</span>
+            <span className="text-muted">{isIndex ? tx('指数暂无分钟数据') : tx('本地暂无可展示的分钟数据')}</span>
             {!isIndex && (
               <button
                 type="button"

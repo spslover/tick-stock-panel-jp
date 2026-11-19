@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { createChart, CandlestickSeries, LineSeries, AreaSeries, BaselineSeries, HistogramSeries, createSeriesMarkers, ColorType, CrosshairMode,
   type IChartApi, type ISeriesApi, type ISeriesMarkersPluginApi, type SeriesType, type Time, type SeriesMarker, type MouseEventParams } from 'lightweight-charts'
 import { useChartTheme } from '@/lib/theme'
+import { tx } from '@/lib/i18n'
 import { fmtBigNum } from '@/lib/format'
 import { CHART_LAYOUT } from '@/lib/chart-layout'
 import { formatAxisPercent } from '@/lib/intraday-scale'
@@ -311,5 +312,5 @@ export function FinancialPlot(props: Props) {
     markerRef.current?.setMarkers(markersForView(props.markers, compactRef.current))
   }, [props.annotations, props.markers, props.volumeLabels, props.paneTitles, props.paneReadouts, props.linkedPrice, props.series, props.pricePrecision, ct])
 
-  return <div ref={host} role="group" aria-label={props.intraday ? '分时价格与成交量图' : '日 K 与技术指标图'} data-chart-engine="lightweight" className="w-full min-w-0" style={{ height: props.height }} />
+  return <div ref={host} role="group" aria-label={props.intraday ? tx('分时价格与成交量图') : tx('日 K 与技术指标图')} data-chart-engine="lightweight" className="w-full min-w-0" style={{ height: props.height }} />
 }

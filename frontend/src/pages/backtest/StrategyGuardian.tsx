@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BellRing, GitMerge, Play, RefreshCw, ShieldCheck, Trash2 } from 'lucide-react'
 import { api, type GuardianCombinationSuggestion, type GuardianConfig, type GuardianProfile, type LabReport } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { EmptyState } from '@/components/EmptyState'
 import { INPUT_CLS, PRIMARY_OBJECTIVES, StrategySelect } from './components/paramSweep'
@@ -38,6 +39,7 @@ function StatusBadge({ status }: { status: GuardianProfile['status'] }) {
 
 /** 守护配置卡: 阈值改动即时 PATCH, 与后端 GuardianThresholds 同一约束。 */
 function ConfigCard({ config }: { config: GuardianConfig }) {
+  const { tx } = useI18n()
   const queryClient = useQueryClient()
   const [error, setError] = useState<string | null>(null)
   const patch = useMutation({
@@ -52,7 +54,7 @@ function ConfigCard({ config }: { config: GuardianConfig }) {
   return (
     <div className="rounded-card border border-border bg-surface p-3">
       <div className="flex items-center justify-between">
-        <div className="text-xs font-medium">守护设置</div>
+        <div className="text-xs font-medium">{tx('守护设置')}</div>
         <label className="flex cursor-pointer items-center gap-1.5 text-xs text-secondary">
           <input
             type="checkbox"
@@ -60,13 +62,11 @@ function ConfigCard({ config }: { config: GuardianConfig }) {
             onChange={e => update({ guardian_schedule_enabled: e.target.checked })}
             className="h-3.5 w-3.5 accent-[var(--color-accent)]"
           />
-          每日自动复验 (收盘数据更新后)
-        </label>
+          {tx('每日自动复验 (收盘数据更新后)')}</label>
       </div>
       <div className="mt-2 flex flex-wrap items-end gap-2">
         <label className="text-[11px] text-secondary">
-          观察阈值
-          <input
+          {tx('观察阈值')}<input
             type="number" step="0.05" min="0.05" max="0.9"
             defaultValue={config.guardian_watch_pct}
             key={`w-${config.guardian_watch_pct}`}
@@ -75,8 +75,7 @@ function ConfigCard({ config }: { config: GuardianConfig }) {
           />
         </label>
         <label className="text-[11px] text-secondary">
-          退役阈值
-          <input
+          {tx('退役阈值')}<input
             type="number" step="0.05" min="0.1" max="1"
             defaultValue={config.guardian_retire_pct}
             key={`r-${config.guardian_retire_pct}`}
@@ -85,8 +84,7 @@ function ConfigCard({ config }: { config: GuardianConfig }) {
           />
         </label>
         <label className="text-[11px] text-secondary">
-          验证段数上限 K
-          <input
+          {tx('验证段数上限 K')}<input
             type="number" step="1" min="2" max="4"
             defaultValue={config.guardian_k_max}
             key={`k-${config.guardian_k_max}`}
@@ -95,8 +93,7 @@ function ConfigCard({ config }: { config: GuardianConfig }) {
           />
         </label>
         <label className="text-[11px] text-secondary">
-          挖掘策略名额上限
-          <input
+          {tx('挖掘策略名额上限')}<input
             type="number" step="1" min="0" max="50"
             defaultValue={config.lab_mined_slot_limit}
             key={`slot-${config.lab_mined_slot_limit}`}
@@ -104,7 +101,7 @@ function ConfigCard({ config }: { config: GuardianConfig }) {
             className={`${INPUT_CLS} mt-0.5 w-24`}
           />
         </label>
-        <div className="text-[10px] text-secondary">基线后退化为百分比; 段回测失败只降级到观察, 不会直接退役</div>
+        <div className="text-[10px] text-secondary">{tx('基线后退化为百分比; 段回测失败只降级到观察, 不会直接退役')}</div>
       </div>
       {error && <div className="mt-2 text-[11px] text-red-400">{error}</div>}
     </div>
@@ -113,6 +110,7 @@ function ConfigCard({ config }: { config: GuardianConfig }) {
 
 /** 手动入护: 任意策略 + 目标 (尾随参考基线, 首跑自动标定)。 */
 function AdoptCard({ onChanged }: { onChanged: () => void }) {
+  const { tx } = useI18n()
   const { data: stratData } = useQuery({ queryKey: QK.strategyList(), queryFn: () => api.strategyList() })
   const strategies = stratData?.strategies ?? []
   const [strategyId, setStrategyId] = useState('')
@@ -125,7 +123,7 @@ function AdoptCard({ onChanged }: { onChanged: () => void }) {
   })
   return (
     <div className="rounded-card border border-border bg-surface p-3">
-      <div className="text-xs font-medium">加入守护</div>
+      <div className="text-xs font-medium">{tx('加入守护')}</div>
       <div className="mt-2 flex flex-wrap items-end gap-2">
         <div className="min-w-52 flex-1">
           <StrategySelect strategies={strategies} value={strategyId} onChange={setStrategyId} />
@@ -138,12 +136,10 @@ function AdoptCard({ onChanged }: { onChanged: () => void }) {
           disabled={!strategyId || adopt.isPending}
           className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-2 text-xs font-medium text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          <ShieldCheck className="h-3.5 w-3.5" /> 入护并复验
-        </button>
+          <ShieldCheck className="h-3.5 w-3.5" /> {tx('入护并复验')}</button>
       </div>
       <div className="mt-1.5 text-[10px] text-secondary">
-        手动入护用入护日前 252 个交易日的尾随表现作参考基线 (非样本外), 判定只针对此后新数据; 挖掘发布的策略自动入护 (门槛基线, 天然 OOS)。
-      </div>
+        {tx('手动入护用入护日前 252 个交易日的尾随表现作参考基线 (非样本外), 判定只针对此后新数据; 挖掘发布的策略自动入护 (门槛基线, 天然 OOS)。')}</div>
       {error && <div className="mt-2 text-[11px] text-red-400">{error}</div>}
     </div>
   )
@@ -151,36 +147,35 @@ function AdoptCard({ onChanged }: { onChanged: () => void }) {
 
 /** P3 实验室战报: 挖掘/守护/名额聚合总览。 */
 function LabReportCard({ report }: { report: LabReport | undefined }) {
+  const { tx } = useI18n()
   if (!report) return null
   const mining = report.mining.last_run
   const refinement = mining?.refinement as { applied?: boolean; refined_weights?: number[]; original_weights?: number[] } | null | undefined
   return (
     <div className="rounded-card border border-border bg-surface p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-xs font-medium">实验室战报</div>
+        <div className="text-xs font-medium">{tx('实验室战报')}</div>
         <div className="flex flex-wrap gap-2 text-[11px] text-secondary">
-          <span>守护 {report.guardian.profiles} 个
-            {report.guardian.by_status.healthy ? ` · 健康 ${report.guardian.by_status.healthy}` : ''}
-            {report.guardian.by_status.watch ? ` · 观察 ${report.guardian.by_status.watch}` : ''}
-            {report.guardian.by_status.retired ? ` · 退役 ${report.guardian.by_status.retired}` : ''}
+          <span>{tx('守护')} {report.guardian.profiles} {tx('个')}{report.guardian.by_status.healthy ? tx(' · 健康 {n}', { n: report.guardian.by_status.healthy }) : ''}
+            {report.guardian.by_status.watch ? tx(' · 观察 {n}', { n: report.guardian.by_status.watch }) : ''}
+            {report.guardian.by_status.retired ? tx(' · 退役 {n}', { n: report.guardian.by_status.retired }) : ''}
           </span>
           {report.guardian.alerts > 0 && (
             <span className="inline-flex items-center gap-0.5 text-amber-400">
-              <BellRing className="h-3 w-3" /> {report.guardian.alerts} 个连续观察告警
-            </span>
+              <BellRing className="h-3 w-3" /> {report.guardian.alerts} {tx('个连续观察告警')}</span>
           )}
           <span className={report.slots.full ? 'text-red-400' : ''}>
-            挖掘名额 {report.slots.active_mined}/{report.slots.limit === 0 ? '∞' : report.slots.limit}
-            {report.slots.full ? ' (已满, 新候选等位)' : ''}
+            {tx('挖掘名额')} {report.slots.active_mined}/{report.slots.limit === 0 ? '∞' : report.slots.limit}
+            {report.slots.full ? ' ' + tx('(已满, 新候选等位)') : ''}
           </span>
         </div>
       </div>
       <div className="mt-1.5 text-[11px] text-secondary">
         {mining
-          ? `最近挖掘 ${mining.status} · ${mining.algorithm_version ?? '—'} · 候选 ${mining.candidate_count ?? '—'} 个 · 有效折 ${mining.valid_fold_count ?? '—'}`
-          : '还没有挖掘运行'}
+          ? tx('最近挖掘 {status} · {ver} · 候选 {cand} 个 · 有效折 {folds}', { status: mining.status, ver: mining.algorithm_version ?? '—', cand: mining.candidate_count ?? '—', folds: mining.valid_fold_count ?? '—' })
+          : tx('还没有挖掘运行')}
         {refinement?.applied === true && (
-          <span className="text-emerald-400"> · 冠军权重已精调 {JSON.stringify(refinement.original_weights)} → {JSON.stringify(refinement.refined_weights)}</span>
+          <span className="text-emerald-400"> {tx('· 冠军权重已精调')} {JSON.stringify(refinement.original_weights)} → {JSON.stringify(refinement.refined_weights)}</span>
         )}
       </div>
     </div>
@@ -200,25 +195,23 @@ function CombinationsCard({
   onScan: () => void
   onCreate: (a: string, b: string) => Promise<unknown>
 }) {
+  const { tx } = useI18n()
   const [creating, setCreating] = useState<string | null>(null)
   return (
     <div className="rounded-card border border-border bg-surface p-3">
       <div className="flex items-center justify-between">
         <div className="inline-flex items-center gap-1.5 text-xs font-medium">
-          <GitMerge className="h-3.5 w-3.5 text-secondary" /> 组合建议
-        </div>
+          <GitMerge className="h-3.5 w-3.5 text-secondary" /> {tx('组合建议')}</div>
         <button
           onClick={onScan}
           disabled={busy}
           className="inline-flex items-center gap-1 rounded-btn border border-border px-2 py-1 text-[11px] text-secondary hover:bg-elevated hover:text-foreground disabled:opacity-40"
         >
-          <RefreshCw className="h-3 w-3" /> 扫描相关性
-        </button>
+          <RefreshCw className="h-3 w-3" /> {tx('扫描相关性')}</button>
       </div>
       {combinations.length === 0 ? (
         <div className="mt-2 text-[11px] text-secondary">
-          暂无建议 — 扫描会计算健康守护冠军间近 126 个交易日的日收益相关性, 相关性 ≤0.7 的对才会出现在这里。
-        </div>
+          {tx('暂无建议 — 扫描会计算健康守护冠军间近 126 个交易日的日收益相关性, 相关性 ≤0.7 的对才会出现在这里。')}</div>
       ) : (
         <div className="mt-2 space-y-1">
           {combinations.map(item => {
@@ -227,11 +220,11 @@ function CombinationsCard({
               <div key={key} className="flex items-center justify-between gap-2 rounded-input bg-elevated/40 px-2 py-1.5 text-[11px]">
                 <span className="min-w-0 truncate">
                   {item.a} <span className="text-secondary">×</span> {item.b}
-                  <span className="ml-2 text-secondary">相关性 {item.corr.toFixed(2)} · {item.common_days} 日</span>
+                  <span className="ml-2 text-secondary">{tx('相关性')} {item.corr.toFixed(2)} · {item.common_days} {tx('日')}</span>
                 </span>
                 <button
                   onClick={() => {
-                    if (window.confirm(`生成组合策略 ${item.a} + ${item.b}? (等权 composite, 自动加入守护)`)) {
+                    if (window.confirm(tx('生成组合策略 {a} + {b}? (等权 composite, 自动加入守护)', { a: item.a, b: item.b }))) {
                       setCreating(key)
                       // 成功或失败都要复位按钮状态 (错误展示走父组件 error)
                       Promise.resolve(onCreate(item.a, item.b))
@@ -242,7 +235,7 @@ function CombinationsCard({
                   disabled={busy || creating === key}
                   className="shrink-0 rounded-btn bg-accent px-2 py-1 text-[11px] font-medium text-white hover:opacity-90 disabled:opacity-40"
                 >
-                  {creating === key ? '生成中…' : '生成组合'}
+                  {creating === key ? tx('生成中…') : tx('生成组合')}
                 </button>
               </div>
             )
@@ -254,6 +247,7 @@ function CombinationsCard({
 }
 
 export function StrategyGuardian() {
+  const { tx } = useI18n()
   const queryClient = useQueryClient()
   const [error, setError] = useState<string | null>(null)
   const { data, isLoading, error: queryError } = useQuery({
@@ -305,7 +299,7 @@ export function StrategyGuardian() {
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-1">
       {(error || queryError) && (
         <div className="rounded-input border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
-          {error ?? (queryError instanceof Error ? queryError.message : '加载失败')}
+          {error ?? (queryError instanceof Error ? queryError.message : tx('加载失败'))}
         </div>
       )}
 
@@ -314,7 +308,7 @@ export function StrategyGuardian() {
           <div className="flex items-center justify-between text-xs">
             <span className="inline-flex items-center gap-1.5 text-secondary">
               <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-              复验进行中 {progress?.strategy_id ? `· ${progress.strategy_id}` : ''}
+              {tx('复验进行中')} {progress?.strategy_id ? `· ${progress.strategy_id}` : ''}
             </span>
             <span className="text-secondary">{progress?.done ?? 0}/{progress?.total ?? '?'}</span>
           </div>
@@ -338,46 +332,45 @@ export function StrategyGuardian() {
       <AdoptCard onChanged={refresh} />
 
       <div className="flex items-center justify-between">
-        <div className="text-xs font-medium">守护中的策略 ({items.length})</div>
+        <div className="text-xs font-medium">{tx('守护中的策略 (')}{items.length})</div>
         <button
           onClick={() => runAll.mutate()}
           disabled={runAll.isPending || !!activeRun}
           className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          <Play className="h-3.5 w-3.5" /> 全部复验
-        </button>
+          <Play className="h-3.5 w-3.5" /> {tx('全部复验')}</button>
       </div>
 
       {isLoading ? (
-        <div className="py-10 text-center text-xs text-secondary">加载中…</div>
+        <div className="py-10 text-center text-xs text-secondary">{tx('加载中…')}</div>
       ) : items.length === 0 ? (
         <EmptyState
-          title="还没有守护中的策略"
-          hint="挖掘发布的策略会在发布时自动建立守护基线; 也可以在上方手动把任意策略加入守护。守护会在每天收盘数据更新后, 用基线之后的新数据自动复验, 退化时告警、严重时标记退役。"
+          title={tx('还没有守护中的策略')}
+          hint={tx('挖掘发布的策略会在发布时自动建立守护基线; 也可以在上方手动把任意策略加入守护。守护会在每天收盘数据更新后, 用基线之后的新数据自动复验, 退化时告警、严重时标记退役。')}
         />
       ) : (
         <div className="overflow-x-auto rounded-card border border-border bg-surface">
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-border text-secondary">
-                <th className="px-3 py-2 text-left">策略</th>
-                <th className="px-2 py-2 text-left">状态</th>
-                <th className="px-2 py-2 text-left">基线</th>
-                <th className="px-2 py-2 text-left">最近复验</th>
-                <th className="px-2 py-2 text-right">退化</th>
-                <th className="px-2 py-2 text-left">说明</th>
-                <th className="px-2 py-2 text-right">操作</th>
+                <th className="px-3 py-2 text-left">{tx('策略')}</th>
+                <th className="px-2 py-2 text-left">{tx('状态')}</th>
+                <th className="px-2 py-2 text-left">{tx('基线')}</th>
+                <th className="px-2 py-2 text-left">{tx('最近复验')}</th>
+                <th className="px-2 py-2 text-right">{tx('退化')}</th>
+                <th className="px-2 py-2 text-left">{tx('说明')}</th>
+                <th className="px-2 py-2 text-right">{tx('操作')}</th>
               </tr>
             </thead>
             <tbody>
               {items.map(p => {
                 const last = p.last_check
                 const lastText = last?.skipped
-                  ? (last.reason ?? '跳过')
+                  ? (last.reason ?? tx('跳过'))
                   : last?.error
                     ? last.error
                     : last?.verdict
-                      ? `${last.window_start ?? ''} ~ ${last.window_end ?? ''} · ${last.k ?? '—'} 段`
+                      ? tx('{start} ~ {end} · {k} 段', { start: last.window_start ?? '', end: last.window_end ?? '', k: last.k ?? '—' })
                       : '—'
                 return (
                   <tr key={p.strategy_id} className="border-b border-border/40 align-top hover:bg-elevated/50">
@@ -390,15 +383,14 @@ export function StrategyGuardian() {
                         <StatusBadge status={p.status} />
                         {p.alert && (
                           <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-400">
-                            <BellRing className="h-3 w-3" /> 连续 {p.consecutive_watch} 次观察
-                          </span>
+                            <BellRing className="h-3 w-3" /> {tx('连续')} {p.consecutive_watch} {tx('次观察')}</span>
                         )}
                       </div>
                     </td>
                     <td className="px-2 py-2 text-secondary">
-                      <div>{BASELINE_KIND_LABEL[p.baseline.kind ?? ''] ?? '—'}</div>
+                      <div>{tx(BASELINE_KIND_LABEL[p.baseline.kind ?? ''] ?? '—')}</div>
                       <div className="text-[10px]">
-                        {p.baseline.objective ?? '—'} {fmtNum(p.baseline.score)} · {p.baseline.n_trades ?? '—'} 笔 · 截至 {p.baseline.data_as_of ?? '—'}
+                        {p.baseline.objective ?? '—'} {fmtNum(p.baseline.score)} · {p.baseline.n_trades ?? '—'} {tx('笔 · 截至')} {p.baseline.data_as_of ?? '—'}
                       </div>
                     </td>
                     <td className="px-2 py-2 text-secondary">
@@ -416,18 +408,18 @@ export function StrategyGuardian() {
                         <button
                           onClick={() => rerun.mutate(p.strategy_id)}
                           disabled={rerun.isPending || !!activeRun}
-                          title="立即复验"
+                          title={tx('立即复验')}
                           className="rounded-btn border border-border p-1.5 text-secondary hover:bg-elevated hover:text-foreground disabled:opacity-40"
                         >
                           <RefreshCw className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => {
-                            if (window.confirm(`移除 ${p.name ?? p.strategy_id} 的守护? 档案与复验历史将删除 (策略本身不受影响)。`))
+                            if (window.confirm(tx('移除 {name} 的守护? 档案与复验历史将删除 (策略本身不受影响)。', { name: p.name ?? p.strategy_id })))
                               drop.mutate(p.strategy_id)
                           }}
                           disabled={drop.isPending}
-                          title="移除守护"
+                          title={tx('移除守护')}
                           className="rounded-btn border border-border p-1.5 text-secondary hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40"
                         >
                           <Trash2 className="h-3.5 w-3.5" />

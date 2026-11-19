@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, BookmarkPlus, ChevronsUpDown, Clock, Expand, Info, 
 import { DatePicker } from '@/components/DatePicker'
 import { toast } from '@/components/Toast'
 import { cn } from '@/lib/cn'
+import { useI18n } from '@/lib/i18n'
 import { WatchlistGroupMenu } from '@/components/WatchlistAddMenu'
 import { api, type FactorBatchItem, type FactorBatchResult, type FactorColumn } from '@/lib/api'
 import { fmtPct, priceColorClass } from '@/lib/format'
@@ -60,13 +61,16 @@ const hasServerVerdict = (results: FactorBatchItem[]): boolean =>
 
 // 预设场景: 纯前端选择集, 数量按 columns 数据实时计算 (分组名缺失时该项自动为空并禁用)
 type PresetDef = { id: string; label: string; hint: string; groups?: string[]; quick?: boolean }
+
+/** 财务分组名是后端列分组的中文键: 比较时用原始值, 只有展示时才翻译 */
+const FACTOR_GROUP_FINANCE = '财务'
 const PRESETS: PresetDef[] = [
   { id: 'all', label: '全面体检', hint: '全部因子，耗时最长' },
   { id: 'quick', label: '快速体检', hint: '除财务组外每组各取 1 个代表因子' , quick: true },
   { id: 'trend', label: '趋势动量', hint: '动量组 + 趋势组', groups: ['动量', '趋势'] },
   { id: 'reversal', label: '超跌反转', hint: '超买超卖组 + 价格位置组', groups: ['超买超卖', '价格位置'] },
   { id: 'volume', label: '量价资金', hint: '量价组 + 流动性组', groups: ['量价', '流动性'] },
-  { id: 'fundamental', label: '财务价值', hint: '财务组（需财务数据）', groups: ['财务'] },
+  { id: 'fundamental', label: '财务价值', hint: '财务组（需财务数据）', groups: [FACTOR_GROUP_FINANCE] },
 ]
 const QUICK_PRESET = PRESETS.find(preset => preset.quick) ?? PRESETS[0]
 
@@ -144,6 +148,7 @@ function SortableTh({ label, sortKeyName, sortKey, sortAsc, onSort, className, t
   className?: string
   title?: string
 }) {
+  const { tx } = useI18n()
   const active = sortKey === sortKeyName
   const Icon = !active ? ChevronsUpDown : sortAsc ? ArrowUp : ArrowDown
   return (
@@ -156,7 +161,7 @@ function SortableTh({ label, sortKeyName, sortKey, sortAsc, onSort, className, t
         type="button"
         onClick={() => onSort(sortKeyName)}
         className={`inline-flex items-center gap-0.5 rounded-btn transition-colors hover:text-foreground ${active ? 'text-foreground' : ''}`}
-        title={title ? `${title}${active ? '' : '（点击排序）'}` : '点击排序'}
+        title={title ? `${title}${active ? '' : tx('（点击排序）')}` : tx('点击排序')}
       >
         {label}
         <Icon className={`h-3 w-3 ${active ? 'text-accent' : 'text-muted/50'}`} />
@@ -177,6 +182,7 @@ function BatchDiscovery({
   onOrder?: (order: { name: string; label: string }[]) => void
   focusFactor?: string
 }) {
+  const { tx } = useI18n()
   const queryClient = useQueryClient()
   const initialized = useRef(false)
   const savedConfig = useRef(loadRunConfig()).current
@@ -226,7 +232,7 @@ function BatchDiscovery({
     if (preset.quick) {
       // 每组取列表中位代表 (上游按窗口升序排列时即窗口中位数, 如动量组取 20日)
       return Object.entries(columnsByGroup)
-        .filter(([group]) => group !== '财务')
+        .filter(([group]) => group !== FACTOR_GROUP_FINANCE)
         .map(([, items]) => items[Math.floor((items.length - 1) / 2)])
         .filter(item => item != null)
         .map(item => item.id)
@@ -303,14 +309,14 @@ function BatchDiscovery({
   const save = useMutation({
     mutationFn: (item: FactorBatchItem) => {
       const current = resultsRef.current
-      if (!current) throw new Error('暂无批量结果')
+      if (!current) throw new Error(tx('暂无批量结果'))
       return api.researchCandidateCreate(factorBatchCandidate(current, item))
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QK.researchCandidates })
-      toast('已保存到候选方案（右上角「候选方案」查看）', 'success')
+      toast(tx('已保存到候选方案（右上角「候选方案」查看）'), 'success')
     },
-    onError: error => toast(`保存失败 · ${String((error as Error).message || error)}`, 'error'),
+    onError: error => toast(tx('保存失败 · {msg}', { msg: String((error as Error).message || error) }), 'error'),
   })
 
   const sortedResults = useMemo(() => {
@@ -394,7 +400,7 @@ function BatchDiscovery({
         {/* 顶部固定区: 计数 + 预设 + 搜索 */}
         <div className="shrink-0 space-y-2 border-b border-border/60 px-3 py-2.5">
           <div className="flex items-center justify-between gap-2">
-            <div className="text-xs font-semibold text-foreground">选择因子</div>
+            <div className="text-xs font-semibold text-foreground">{tx('选择因子')}</div>
             <div className="flex items-center gap-2">
               <span className="font-mono text-[10px] text-muted">{selected.length}/{allColumns.length}</span>
               <button
@@ -402,7 +408,7 @@ function BatchDiscovery({
                 onClick={() => { setActivePreset(null); setSelected(allSelected ? [] : allColumns.map(item => item.id)) }}
                 className="rounded-btn px-1.5 py-0.5 text-[10px] text-accent transition-colors hover:bg-accent/10"
               >
-                {allSelected ? '清空' : '全选'}
+                {allSelected ? tx('清空') : tx('全选')}
               </button>
             </div>
           </div>
@@ -416,13 +422,13 @@ function BatchDiscovery({
                   type="button"
                   onClick={() => applyPreset(preset)}
                   disabled={ids.length === 0}
-                  title={preset.hint}
+                  title={tx(preset.hint)}
                   className={`inline-flex items-center gap-1 rounded-btn border px-2 py-1 text-[10px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-40 ${active
                     ? 'border-accent/60 bg-accent/10 text-accent'
                     : 'border-border bg-surface text-secondary hover:border-accent/40 hover:text-accent'
                   }`}
                 >
-                  {preset.label}
+                  {tx(preset.label)}
                   <span className="font-mono opacity-70">{ids.length}</span>
                   {active && <span aria-hidden>✓</span>}
                 </button>
@@ -435,7 +441,7 @@ function BatchDiscovery({
               type="text"
               value={factorQuery}
               onChange={event => setFactorQuery(event.target.value)}
-              placeholder="搜索因子 (名称/公式)"
+              placeholder={tx('搜索因子 (名称/公式)')}
               className={`${INPUT_CLS} pl-7`}
             />
           </div>
@@ -455,7 +461,7 @@ function BatchDiscovery({
                     onClick={() => toggleGroup(items)}
                     className="ml-auto text-[10px] text-muted transition-colors hover:text-accent"
                   >
-                    {groupSelected === items.length && items.length > 0 ? '取消' : '全选'}
+                    {groupSelected === items.length && items.length > 0 ? tx('取消') : tx('全选')}
                   </button>
                 </div>
                 <div className="space-y-0.5">
@@ -485,7 +491,7 @@ function BatchDiscovery({
           })}
           {Object.keys(factorGroups).length === 0 && (
             <div className="py-4 text-center text-[10px] text-muted">
-              {columns.isLoading ? '因子加载中…' : '无匹配因子'}
+              {columns.isLoading ? tx('因子加载中…') : tx('无匹配因子')}
             </div>
           )}
         </div>
@@ -494,7 +500,7 @@ function BatchDiscovery({
         <div className="shrink-0 space-y-2 border-t border-border/60 px-3 py-2.5">
           <div>
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-[10px] font-medium text-muted">资产与范围</span>
+              <span className="text-[10px] font-medium text-muted">{tx('资产与范围')}</span>
               <div className="inline-flex overflow-hidden rounded-btn border border-border bg-surface">
                 {(['stock', 'etf'] as const).map(value => (
                   <button
@@ -506,7 +512,7 @@ function BatchDiscovery({
                       : 'text-muted hover:text-foreground'
                     }`}
                   >
-                    {value === 'stock' ? '股票' : 'ETF'}
+                    {value === 'stock' ? tx('股票') : 'ETF'}
                   </button>
                 ))}
               </div>
@@ -516,7 +522,7 @@ function BatchDiscovery({
                 type="text"
                 value={symbols}
                 onChange={event => setSymbols(event.target.value)}
-                placeholder="留空使用全市场"
+                placeholder={tx('留空使用全市场')}
                 className={`${INPUT_CLS} min-w-0 flex-1 font-mono`}
               />
               <WatchlistGroupMenu
@@ -526,25 +532,24 @@ function BatchDiscovery({
                 counts={watchlistCounts}
                 total={watchlistEntries.length}
                 disableEmpty
-                menuLabel="选择自选分组"
+                menuLabel={tx('选择自选分组')}
                 align="right"
                 triggerClassName="inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-input border border-border bg-surface px-2 text-[11px] text-secondary transition-colors hover:border-accent/50 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                title="从自选分组加入筛选范围"
-                ariaLabel="从自选加入筛选范围"
+                title={tx('从自选分组加入筛选范围')}
+                ariaLabel={tx('从自选加入筛选范围')}
               >
                 <ListPlus className="h-3 w-3" />
-                {watchlist.isLoading ? '加载中' : watchlistEntries.length === 0 ? '自选为空' : '自选'}
+                {watchlist.isLoading ? tx('加载中') : watchlistEntries.length === 0 ? tx('自选为空') : tx('自选')}
               </WatchlistGroupMenu>
             </div>
             {symbols.trim() && (
-              <div className="mt-1 text-[10px] text-muted" title="按逗号/分号/空格分隔, 自动去重; 留空使用全市场">
-                已识别 {parseSymbolList(symbols).length} 只标的 · 留空使用全市场
-              </div>
+              <div className="mt-1 text-[10px] text-muted" title={tx('按逗号/分号/空格分隔, 自动去重; 留空使用全市场')}>
+                {tx('已识别')} {parseSymbolList(symbols).length} {tx('只标的 · 留空使用全市场')}</div>
             )}
           </div>
 
           <div>
-            <span className="mb-1 block text-[10px] font-medium text-muted">区间</span>
+            <span className="mb-1 block text-[10px] font-medium text-muted">{tx('区间')}</span>
             <div className="grid grid-cols-[1fr_1fr] gap-1.5">
               <DatePicker value={start} onChange={setStart} max={end || undefined} className="w-full" buttonClassName="w-full justify-start" align="left" />
               <DatePicker value={end} onChange={setEnd} min={start || undefined} className="w-full" buttonClassName="w-full justify-start" />
@@ -560,7 +565,7 @@ function BatchDiscovery({
                     : 'text-muted hover:bg-elevated hover:text-secondary'
                   }`}
                 >
-                  {months === 12 ? '1年' : `${months}个月`}
+                  {months === 12 ? tx('1年') : tx('{n}个月', { n: months })}
                 </button>
               ))}
             </div>
@@ -568,27 +573,27 @@ function BatchDiscovery({
 
           <details className="rounded-btn border border-border bg-surface/60">
             <summary className="cursor-pointer select-none px-2.5 py-1.5 text-[11px] text-secondary transition-colors hover:text-foreground">
-              回测参数 · {rebalance === 'daily' ? '日度' : rebalance === 'weekly' ? '周度' : '月度'} / {nGroups}组 / 佣金 {fees}‱
+              {tx('回测参数 ·')} {rebalance === 'daily' ? tx('日度') : rebalance === 'weekly' ? tx('周度') : tx('月度')} / {nGroups}{tx('组 / 佣金')} {fees}‱
             </summary>
             <div className="grid grid-cols-3 gap-1.5 border-t border-border/60 px-2.5 py-2">
               <label className="block">
-                <span className="mb-1 block text-[10px] text-muted">调仓</span>
+                <span className="mb-1 block text-[10px] text-muted">{tx('调仓')}</span>
                 <select value={rebalance} onChange={event => setRebalance(event.target.value as typeof rebalance)} className={INPUT_CLS}>
-                  <option value="daily">日度</option>
-                  <option value="weekly">周度</option>
-                  <option value="monthly">月度</option>
+                  <option value="daily">{tx('日度')}</option>
+                  <option value="weekly">{tx('周度')}</option>
+                  <option value="monthly">{tx('月度')}</option>
                 </select>
               </label>
               <label className="block">
-                <span className="mb-1 block text-[10px] text-muted">分组</span>
+                <span className="mb-1 block text-[10px] text-muted">{tx('分组')}</span>
                 <select value={nGroups} onChange={event => setNGroups(Number(event.target.value))} className={INPUT_CLS}>
-                  <option value={3}>3组</option>
-                  <option value={5}>5组</option>
-                  <option value={10}>10组</option>
+                  <option value={3}>{tx('3组')}</option>
+                  <option value={5}>{tx('5组')}</option>
+                  <option value={10}>{tx('10组')}</option>
                 </select>
               </label>
               <label className="block">
-                <span className="mb-1 block text-[10px] text-muted">佣金/万</span>
+                <span className="mb-1 block text-[10px] text-muted">{tx('佣金/万')}</span>
                 <input type="number" value={fees} onChange={event => setFees(event.target.value)} className={INPUT_CLS} />
               </label>
             </div>
@@ -601,11 +606,11 @@ function BatchDiscovery({
             type="button"
             onClick={() => startRun()}
             disabled={run.isPending || selected.length === 0}
-            title={selected.length >= 16 ? '因子较多, 全市场运行可能需要较长时间; 可先用「快速体检」' : undefined}
+            title={selected.length >= 16 ? tx('因子较多, 全市场运行可能需要较长时间; 可先用「快速体检」') : undefined}
             className="inline-flex w-full items-center justify-center gap-1.5 rounded-btn bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Play className="h-3.5 w-3.5" />
-            {run.isPending ? '筛选中…' : `筛选 ${selected.length} 个因子`}
+            {run.isPending ? tx('筛选中…') : tx('筛选 {n} 个因子', { n: selected.length })}
           </button>
           {run.isPending && (
             <button
@@ -613,8 +618,7 @@ function BatchDiscovery({
               onClick={cancelRun}
               className="w-full rounded-btn border border-border px-3 py-1.5 text-[11px] text-secondary transition-colors hover:border-danger/40 hover:text-danger"
             >
-              取消本次筛选
-            </button>
+              {tx('取消本次筛选')}</button>
           )}
         </div>
       </section>
@@ -623,20 +627,17 @@ function BatchDiscovery({
         {run.isPending && (
           <div className="m-3 flex items-center gap-3 rounded-btn border border-accent/30 bg-accent/5 px-3 py-2.5 text-xs text-secondary">
             <span className="h-4 w-4 animate-spin rounded-full border-2 border-accent/25 border-t-accent" />
-            正在加载共享数据面板并评估 {selected.length} 个因子
-            <button
+            {tx('正在加载共享数据面板并评估')} {selected.length} {tx('个因子')}<button
               type="button"
               onClick={cancelRun}
               className="ml-auto shrink-0 rounded-btn border border-border px-2 py-1 text-[10px] text-secondary transition-colors hover:border-danger/40 hover:text-danger"
             >
-              取消
-            </button>
+              {tx('取消')}</button>
           </div>
         )}
         {runCancelled && (
           <div className="m-3 rounded-btn border border-border bg-elevated/40 px-3 py-2 text-xs text-muted">
-            已取消本次筛选, 配置与已选因子保留, 可调整后重新运行。
-          </div>
+            {tx('已取消本次筛选, 配置与已选因子保留, 可调整后重新运行。')}</div>
         )}
         {run.isError && !runCancelled && (
           <div className="m-3 rounded-btn border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
@@ -651,11 +652,9 @@ function BatchDiscovery({
             <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 text-accent">
               <Search className="h-5 w-5" />
             </div>
-            <div className="mt-3 text-sm font-medium text-foreground">三步找到有效因子</div>
+            <div className="mt-3 text-sm font-medium text-foreground">{tx('三步找到有效因子')}</div>
             <div className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-muted">
-              左侧选因子（或用预设）→ 点「筛选」批量检验 → 点击结果行看单因子详情。
-              IC 衡量历史上因子值与后续涨跌的关联强度（绝对值越大关联越强），IR 是稳定度。
-            </div>
+              {tx('左侧选因子（或用预设）→ 点「筛选」批量检验 → 点击结果行看单因子详情。 IC 衡量历史上因子值与后续涨跌的关联强度（绝对值越大关联越强），IR 是稳定度。')}</div>
             <button
               type="button"
               onClick={() => {
@@ -668,9 +667,8 @@ function BatchDiscovery({
               className="mt-3 inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Play className="h-3.5 w-3.5" />
-              立即跑「快速体检」
-            </button>
-            <div className="mt-1.5 text-[10px] text-muted">每组取 1 个代表因子, 通常十几秒出结果</div>
+              {tx('立即跑「快速体检」')}</button>
+            <div className="mt-1.5 text-[10px] text-muted">{tx('每组取 1 个代表因子, 通常十几秒出结果')}</div>
           </div>
         )}
         {results && !results.error && (
@@ -678,36 +676,36 @@ function BatchDiscovery({
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border px-4 py-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                  <span className="text-sm font-medium text-foreground">筛选结果</span>
+                  <span className="text-sm font-medium text-foreground">{tx('筛选结果')}</span>
                   <span className="text-[10px] text-muted">
-                    {results.results.length} 因子 · {results.n_symbols} 标的 · {results.n_dates} 交易日 · <Clock className="inline h-3 w-3" />{results.elapsed_ms.toFixed(0)}ms
+                    {results.results.length} {tx('因子 ·')} {results.n_symbols} {tx('标的 ·')} {results.n_dates} {tx('交易日 ·')} <Clock className="inline h-3 w-3" />{results.elapsed_ms.toFixed(0)}ms
                   </span>
                   {!run.data && restored && (
                     <span
                       className="inline-flex items-center gap-1 rounded-btn border border-border bg-elevated/40 px-1.5 py-0.5 text-[10px] text-muted"
-                      title="会话内记忆的上次运行结果; 修改左侧配置后点「筛选」重新计算"
+                      title={tx('会话内记忆的上次运行结果; 修改左侧配置后点「筛选」重新计算')}
                     >
                       <Clock className="h-3 w-3" />
-                      上次运行 {new Date(restored.ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+                      {tx('上次运行')} {new Date(restored.ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   )}
                 </div>
                 {computableResults.length > 0 && (
                   <div className="mt-1 text-[11px] text-secondary">
-                    <span className="font-medium text-bull">{validCount} 个有效</span>
+                    <span className="font-medium text-bull">{validCount} {tx('个有效')}</span>
                     <span className="text-muted">
                       {hasServerVerdict(computableResults)
-                        ? '（NW 显著性检验：|t|≥2 且 BH q≤0.1，|IC|≥0.02）'
-                        : '（经验规则：|IC|≥0.02 且 |IR|≥0.3）'}
+                        ? tx('（NW 显著性检验：|t|≥2 且 BH q≤0.1，|IC|≥0.02）')
+                        : tx('（经验规则：|IC|≥0.02 且 |IR|≥0.3）')}
                     </span>
                     {bestFactor && bestFactor.ic_mean != null && (
-                      <> · 最强 <span className="font-medium text-foreground">{bestFactor.label}</span>（IC {fmtPct(bestFactor.ic_mean)}）</>
+                      <> {tx('· 最强')} <span className="font-medium text-foreground">{bestFactor.label}</span>（IC {fmtPct(bestFactor.ic_mean)}）</>
                     )}
                   </div>
                 )}
               </div>
               {results.results.length > 0 && (
-                <div className="ml-auto shrink-0 text-right" title="全部结果的结论分布 (有效/边缘/无效/失败)">
+                <div className="ml-auto shrink-0 text-right" title={tx('全部结果的结论分布 (有效/边缘/无效/失败)')}>
                   <div className="ml-auto flex h-1.5 w-40 overflow-hidden rounded-full bg-base">
                     {([
                       ['bg-bull', verdictCounts.valid],
@@ -719,10 +717,10 @@ function BatchDiscovery({
                     ))}
                   </div>
                   <div className="mt-1 text-[10px] text-muted">
-                    有效 {verdictCounts.valid} · 边缘 {verdictCounts.edge} · 无效 {verdictCounts.invalid}
-                    {verdictCounts.error > 0 && ` · 失败 ${verdictCounts.error}`}
+                    {tx('有效')} {verdictCounts.valid} {tx('· 边缘')} {verdictCounts.edge} {tx('· 无效')} {verdictCounts.invalid}
+                    {verdictCounts.error > 0 && tx(' · 失败 {n}', { n: verdictCounts.error })}
                   </div>
-                  <div className="mt-0.5 text-[10px] text-muted/60">点击行深看 · ↑↓ 切换 · 表头排序</div>
+                  <div className="mt-0.5 text-[10px] text-muted/60">{tx('点击行深看 · ↑↓ 切换 · 表头排序')}</div>
                 </div>
               )}
             </div>
@@ -730,23 +728,22 @@ function BatchDiscovery({
               <table className="w-full min-w-[820px] text-xs">
                 <thead className="sticky top-0 bg-elevated text-left text-[11px] text-secondary">
                   <tr>
-                    <th className="w-12 px-3 py-2.5 text-center font-medium" title="按当前排序键排序的名次，默认按 |IC|。">排名</th>
-                    <th className="px-3 py-2.5 font-medium">因子</th>
-                    <SortableTh label="IC 均值" sortKeyName="ic" sortKey={sortKey} sortAsc={sortAsc} onSort={applySort} className="px-3 py-2.5 text-right" title="每天用因子给股票打分、与次日真实涨跌算相关性（Rank IC）的均值。|IC|≥0.02 且稳定即视为历史有效；负值同样有效（反向使用）。" />
-                    <SortableTh label="稳定度 IR" sortKeyName="ir" sortKey={sortKey} sortAsc={sortAsc} onSort={applySort} className="px-3 py-2.5 text-right" title="IC 均值 ÷ IC 波动。≥0.3 值得关注，≥0.5 相当稳定。" />
-                    <SortableTh label="t 值(NW)" sortKeyName="t_nw" sortKey={sortKey} sortAsc={sortAsc} onSort={applySort} className="px-3 py-2.5 text-right" title="Newey-West HAC 稳健 t 值（滞后 1）：|t|≥2 视为统计显著；悬停查看多重检验校正后的 q 值（≤0.1 通过）。样本不足显示 —。" />
-                    <SortableTh label="方向一致占比" sortKeyName="win_rate" sortKey={sortKey} sortAsc={sortAsc} onSort={applySort} className="px-3 py-2.5 text-right" title="IC 与自身方向一致的天数占比。50% 是抛硬币，55%+ 不错。" />
-                    <SortableTh label="多空收益" sortKeyName="return" sortKey={sortKey} sortAsc={sortAsc} onSort={applySort} className="px-3 py-2.5 text-right" title="每期买因子最高组、（模拟）卖最低组的累计收益差。A 股做空受限，此列为理论口径。" />
-                    <SortableTh label="最大回撤" sortKeyName="drawdown" sortKey={sortKey} sortAsc={sortAsc} onSort={applySort} className="px-3 py-2.5 text-right" title="上述多空组合最痛的一段亏损幅度，衡量拿得住不住。" />
+                    <th className="w-12 px-3 py-2.5 text-center font-medium" title={tx('按当前排序键排序的名次，默认按 |IC|。')}>{tx('排名')}</th>
+                    <th className="px-3 py-2.5 font-medium">{tx('因子')}</th>
+                    <SortableTh label={tx('IC 均值')} sortKeyName="ic" sortKey={sortKey} sortAsc={sortAsc} onSort={applySort} className="px-3 py-2.5 text-right" title={tx('每天用因子给股票打分、与次日真实涨跌算相关性（Rank IC）的均值。|IC|≥0.02 且稳定即视为历史有效；负值同样有效（反向使用）。')} />
+                    <SortableTh label={tx('稳定度 IR')} sortKeyName="ir" sortKey={sortKey} sortAsc={sortAsc} onSort={applySort} className="px-3 py-2.5 text-right" title={tx('IC 均值 ÷ IC 波动。≥0.3 值得关注，≥0.5 相当稳定。')} />
+                    <SortableTh label={tx('t 值(NW)')} sortKeyName="t_nw" sortKey={sortKey} sortAsc={sortAsc} onSort={applySort} className="px-3 py-2.5 text-right" title={tx('Newey-West HAC 稳健 t 值（滞后 1）：|t|≥2 视为统计显著；悬停查看多重检验校正后的 q 值（≤0.1 通过）。样本不足显示 —。')} />
+                    <SortableTh label={tx('方向一致占比')} sortKeyName="win_rate" sortKey={sortKey} sortAsc={sortAsc} onSort={applySort} className="px-3 py-2.5 text-right" title={tx('IC 与自身方向一致的天数占比。50% 是抛硬币，55%+ 不错。')} />
+                    <SortableTh label={tx('多空收益')} sortKeyName="return" sortKey={sortKey} sortAsc={sortAsc} onSort={applySort} className="px-3 py-2.5 text-right" title={tx('每期买因子最高组、（模拟）卖最低组的累计收益差。A 股做空受限，此列为理论口径。')} />
+                    <SortableTh label={tx('最大回撤')} sortKeyName="drawdown" sortKey={sortKey} sortAsc={sortAsc} onSort={applySort} className="px-3 py-2.5 text-right" title={tx('上述多空组合最痛的一段亏损幅度，衡量拿得住不住。')} />
                     <th
                       className="w-16 px-3 py-2.5 text-center font-medium"
                       title={hasServerVerdict(computableResults)
-                        ? 'NW 显著性检验：|t|≥2 且 BH q≤0.1 且 |IC|≥0.02 为有效；其一达标为边缘'
-                        : '经验规则：|IC|≥0.02 且 |IR|≥0.3 为有效；其一达标为边缘'}
+                        ? tx('NW 显著性检验：|t|≥2 且 BH q≤0.1 且 |IC|≥0.02 为有效；其一达标为边缘')
+                        : tx('经验规则：|IC|≥0.02 且 |IR|≥0.3 为有效；其一达标为边缘')}
                     >
-                      结论
-                    </th>
-                    <th className="w-24 px-3 py-2.5 text-right font-medium">操作</th>
+                      {tx('结论')}</th>
+                    <th className="w-24 px-3 py-2.5 text-right font-medium">{tx('操作')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -754,7 +751,7 @@ function BatchDiscovery({
                     <tr
                       key={item.factor_name}
                       onClick={() => !item.error && onDetail(item.factor_name, item.label)}
-                      title={item.error ? undefined : '点击查看单因子详情 (IC 曲线 / 分层净值 / 分组表现)'}
+                      title={item.error ? undefined : tx('点击查看单因子详情 (IC 曲线 / 分层净值 / 分组表现)')}
                       className={`border-t border-border/70 transition-colors hover:bg-elevated/40 ${item.error ? '' : 'cursor-pointer'}`}
                     >
                       <td className="px-3 py-3 text-center font-mono text-muted">{index + 1}</td>
@@ -763,8 +760,8 @@ function BatchDiscovery({
                           {item.label}
                           {!item.error && item.ic_mean != null && (
                             item.ic_mean >= 0
-                              ? <span className="ml-1 text-bull" title="样本内方向：值大看多（IC 为正）。历史方向不代表未来。">↑</span>
-                              : <span className="ml-1 text-bear" title="样本内方向：值小看多（IC 为负，反向使用）。历史方向不代表未来。">↓</span>
+                              ? <span className="ml-1 text-bull" title={tx('样本内方向：值大看多（IC 为正）。历史方向不代表未来。')}>↑</span>
+                              : <span className="ml-1 text-bear" title={tx('样本内方向：值小看多（IC 为负，反向使用）。历史方向不代表未来。')}>↓</span>
                           )}
                         </div>
                         <div className="mt-0.5 text-[10px] text-muted">{item.group} · {item.factor_name}</div>
@@ -774,7 +771,7 @@ function BatchDiscovery({
                         <div className="flex items-center justify-end gap-1.5">
                           <span className={priceColorClass(item.ic_mean)}>{item.ic_mean == null ? '—' : fmtPct(item.ic_mean)}</span>
                           {item.ic_mean != null && (
-                            <span className="inline-flex h-1 w-10 shrink-0 overflow-hidden rounded-full bg-base" title={`|IC|=${Math.abs(item.ic_mean).toFixed(4)} 的可视化`}>
+                            <span className="inline-flex h-1 w-10 shrink-0 overflow-hidden rounded-full bg-base" title={tx('|IC|={v} 的可视化', { v: Math.abs(item.ic_mean).toFixed(4) })}>
                               <span
                                 className={`h-full ${item.ic_mean >= 0 ? 'bg-bull/70' : 'bg-bear/70'}`}
                                 style={{ width: `${Math.min(Math.abs(item.ic_mean) / 0.08, 1) * 100}%` }}
@@ -787,8 +784,8 @@ function BatchDiscovery({
                       <td
                         className={`px-3 py-3 text-right font-mono ${item.t_newey_west != null && Math.abs(item.t_newey_west) >= 2 ? 'text-foreground' : 'text-muted'}`}
                         title={item.t_newey_west != null
-                          ? `NW t=${item.t_newey_west.toFixed(2)}${item.q_value != null ? `，BH q=${item.q_value.toFixed(3)}` : ''}（${item.q_value != null && item.q_value <= 0.1 ? '通过' : '未通过'}多重检验校正）`
-                          : '样本不足，无法计算'}
+                          ? `NW t=${item.t_newey_west.toFixed(2)}${item.q_value != null ? `，BH q=${item.q_value.toFixed(3)}` : ''}（${item.q_value != null && item.q_value <= 0.1 ? tx('通过') : tx('未通过')}${tx('多重检验校正')}）`
+                          : tx('样本不足，无法计算')}
                       >
                         {item.t_newey_west == null ? '—' : item.t_newey_west.toFixed(2)}
                       </td>
@@ -797,7 +794,7 @@ function BatchDiscovery({
                       <td className="px-3 py-3 text-right font-mono text-bear">{item.long_short_max_drawdown == null ? '—' : fmtPct(item.long_short_max_drawdown)}</td>
                       <td className="px-3 py-3 text-center">
                         <span className={`inline-flex rounded-btn px-1.5 py-0.5 text-[10px] font-medium ${VERDICT_META[verdict].cls}`}>
-                          {VERDICT_META[verdict].label}
+                          {tx(VERDICT_META[verdict].label)}
                         </span>
                       </td>
                       <td className="px-3 py-3">
@@ -807,8 +804,8 @@ function BatchDiscovery({
                             onClick={() => save.mutate(item)}
                             disabled={!!item.error || save.isPending}
                             className="flex h-7 w-7 items-center justify-center rounded-btn text-muted transition-colors hover:bg-accent/10 hover:text-accent disabled:opacity-40"
-                            title="保存候选"
-                            aria-label={`保存 ${item.label} 为候选`}
+                            title={tx('保存候选')}
+                            aria-label={tx('保存 {name} 为候选', { name: item.label })}
                           >
                             <BookmarkPlus className="h-3.5 w-3.5" />
                           </button>
@@ -817,8 +814,8 @@ function BatchDiscovery({
                             onClick={() => setSignalFrom(item)}
                             disabled={!!item.error}
                             className="flex h-7 w-7 items-center justify-center rounded-btn text-muted transition-colors hover:bg-amber-400/10 hover:text-amber-400 disabled:opacity-40"
-                            title="加入信号条件（方向按 IC 预填，阈值给建议值）"
-                            aria-label={`把 ${item.label} 加入信号条件`}
+                            title={tx('加入信号条件（方向按 IC 预填，阈值给建议值）')}
+                            aria-label={tx('把 {name} 加入信号条件', { name: item.label })}
                           >
                             <Zap className="h-3.5 w-3.5" />
                           </button>
@@ -827,8 +824,8 @@ function BatchDiscovery({
                             onClick={event => { event.stopPropagation(); onFullscreen(item.factor_name, item.label) }}
                             disabled={!!item.error}
                             className="flex h-7 w-7 items-center justify-center rounded-btn text-muted transition-colors hover:bg-elevated hover:text-foreground disabled:opacity-40"
-                            title="全屏单因子检验（完整配置与图表）"
-                            aria-label={`全屏检验 ${item.label}`}
+                            title={tx('全屏单因子检验（完整配置与图表）')}
+                            aria-label={tx('全屏检验 {name}', { name: item.label })}
                           >
                             <Expand className="h-3.5 w-3.5" />
                           </button>
@@ -859,6 +856,7 @@ function FactorDetailPanel({ name, label, onClose, onFullscreen }: {
   onClose: () => void
   onFullscreen: () => void
 }) {
+  const { tx } = useI18n()
   // label 由调用方带给出 (结果行); 因子库「去检验」直达时只有 id, 经共享列缓存解析
   const columns = useQuery({
     queryKey: QK.factorColumns,
@@ -880,7 +878,7 @@ function FactorDetailPanel({ name, label, onClose, onFullscreen }: {
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: 24, opacity: 0 }}
       transition={{ duration: 0.22, ease: EASE_SMOOTH }}
-      aria-label={`单因子详情: ${resolvedLabel}`}
+      aria-label={tx('单因子详情: {name}', { name: resolvedLabel })}
       className={cn(
         'flex min-h-0 flex-col overflow-hidden rounded-card border border-border bg-surface',
         'lg:w-[42rem] lg:shrink-0',
@@ -892,17 +890,16 @@ function FactorDetailPanel({ name, label, onClose, onFullscreen }: {
         <span className="min-w-0 shrink-0 truncate text-sm font-medium text-foreground">{resolvedLabel}</span>
         <span className="min-w-0 truncate font-mono text-[10px] text-muted">{name}</span>
         {name !== runName && (
-          <span className="shrink-0 animate-pulse text-[10px] text-accent">切换中…</span>
+          <span className="shrink-0 animate-pulse text-[10px] text-accent">{tx('切换中…')}</span>
         )}
-        <span className="ml-auto hidden shrink-0 text-[10px] text-muted md:inline" title="按当前排序切换, 首尾循环">
-          ↑↓ 切换 · Esc 关闭
-        </span>
+        <span className="ml-auto hidden shrink-0 text-[10px] text-muted md:inline" title={tx('按当前排序切换, 首尾循环')}>
+          {tx('↑↓ 切换 · Esc 关闭')}</span>
         <div className="flex shrink-0 items-center gap-0.5">
           <button
             type="button"
             onClick={onFullscreen}
-            title="全屏单因子检验（完整配置与图表）"
-            aria-label="全屏单因子检验"
+            title={tx('全屏单因子检验（完整配置与图表）')}
+            aria-label={tx('全屏单因子检验')}
             className="flex h-7 w-7 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-elevated hover:text-foreground"
           >
             <Expand className="h-3.5 w-3.5" />
@@ -910,8 +907,8 @@ function FactorDetailPanel({ name, label, onClose, onFullscreen }: {
           <button
             type="button"
             onClick={onClose}
-            title="关闭详情 (Esc)"
-            aria-label="关闭详情"
+            title={tx('关闭详情 (Esc)')}
+            aria-label={tx('关闭详情')}
             className="flex h-7 w-7 items-center justify-center rounded-btn text-secondary transition-colors hover:bg-elevated hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
@@ -925,8 +922,7 @@ function FactorDetailPanel({ name, label, onClose, onFullscreen }: {
           </div>
         ) : (
           <div className="p-6 text-center text-xs text-muted">
-            未找到因子 <code className="font-mono text-secondary">{name}</code>, 可能已被删除或重命名。
-          </div>
+            {tx('未找到因子')} <code className="font-mono text-secondary">{name}</code>{tx(', 可能已被删除或重命名。')}</div>
         )}
       </div>
     </motion.aside>
@@ -934,6 +930,7 @@ function FactorDetailPanel({ name, label, onClose, onFullscreen }: {
 }
 
 export function FactorDiscovery({ focusFactor, initialView = 'batch' }: { focusFactor?: string; initialView?: View } = {}) {
+  const { tx } = useI18n()
   const [view, setView] = useState<View>(initialView)
   const [detailFactor, setDetailFactor] = useState('momentum_20d')
   const [detail, setDetail] = useState<{ name: string; label: string } | null>(null)
@@ -996,16 +993,14 @@ export function FactorDiscovery({ focusFactor, initialView = 'batch' }: { focusF
         <div className="flex shrink-0 items-start gap-2 rounded-card border border-border bg-surface/60 px-3 py-2 text-[11px] leading-relaxed text-secondary">
           <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />
           <div className="min-w-0 flex-1">
-            <span className="font-medium text-foreground">三步看懂本页：</span>
-            ① 因子 = 给股票打分排序的特征（如 20日涨幅、换手率变化）；② 本页度量过去哪些特征与次日涨跌存在稳定关联；③ IC = 关联强度（绝对值越大越强，负值反向用），IR = 稳定度（越大越稳）。所有结果均为历史统计，不构成投资建议，不代表未来表现。
-          </div>
+            <span className="font-medium text-foreground">{tx('三步看懂本页：')}</span>
+            {tx('① 因子 = 给股票打分排序的特征（如 20日涨幅、换手率变化）；② 本页度量过去哪些特征与次日涨跌存在稳定关联；③ IC = 关联强度（绝对值越大越强，负值反向用），IR = 稳定度（越大越稳）。所有结果均为历史统计，不构成投资建议，不代表未来表现。')}</div>
           <button
             type="button"
             onClick={collapseIntro}
             className="shrink-0 rounded-btn px-2 py-0.5 text-[10px] text-muted transition-colors hover:bg-elevated hover:text-foreground"
           >
-            知道了
-          </button>
+            {tx('知道了')}</button>
         </div>
       )}
       <div className="flex shrink-0 items-center border-b border-border/70 px-1 pb-2">
@@ -1014,10 +1009,9 @@ export function FactorDiscovery({ focusFactor, initialView = 'batch' }: { focusF
             type="button"
             onClick={() => setView('batch')}
             className="mr-2 inline-flex items-center gap-1 rounded-btn px-2 py-1 text-[11px] text-muted transition-colors hover:bg-elevated hover:text-foreground"
-            title="返回批量结果（筛选配置与结果保留）"
+            title={tx('返回批量结果（筛选配置与结果保留）')}
           >
-            ← 返回批量
-          </button>
+            {tx('← 返回批量')}</button>
         )}
         <div className="inline-flex rounded-btn border border-border bg-surface/80 p-0.5">
           {([
@@ -1034,7 +1028,7 @@ export function FactorDiscovery({ focusFactor, initialView = 'batch' }: { focusF
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
-              {label}
+              {tx(label)}
             </button>
           ))}
         </div>
@@ -1043,11 +1037,10 @@ export function FactorDiscovery({ focusFactor, initialView = 'batch' }: { focusF
             type="button"
             onClick={() => setAutoOpen(true)}
             className="ml-auto mr-1 inline-flex items-center gap-1.5 rounded-btn border border-accent/40 bg-accent/5 px-2.5 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/10"
-            title="不知道选什么因子？让系统全量筛选达标因子并自动搜索组合（嵌套样本外验证）"
+            title={tx('不知道选什么因子？让系统全量筛选达标因子并自动搜索组合（嵌套样本外验证）')}
           >
             <Sparkles className="h-3.5 w-3.5" />
-            自动挖掘
-          </button>
+            {tx('自动挖掘')}</button>
         )}
       </div>
       <div className="min-h-0 flex-1">

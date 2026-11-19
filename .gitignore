@@ -20,6 +20,11 @@ build/
 # ===== uv =====
 .uv/
 
+# 测试产物: MagicMock 的 data_dir 属性被当路径使用时会生成的垃圾目录
+backend/MagicMock/
+# 本地运行时工具状态目录(非交付物)
+.mimosa/
+
 # ===== Node / pnpm =====
 node_modules/
 .pnpm-store/

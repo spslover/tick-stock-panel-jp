@@ -3,6 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { KeyRound, Play, Plus, Save, Trash2, X, Zap, Check, ChevronDown } from 'lucide-react'
 import { api, type CustomSourceConfig, type DatasetConfig } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { toast } from '@/components/Toast'
 
 // 暗色适配的标准输入框样式 (与 AI 页统一, bg-base 在暗色下为深色, 不会白底白字)
@@ -215,6 +216,7 @@ export function DataSourceEditor({
   onActivate: (name: string) => void
   onDelete?: () => void
 }) {
+  const { tx } = useI18n()
   const isNew = !existingName
   const [config, setConfig] = useState<CustomSourceConfig>(() => initial ? structuredClone(initial) : emptyConfig())
   const [activeTab, setActiveTab] = useState<DatasetKey>('daily')
@@ -238,21 +240,21 @@ export function DataSourceEditor({
       // 提交前校验: 每个已启用数据集必须填了 URL
       for (const [key, ds] of Object.entries(config.datasets)) {
         if (!ds.url.trim()) {
-          throw new Error(`数据集「${DATASET_LABEL[key as DatasetKey] || key}」未填写接口 URL`)
+          throw new Error(tx('数据集「{name}」未填写接口 URL', { name: tx(DATASET_LABEL[key as DatasetKey]) || key }))
         }
         if (
           ds.timeout != null &&
           (!Number.isFinite(ds.timeout) || ds.timeout <= 0 || ds.timeout > 300)
         ) {
           throw new Error(
-            `数据集「${DATASET_LABEL[key as DatasetKey] || key}」超时必须在 0 到 300 秒之间`
+            tx('数据集「{name}」超时必须在 0 到 300 秒之间', { name: tx(DATASET_LABEL[key as DatasetKey]) || key })
           )
         }
       }
       return api.saveDataSource(normalizeConfig(config))
     },
     onSuccess: () => {
-      toast(isNew ? '数据源已创建' : '数据源已更新', 'success')
+      toast(isNew ? tx('数据源已创建') : tx('数据源已更新'), 'success')
       // 保存后强制重新拉取最新配置, 让数据集开关状态正确刷新
       fetchCfg.refetch()
       onSaved()
@@ -296,42 +298,39 @@ export function DataSourceEditor({
             {isNew ? <Plus className="h-4 w-4 text-accent" /> : <KeyRound className="h-4 w-4 text-secondary" />}
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-foreground">{isNew ? '新增数据源' : '编辑数据源'}</h2>
-            <p className="text-[11px] text-muted">{isNew ? '配置一个自定义 HTTP 数据源' : config.display_name || existingName}</p>
+            <h2 className="text-sm font-semibold text-foreground">{isNew ? tx('新增数据源') : tx('编辑数据源')}</h2>
+            <p className="text-[11px] text-muted">{isNew ? tx('配置一个自定义 HTTP 数据源') : config.display_name || existingName}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {!isNew && isActive && (
             <span className="inline-flex items-center gap-1 text-[10px] text-accent bg-accent/10 px-2 py-1 rounded">
-              <Check className="h-2.5 w-2.5" /> 使用中
-            </span>
+              <Check className="h-2.5 w-2.5" /> {tx('使用中')}</span>
           )}
           {!isNew && !isActive && config.name.trim() && (
             <button
               onClick={() => onActivate(config.name.toLowerCase().trim())}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-accent/10 text-accent text-xs font-medium hover:bg-accent/20 transition-colors"
             >
-              <Zap className="h-3.5 w-3.5" /> 切换为当前数据源
-            </button>
+              <Zap className="h-3.5 w-3.5" /> {tx('切换为当前数据源')}</button>
           )}
           {!isNew && onDelete && (
             <button
               onClick={onDelete}
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-btn text-xs text-muted hover:text-danger hover:bg-danger/10 transition-colors"
             >
-              <Trash2 className="h-3 w-3" /> 删除
-            </button>
+              <Trash2 className="h-3 w-3" /> {tx('删除')}</button>
           )}
         </div>
       </div>
 
       {loading ? (
-        <div className="p-12 text-center text-sm text-muted">加载配置...</div>
+        <div className="p-12 text-center text-sm text-muted">{tx('加载配置...')}</div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr]">
           {/* 左: 基本信息 + 鉴权 + 数据集开关 */}
           <div className="p-5 space-y-4 border-r border-border/40">
-            <Field label="名称" hint="小写字母/数字/下划线">
+            <Field label={tx('名称')} hint={tx('小写字母/数字/下划线')}>
               <input
                 value={config.name}
                 onChange={e => setConfig({ ...config, name: e.target.value })}
@@ -340,31 +339,31 @@ export function DataSourceEditor({
                 className={`${INPUT_CLS} w-full disabled:opacity-60`}
               />
             </Field>
-            <Field label="显示名">
+            <Field label={tx('显示名')}>
               <input
                 value={config.display_name}
                 onChange={e => setConfig({ ...config, display_name: e.target.value })}
-                placeholder="我的 Tushare"
+                placeholder={tx('我的 Tushare')}
                 className={`${INPUT_CLS} w-full`}
               />
             </Field>
-            <Field label="鉴权">
+            <Field label={tx('鉴权')}>
               <div className="space-y-2">
                 <select
                   value={config.auth.type}
                   onChange={e => setConfig({ ...config, auth: { ...config.auth, type: e.target.value } })}
                   className={`${INPUT_CLS} w-full`}
                 >
-                  <option value="none">无需鉴权</option>
+                  <option value="none">{tx('无需鉴权')}</option>
                   <option value="bearer">Bearer Token</option>
-                  <option value="header">自定义 Header</option>
-                  <option value="query">Query 参数</option>
+                  <option value="header">{tx('自定义 Header')}</option>
+                  <option value="query">{tx('Query 参数')}</option>
                 </select>
                 {config.auth.type !== 'none' && (
                   <input
                     value={config.auth.token_env ?? ''}
                     onChange={e => setConfig({ ...config, auth: { ...config.auth, token_env: e.target.value } })}
-                    placeholder="环境变量名 (MY_TOKEN)"
+                    placeholder={tx('环境变量名 (MY_TOKEN)')}
                     className={`${INPUT_CLS} w-full`}
                   />
                 )}
@@ -372,7 +371,7 @@ export function DataSourceEditor({
             </Field>
 
             <div className="pt-2 border-t border-border/30 space-y-1.5">
-              <div className="text-[10px] uppercase tracking-widest text-muted">数据集</div>
+              <div className="text-[10px] uppercase tracking-widest text-muted">{tx('数据集')}</div>
               {DATASETS.map(key => {
                 const enabled = !!config.datasets[key]
                 return (
@@ -384,10 +383,10 @@ export function DataSourceEditor({
                     }`}
                   >
                     <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${enabled ? 'bg-accent' : 'bg-muted/30'}`} />
-                    <span className="flex-1 text-left">{DATASET_LABEL[key]}</span>
+                    <span className="flex-1 text-left">{tx(DATASET_LABEL[key])}</span>
                     {enabled
-                      ? <span className="text-[9px] text-accent">已配置</span>
-                      : <span className="text-[9px] text-muted/50">回退 TF</span>
+                      ? <span className="text-[9px] text-accent">{tx('已配置')}</span>
+                      : <span className="text-[9px] text-muted/50">{tx('回退 TF')}</span>
                     }
                     <Toggle
                       checked={enabled}
@@ -418,19 +417,17 @@ export function DataSourceEditor({
       {/* 底部保存栏 */}
       <div className="px-6 py-3.5 border-t border-border/60 flex items-center justify-between bg-elevated/20">
         <div className="text-[11px] text-muted">
-          {Object.keys(config.datasets).length} 个数据集已配置
-        </div>
+          {Object.keys(config.datasets).length} {tx('个数据集已配置')}</div>
         <div className="flex items-center gap-2">
           <button onClick={onCancel} className="px-3 py-1.5 rounded-btn text-sm text-secondary hover:text-foreground transition-colors">
-            取消
-          </button>
+            {tx('取消')}</button>
           <button
             onClick={() => save.mutate()}
             disabled={!canSave}
             className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-btn bg-accent text-white text-sm font-medium hover:bg-accent/90 disabled:opacity-50 transition-colors"
           >
             <Save className="h-3.5 w-3.5" />
-            {save.isPending ? '保存中...' : '保存'}
+            {save.isPending ? tx('保存中...') : tx('保存')}
           </button>
         </div>
       </div>
@@ -455,6 +452,7 @@ function DatasetDetail({
   onFieldMap: (fm: Record<string, string>) => void
   onToggle: (v: boolean) => void
 }) {
+  const { tx } = useI18n()
   const enabled = !!cfg
   const [testSymbols, setTestSymbols] = useState('000001.SZ,600000.SH')
   const [showParams, setShowParams] = useState(false)
@@ -477,7 +475,7 @@ function DatasetDetail({
     <div>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <h3 className="text-sm font-medium text-foreground">{DATASET_LABEL[datasetKey]}</h3>
+          <h3 className="text-sm font-medium text-foreground">{tx(DATASET_LABEL[datasetKey])}</h3>
           <span className="text-[10px] text-muted/50 font-mono">{datasetKey}</span>
         </div>
         <Toggle checked={enabled} onChange={() => onToggle(!enabled)} />
@@ -494,7 +492,7 @@ function DatasetDetail({
             className="space-y-4"
           >
             <div className="grid grid-cols-1 md:grid-cols-[1fr_90px] gap-2">
-              <Field label="接口 URL">
+              <Field label={tx('接口 URL')}>
                 <input
                   value={cfg.url}
                   onChange={e => onUpdate({ url: e.target.value })}
@@ -502,7 +500,7 @@ function DatasetDetail({
                   className={`${INPUT_CLS} w-full`}
                 />
               </Field>
-              <Field label="方法">
+              <Field label={tx('方法')}>
                 <select
                   value={cfg.method}
                   onChange={e => onUpdate({ method: e.target.value })}
@@ -515,7 +513,7 @@ function DatasetDetail({
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-              <Field label="批量">
+              <Field label={tx('批量')}>
                 <input
                   value={cfg.batch ?? ''}
                   onChange={e => onUpdate({ batch: e.target.value ? Number(e.target.value) : null })}
@@ -531,7 +529,7 @@ function DatasetDetail({
                   className={`${INPUT_CLS} w-full`}
                 />
               </Field>
-              <Field label="超时">
+              <Field label={tx('超时')}>
                 <input
                   type="number"
                   min="0.1"
@@ -544,7 +542,7 @@ function DatasetDetail({
                   className={`${INPUT_CLS} w-full`}
                 />
               </Field>
-              <Field label="响应路径">
+              <Field label={tx('响应路径')}>
                 <input
                   value={cfg.response_path}
                   onChange={e => onUpdate({ response_path: e.target.value })}
@@ -561,18 +559,14 @@ function DatasetDetail({
                 onClick={() => setShowParams(v => !v)}
                 className="w-full flex items-center gap-1.5 mb-2"
               >
-                <span className="text-[10px] uppercase tracking-widest text-muted">请求参数字段映射</span>
+                <span className="text-[10px] uppercase tracking-widest text-muted">{tx('请求参数字段映射')}</span>
                 <ChevronDown className={`h-3 w-3 text-muted transition-transform ${showParams ? 'rotate-180' : ''}`} />
               </button>
               <div className="text-[10px] text-muted/50 mb-1.5">
-                改外部接口的参数名（留空用默认）
-              </div>
+                {tx('改外部接口的参数名（留空用默认）')}</div>
               {datasetKey === 'financial' && (
                 <div className="text-[10px] text-muted/50 mb-1.5">
-                  一个财务配置覆盖全部五表；请求时自动附带 <span className="font-mono">table</span> 参数
-                  (metrics/income/balance_sheet/cash_flow/shares)，上游据此返回对应表数据。
-                  shares 表额外附带 <span className="font-mono">latest</span> 参数（当期/历史）。
-                </div>
+                  {tx('一个财务配置覆盖全部五表；请求时自动附带')} <span className="font-mono">table</span> {tx('参数 (metrics/income/balance_sheet/cash_flow/shares)，上游据此返回对应表数据。 shares 表额外附带')} <span className="font-mono">latest</span> {tx('参数（当期/历史）。')}</div>
               )}
               <AnimatePresence initial={false}>
                 {showParams && (
@@ -585,7 +579,7 @@ function DatasetDetail({
                   >
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
                       {showSymbolsParam && (
-                        <Field label="代码参数">
+                        <Field label={tx('代码参数')}>
                           <input
                             value={cfg.symbols_param ?? ''}
                             onChange={e => onUpdate({ symbols_param: e.target.value || undefined })}
@@ -596,7 +590,7 @@ function DatasetDetail({
                       )}
                       {showTimeParams && (
                         <>
-                          <Field label="起始时间参数">
+                          <Field label={tx('起始时间参数')}>
                             <input
                               value={cfg.start_param ?? ''}
                               onChange={e => onUpdate({ start_param: e.target.value || undefined })}
@@ -604,7 +598,7 @@ function DatasetDetail({
                               className={`${INPUT_CLS} w-full`}
                             />
                           </Field>
-                          <Field label="结束时间参数">
+                          <Field label={tx('结束时间参数')}>
                             <input
                               value={cfg.end_param ?? ''}
                               onChange={e => onUpdate({ end_param: e.target.value || undefined })}
@@ -616,7 +610,7 @@ function DatasetDetail({
                       )}
                       {(datasetKey === 'minute' || datasetKey === 'full_minute') && (
                         <>
-                          <Field label="资产类型参数">
+                          <Field label={tx('资产类型参数')}>
                             <input
                               value={cfg.asset_type_param ?? ''}
                               onChange={e => onUpdate({ asset_type_param: e.target.value || null })}
@@ -624,7 +618,7 @@ function DatasetDetail({
                               className={`${INPUT_CLS} w-full`}
                             />
                           </Field>
-                          <Field label="周期参数">
+                          <Field label={tx('周期参数')}>
                             <input
                               value={cfg.freq_param ?? ''}
                               onChange={e => onUpdate({ freq_param: e.target.value || null })}
@@ -636,8 +630,7 @@ function DatasetDetail({
                       )}
                       {datasetKey === 'realtime' && (
                         <div className="col-span-full text-[10px] text-muted/50">
-                          实时行情为全市场快照接口，不逐标的拉取，无需配置请求参数名。
-                        </div>
+                          {tx('实时行情为全市场快照接口，不逐标的拉取，无需配置请求参数名。')}</div>
                       )}
                     </div>
                   </motion.div>
@@ -647,19 +640,17 @@ function DatasetDetail({
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <div className="text-[10px] uppercase tracking-widest text-muted">响应参数字段映射</div>
+                <div className="text-[10px] uppercase tracking-widest text-muted">{tx('响应参数字段映射')}</div>
                 <a
-                  href="https://github.com/shy3130/tickflow-stock-panel/blob/main/docs/custom-data-source.md#用-ai-生成映射配置"
+                  href="https://github.com/shy3130/tickflow-stock-panel/blob/main/docs/custom-data-source.md#用-ai-生成映射配置 // i18n-exempt: 外部文档 URL 锚点"
                   target="_blank"
                   rel="noreferrer"
                   className="text-[10px] text-accent/70 hover:text-accent hover:underline"
                 >
-                  AI 帮你整理映射 →
-                </a>
+                  {tx('AI 帮你整理映射 →')}</a>
               </div>
               <div className="text-[10px] text-muted/50 mb-1.5">
-                外部字段 → 内部字段 · 不知道怎么填? 点上方链接用 AI 整理
-              </div>
+                {tx('外部字段 → 内部字段 · 不知道怎么填? 点上方链接用 AI 整理')}</div>
               <FieldMapEditor
                 key={datasetKey}
                 fieldMap={cfg.field_map}
@@ -672,32 +663,31 @@ function DatasetDetail({
             <div className="pt-3 border-t border-border/30">
               <div className="flex items-center gap-2 mb-2">
                 <Play className="h-3 w-3 text-muted" />
-                <span className="text-[11px] font-medium text-secondary">测试连接</span>
+                <span className="text-[11px] font-medium text-secondary">{tx('测试连接')}</span>
               </div>
               <div className="flex items-center gap-2">
                 <input
                   value={testSymbols}
                   onChange={e => setTestSymbols(e.target.value)}
                   className={`${INPUT_CLS} flex-1 text-xs`}
-                  placeholder="测试标的, 逗号分隔"
+                  placeholder={tx('测试标的, 逗号分隔')}
                 />
                 <button
                   onClick={() => test.mutate()}
                   disabled={test.isPending || !cfg.url}
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:text-foreground text-xs disabled:opacity-40 transition-colors"
                 >
-                  {test.isPending ? '测试中...' : '测试'}
+                  {test.isPending ? tx('测试中...') : tx('测试')}
                 </button>
               </div>
               {test.data && (
                 <div className="mt-2 rounded-lg border border-accent/20 bg-accent/5 px-3 py-2 text-xs">
-                  <span className="text-accent font-medium">{test.data.rows}</span> 行
-                  <span className="text-muted mx-1.5">·</span>
-                  列: <span className="text-secondary">{test.data.columns.join(', ')}</span>
+                  <span className="text-accent font-medium">{test.data.rows}</span> {tx('行')}<span className="text-muted mx-1.5">·</span>
+                  {tx('列:')} <span className="text-secondary">{test.data.columns.join(', ')}</span>
                 </div>
               )}
               {test.isError && (
-                <div className="mt-2 text-xs text-danger">测试失败, 请检查接口和映射</div>
+                <div className="mt-2 text-xs text-danger">{tx('测试失败, 请检查接口和映射')}</div>
               )}
             </div>
           </motion.div>
@@ -709,13 +699,13 @@ function DatasetDetail({
             exit={{ opacity: 0 }}
             className="py-12 text-center"
           >
-            <div className="text-sm text-muted mb-1">{DATASET_LABEL[datasetKey]} 未启用</div>
-            <div className="text-[11px] text-muted/60">启用后此数据集将由该自定义源提供, 未启用则回退 TickFlow</div>
+            <div className="text-sm text-muted mb-1">{tx(DATASET_LABEL[datasetKey])} {tx('未启用')}</div>
+            <div className="text-[11px] text-muted/60">{tx('启用后此数据集将由该自定义源提供, 未启用则回退 TickFlow')}</div>
             <button
               onClick={() => onToggle(true)}
               className="mt-3 inline-flex items-center gap-1 px-3 py-1.5 rounded-btn bg-accent/10 text-accent text-xs font-medium hover:bg-accent/20 transition-colors"
             >
-              <Plus className="h-3 w-3" /> 启用{DATASET_LABEL[datasetKey]}
+              <Plus className="h-3 w-3" /> {tx('启用')}{tx(DATASET_LABEL[datasetKey])}
             </button>
           </motion.div>
         )}
@@ -736,6 +726,7 @@ function FieldMapEditor({
   options?: string[]
   onChange: (fm: Record<string, string>) => void
 }) {
+  const { tx } = useI18n()
   const choices = options ?? targets
   // 内部用数组维护行的稳定身份, 避免 Record 在编辑空行时 key 漂移导致输入框失焦
   const [rows, setRows] = useState<Array<{ src: string; target: string; id: number }>>(() => {
@@ -794,14 +785,14 @@ function FieldMapEditor({
   return (
     <div className="space-y-1.5">
       {!hasValid && (
-        <div className="text-[11px] text-muted/60 py-1">填写外部字段名后自动生效, 无需的字段可删除</div>
+        <div className="text-[11px] text-muted/60 py-1">{tx('填写外部字段名后自动生效, 无需的字段可删除')}</div>
       )}
       {rows.map((row) => (
         <div key={row.id} className="grid grid-cols-[1fr_auto_1.2fr_auto] gap-1.5 items-center">
           <input
             value={row.src}
             onChange={e => updateRow(row.id, { src: e.target.value })}
-            placeholder="外部字段名"
+            placeholder={tx('外部字段名')}
             className={`${INPUT_CLS} text-xs`}
           />
           <span className="text-muted/50 text-[10px]">→</span>
@@ -810,10 +801,10 @@ function FieldMapEditor({
             onChange={e => updateRow(row.id, { target: e.target.value })}
             className={`${INPUT_CLS} text-xs ${row.target && !choices.includes(row.target) ? 'text-warning' : ''}`}
           >
-            <option value="">{row.target || '(选择)'}</option>
+            <option value="">{row.target || tx('(选择)')}</option>
             {choices.map(t => (
               <option key={t} value={t}>
-                {t}（{FIELD_LABELS[t] || t}）
+                {t}（{tx(FIELD_LABELS[t]) || t}）
               </option>
             ))}
           </select>
@@ -829,8 +820,7 @@ function FieldMapEditor({
         onClick={addRow}
         className="inline-flex items-center gap-1 text-xs text-accent hover:text-accent/80 mt-1"
       >
-        <Plus className="h-3 w-3" /> 添加映射
-      </button>
+        <Plus className="h-3 w-3" /> {tx('添加映射')}</button>
     </div>
   )
 }

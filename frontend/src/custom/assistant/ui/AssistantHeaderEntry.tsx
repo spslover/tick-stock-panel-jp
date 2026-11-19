@@ -7,16 +7,18 @@
  */
 import { MessagesSquare } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { useI18n } from '@/lib/i18n'
 import { toggleAssistant, useAssistantStore } from '../store'
 
 export function AssistantHeaderEntry() {
+  const { tx } = useI18n()
   const { open } = useAssistantStore()
   return (
     <button
       type="button"
       onClick={toggleAssistant}
-      title="AI 助手 (⌘K)"
-      aria-label="打开 AI 助手"
+      title={tx('AI 助手 (⌘K)')}
+      aria-label={tx('打开 AI 助手')}
       className={cn(
         'group flex h-7 flex-1 items-center justify-center gap-1.5 rounded-md border transition-colors duration-150',
         open
@@ -30,7 +32,7 @@ export function AssistantHeaderEntry() {
           open ? 'text-accent' : 'text-muted group-hover:text-foreground',
         )}
       />
-      <span className="text-[11px] leading-none">AI 助手</span>
+      <span className="text-[11px] leading-none">{tx('AI 助手')}</span>
     </button>
   )
 }

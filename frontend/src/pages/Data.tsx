@@ -62,8 +62,10 @@ import { ExtDataStatCard } from '@/components/ext-data/ExtDataStatCard'
 import { CreateExtDialog } from '@/components/ext-data/CreateExtDialog'
 import { EditExtDialog } from '@/components/ext-data/EditExtDialog'
 import { ExtConfigImportDialog } from '@/components/ext-data/ExtConfigTransfer'
+import { useI18n } from '@/lib/i18n'
 
 export function Data() {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const startTime = useRef<number | null>(null)
@@ -271,12 +273,12 @@ export function Data() {
   const etfAuto = prefs.data?.pipeline_pull_etf ?? false
   // 管道步骤 + 各步能力路由 (路由徽标数据源 = 能力矩阵, 单一权威; 指标为本地计算无路由)
   const pipelineSteps: { label: string; cap?: RouteCapId }[] = [
-    { label: '日K', cap: 'daily' },
-    ...(hasAdjCap ? [{ label: '复权', cap: 'adj_factor' as const }] : []),
-    { label: '指标' },
-    ...(indexAuto ? [{ label: '指数', cap: 'daily' as const }] : []),
+    { label: tx('日K'), cap: 'daily' },
+    ...(hasAdjCap ? [{ label: tx('复权'), cap: 'adj_factor' as const }] : []),
+    { label: tx('指标') },
+    ...(indexAuto ? [{ label: tx('指数'), cap: 'daily' as const }] : []),
     ...(etfAuto ? [{ label: 'ETF', cap: 'daily' as const }] : []),
-    ...((hasMinuteCap && minuteAuto) ? [{ label: '分钟K', cap: 'minute' as const }] : []),
+    ...((hasMinuteCap && minuteAuto) ? [{ label: tx('分钟K'), cap: 'minute' as const }] : []),
   ]
 
   // 数据画像卡片显隐(由页面设置弹窗控制,存 localStorage)
@@ -350,7 +352,7 @@ export function Data() {
     symbols_covered: s.etf_daily?.symbols_covered ?? s.etf_instruments?.rows ?? 0,
     trading_days: s.etf_daily?.trading_days ?? s.etf_enriched?.trading_days ?? 0,
   } : null
-  const indexOverviewLabel = s ? '日 · 维表 · 日K · 指标' : undefined
+  const indexOverviewLabel = s ? tx('日 · 维表 · 日K · 指标') : undefined
   const indexEarliestDate = s?.index_daily?.earliest_date ?? s?.index_enriched?.earliest_date ?? null
   const indexOffsetDays = indexExtendUnit === 'month' ? indexExtendValue * 30 : indexExtendValue * 365
   const indexTargetDate = (() => {
@@ -420,8 +422,8 @@ export function Data() {
       case 'instruments':
         return (
           <StatCard
-            title="个股维表"
-            hint="盘前同步 · 元数据快照"
+            title={tx('个股维表')}
+            hint={tx('盘前同步 · 元数据快照')}
             stats={s?.instruments}
             isInstrument
             loading={isLoading}
@@ -438,8 +440,8 @@ export function Data() {
       case 'daily':
         return (
           <StatCard
-            title="日 K"
-            hint="增量同步 · 全市场"
+            title={tx('日 K')}
+            hint={tx('增量同步 · 全市场')}
             stats={s?.daily}
             loading={isLoading}
             active={activeCard === 'daily'}
@@ -458,8 +460,8 @@ export function Data() {
       case 'adj_factor':
         return (
           <StatCard
-            title="除权因子"
-            hint="增量同步 · 全市场"
+            title={tx('除权因子')}
+            hint={tx('增量同步 · 全市场')}
             stats={s?.adj_factor}
             loading={isLoading}
             active={activeCard === 'adj_factor'}
@@ -479,7 +481,7 @@ export function Data() {
         return (
           <StatCard
             title="Enriched"
-            hint="复权 OHLCV + 技术指标"
+            hint={tx('复权 OHLCV + 技术指标')}
             stats={s?.enriched}
             loading={isLoading}
             active={activeCard === 'enriched'}
@@ -489,8 +491,8 @@ export function Data() {
             tierKey="enriched"
             capLimits={mergedCaps}
             auto
-            subLabel={status.data?.indicators_ready === false ? '字段 · 指标计算中…' : '字段 · 指标 · 信号'}
-            localBadgeSuffix={`${prefs.data?.enriched_batch_size ?? 1000}只/批`}
+            subLabel={status.data?.indicators_ready === false ? tx('字段 · 指标计算中…') : tx('字段 · 指标 · 信号')}
+            localBadgeSuffix={tx('{n}只/批', { n: prefs.data?.enriched_batch_size ?? 1000 })}
             onShowFields={() => setSchemaTable('enriched')}
             onSettings={hasData ? () => setOpenSettings(v => v === 'enriched' ? null : 'enriched') : undefined}
             settingsOpen={openSettings === 'enriched'}
@@ -499,8 +501,8 @@ export function Data() {
       case 'index':
         return (
           <StatCard
-            title="指数"
-            hint="CN_Index · 独立存储"
+            title={tx('指数')}
+            hint={tx('CN_Index · 独立存储')}
             stats={indexOverviewStats}
             loading={isLoading}
             active={activeCard === 'index_daily'}
@@ -512,9 +514,9 @@ export function Data() {
             auto={indexAuto}
             subLabel={indexOverviewLabel}
             fieldTabs={[
-              { label: '维表', table: 'index_instruments' },
-              { label: '日K', table: 'index_daily' },
-              { label: '指标', table: 'index_enriched' },
+              { label: tx('维表'), table: 'index_instruments' },
+              { label: tx('日K'), table: 'index_daily' },
+              { label: tx('指标'), table: 'index_enriched' },
             ] as FieldTab[]}
             onShowFields={(t) => setSchemaTable(t ?? 'index_daily')}
             onSettings={hasData ? () => setOpenSettings(v => v === 'index' ? null : 'index') : undefined}
@@ -525,18 +527,18 @@ export function Data() {
         return (
           <StatCard
             title="ETF"
-            hint="场内基金 · 独立存储"
+            hint={tx('场内基金 · 独立存储')}
             stats={etfOverviewStats}
             loading={isLoading}
             tierKey="etf"
             capLimits={mergedCaps}
             customProvider={routeProviderDisplay(matrix.data, 'daily')}
             auto={etfAuto}
-            subLabel="维表 · 日K · 指标"
+            subLabel={tx('维表 · 日K · 指标')}
             fieldTabs={[
-              { label: '维表', table: 'etf_instruments' },
-              { label: '日K', table: 'etf_daily' },
-              { label: '指标', table: 'etf_enriched' },
+              { label: tx('维表'), table: 'etf_instruments' },
+              { label: tx('日K'), table: 'etf_daily' },
+              { label: tx('指标'), table: 'etf_enriched' },
             ] as FieldTab[]}
             onShowFields={(t) => setSchemaTable(t ?? 'etf_daily')}
           />
@@ -544,8 +546,8 @@ export function Data() {
       case 'minute':
         return (
           <StatCard
-            title="分钟 K"
-            hint="全市场同步"
+            title={tx('分钟 K')}
+            hint={tx('全市场同步')}
             stats={s?.minute}
             loading={isLoading}
             active={activeCard === 'minute'}
@@ -565,17 +567,17 @@ export function Data() {
         const historicalShareRows = s?.financials?.tables?.shares?.rows ?? 0
         return (
           <StatCard
-            title="财务数据"
-            hint="财报 / 指标 / 历史股本"
+            title={tx('财务数据')}
+            hint={tx('财报 / 指标 / 历史股本')}
             stats={s?.financials ? { rows: s.financials.rows } : null}
             loading={isLoading}
             tierKey="financials"
             capLimits={mergedCaps}
             customProvider={routeProviderDisplay(matrix.data, 'financial')}
-            subLabel={`历史股本 · ${historicalShareRows.toLocaleString()} 条`}
+            subLabel={tx('历史股本 · {n} 条', { n: historicalShareRows.toLocaleString() })}
             // 财务不在盘后管道内, 顶部「立即同步」不含它 —— 给出独立的拉取入口
             onPull={() => setOpenSettings(v => v === 'financial-sync' ? null : 'financial-sync')}
-            pullTitle="手动拉取财务数据"
+            pullTitle={tx('手动拉取财务数据')}
             onSettings={hasData ? () => setOpenSettings(v => v === 'financials' ? null : 'financials') : undefined}
             settingsOpen={openSettings === 'financials' || openSettings === 'financial-sync'}
           />
@@ -584,8 +586,8 @@ export function Data() {
       case 'regime':
         return (
           <StatCard
-            title="市场环境"
-            hint="每日环境状态 · 本地计算"
+            title={tx('市场环境')}
+            hint={tx('每日环境状态 · 本地计算')}
             stats={regimeCoverage.data ?? null}
             loading={regimeCoverage.isLoading}
             active={activeCard === 'regime'}
@@ -595,7 +597,7 @@ export function Data() {
             tierKey="regime"
             capLimits={mergedCaps}
             auto={prefs.data?.pipeline_regime_enabled === true}
-            subLabel="状态 · 综合分 · 指标"
+            subLabel={tx('状态 · 综合分 · 指标')}
             onSettings={hasData ? () => setOpenSettings(v => v === 'regime' ? null : 'regime') : undefined}
             settingsOpen={openSettings === 'regime'}
           />
@@ -609,8 +611,8 @@ export function Data() {
     <>
       <div ref={topRef} />
       <PageHeader
-        title="数据"
-        subtitle="本地数据画像 · 同步状态 · 历史记录"
+        title={tx('数据')}
+        subtitle={tx('本地数据画像 · 同步状态 · 历史记录')}
         right={
           <div className="flex items-center gap-3">
             <button
@@ -625,16 +627,16 @@ export function Data() {
               ) : (
                 <Play className="h-3.5 w-3.5" />
               )}
-              {isStarting ? '启动中…' : isRunning ? '同步中…' : '立即同步'}
+              {isStarting ? tx('启动中…') : isRunning ? tx('同步中…') : tx('立即同步')}
             </button>
             {isRunning && !!activeJobId && (
               <button
                 onClick={() => setShowStopConfirm(true)}
-                title="停止当前同步任务"
+                title={tx('停止当前同步任务')}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-danger/12 border border-danger/30 text-danger text-xs font-medium hover:bg-danger/20 transition-all duration-150"
               >
                 <Square className="h-3 w-3 fill-current" />
-                停止
+                {tx('停止')}
               </button>
             )}
             <button
@@ -642,7 +644,7 @@ export function Data() {
               className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-150"
             >
               <CheckSquare className="h-3.5 w-3.5" />
-              数据范围
+              {tx('数据范围')}
             </button>
             <button
               onClick={() => setShowRepair(true)}
@@ -650,7 +652,7 @@ export function Data() {
               className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-150 disabled:opacity-40 disabled:pointer-events-none"
             >
               <WandSparkles className="h-3.5 w-3.5" />
-              自检/修补
+              {tx('自检/修补')}
             </button>
             <div className="w-px h-4 bg-border" />
             <div className="flex items-center gap-1.5">
@@ -659,29 +661,26 @@ export function Data() {
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-150"
               >
                 <Plus className="h-3.5 w-3.5" />
-                扩展数据
-              </button>
+                {tx('扩展数据')}</button>
               {hasTickflowKey && (
               <button
                 onClick={() => setShowEndpointTest(true)}
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-150"
               >
                 <Wifi className="h-3.5 w-3.5" />
-                测试端点
-              </button>
+                {tx('测试端点')}</button>
               )}
               <button
                 onClick={() => setOpenSettings('page-settings')}
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-150"
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" />
-                页面设置
-              </button>
+                {tx('页面设置')}</button>
               <div className="w-px h-4 bg-border" />
               <Link
                 to="/settings?tab=data-sources&highlight=data-sources"
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-secondary hover:text-accent hover:bg-accent/8 text-xs transition-colors duration-150"
-                title="切换数据源"
+                title={tx('切换数据源')}
               >
                 <Database className="h-3.5 w-3.5" />
                 <span className="text-foreground/80 max-w-[120px] truncate">{activeDataSourceName}</span>
@@ -692,8 +691,7 @@ export function Data() {
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-btn text-muted hover:text-danger hover:bg-danger/8 text-xs transition-colors duration-150 disabled:opacity-40 disabled:pointer-events-none"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                清除数据
-              </button>
+                {tx('清除数据')}</button>
             </div>
           </div>
         }
@@ -705,13 +703,9 @@ export function Data() {
           <div className="flex items-center gap-2 rounded-card border border-border bg-elevated/40 px-3 py-2 text-xs">
             <Info className="h-4 w-4 shrink-0 text-muted" />
             <span className="text-secondary leading-relaxed">
-              当前无需 API Key,历史日K将使用免费通道获取。
-              实时行情、分钟K等能力取决于所选数据源,可在
-              <Link to="/settings?tab=data-sources&highlight=data-sources" className="mx-0.5 font-medium text-accent hover:underline">
-                数据源设置
-              </Link>
-              中配置。
-            </span>
+              {tx('当前无需 API Key,历史日K将使用免费通道获取。 实时行情、分钟K等能力取决于所选数据源,可在')}<Link to="/settings?tab=data-sources&highlight=data-sources" className="mx-0.5 font-medium text-accent hover:underline">
+                {tx('数据源设置')}</Link>
+              {tx('中配置。')}</span>
           </div>
         )}
 
@@ -752,7 +746,7 @@ export function Data() {
           <div className="rounded-card border border-border bg-surface p-4">
             <div className="flex items-center gap-2 mb-3">
               <Calendar className="h-4 w-4 text-secondary" />
-              <h3 className="text-sm font-medium text-foreground">自动调度</h3>
+              <h3 className="text-sm font-medium text-foreground">{tx('自动调度')}</h3>
             </div>
             {isLoading ? (
               <div className="space-y-2">
@@ -763,18 +757,18 @@ export function Data() {
             ) : (
               <div className="space-y-2">
                 <div className="flex items-center gap-1.5 text-[10px] text-muted pb-2 border-b border-border/50 flex-wrap">
-                  <span className="text-accent/60 font-medium">盘前</span>
-                  <span>个股维表</span>
+                  <span className="text-accent/60 font-medium">{tx('盘前')}</span>
+                  <span>{tx('个股维表')}</span>
                   <span className="text-border">→</span>
-                  <span className="text-accent/60 font-medium">盘后</span>
+                  <span className="text-accent/60 font-medium">{tx('盘后')}</span>
                   {pipelineSteps.map((step, i) => (
                     <span key={step.label} className="contents">
                       {i > 0 && <span className="text-border">→</span>}
                       <span
                         className="inline-flex items-center gap-0.5"
                         title={step.cap
-                          ? `路由: ${routeCap(matrix.data, step.cap)?.effective_display ?? '—'}`
-                          : '本地计算'}
+                          ? tx('路由: {src}', { src: routeCap(matrix.data, step.cap)?.effective_display ?? '—' })
+                          : tx('本地计算')}
                       >
                         {step.label}
                         {step.cap && (
@@ -787,12 +781,12 @@ export function Data() {
                   ))}
                 </div>
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-muted">时区</span>
+                  <span className="text-muted">{tx('时区')}</span>
                   <span className="font-mono text-secondary">Asia/Shanghai</span>
                 </div>
                 <div className="flex items-center justify-between text-[11px]">
                   <div className="flex items-center gap-1">
-                    <span className="text-muted">盘前 · 个股维表</span>
+                    <span className="text-muted">{tx('盘前 · 个股维表')}</span>
                     <span className="text-muted/50">·</span>
                     <span className="font-mono text-secondary">
                       {`${String(instrumentsSched.hour).padStart(2, '0')}:${String(instrumentsSched.minute).padStart(2, '0')}`}
@@ -832,14 +826,14 @@ export function Data() {
                         value={instrumentsSched}
                         onSave={(h, m) => updateInstSchedule.mutate({ hour: h, minute: m })}
                         loading={updateInstSchedule.isPending}
-                        hint="不晚于 09:15"
+                        hint={tx('不晚于 09:15')}
                       />
                     </motion.div>
                   )}
                 </AnimatePresence>
                 <div className="flex items-center justify-between text-[11px]">
                   <div className="flex items-center gap-1">
-                    <span className="text-muted">盘后 · 全量管道</span>
+                    <span className="text-muted">{tx('盘后 · 全量管道')}</span>
                     <span className="text-muted/50">·</span>
                     <span className="font-mono text-secondary">
                       {`${String(pipelineSched.hour).padStart(2, '0')}:${String(pipelineSched.minute).padStart(2, '0')}`}
@@ -879,7 +873,7 @@ export function Data() {
                         value={pipelineSched}
                         onSave={(h, m) => updateSchedule.mutate({ hour: h, minute: m })}
                         loading={updateSchedule.isPending}
-                        hint="不早于 15:00"
+                        hint={tx('不早于 15:00')}
                       />
                     </motion.div>
                   )}
@@ -893,7 +887,7 @@ export function Data() {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <HardDrive className="h-4 w-4 text-secondary" />
-                <h3 className="text-sm font-medium text-foreground">存储</h3>
+                <h3 className="text-sm font-medium text-foreground">{tx('存储')}</h3>
               </div>
               {isLoading ? (
                 <Skeleton w="w-12" />
@@ -913,17 +907,17 @@ export function Data() {
                   </div>
                 ))
               ) : [
-                { label: '个股维表', files: storage?.instruments_files, size: storage?.instruments_size_mb },
-                { label: '日 K',     files: storage?.daily_files,       size: storage?.daily_size_mb },
-                { label: '除权因子', files: storage?.adj_factor_files,  size: storage?.adj_factor_size_mb },
+                { label: tx('个股维表'), files: storage?.instruments_files, size: storage?.instruments_size_mb },
+                { label: tx('日 K'),     files: storage?.daily_files,       size: storage?.daily_size_mb },
+                { label: tx('除权因子'), files: storage?.adj_factor_files,  size: storage?.adj_factor_size_mb },
                 { label: 'Enriched', files: storage?.enriched_files,    size: storage?.enriched_size_mb },
-                { label: '分钟 K',   files: storage?.minute_files,      size: storage?.minute_size_mb },
-                { label: '财务数据', files: storage?.financials_files,   size: storage?.financials_size_mb },
+                { label: tx('分钟 K'),   files: storage?.minute_files,      size: storage?.minute_size_mb },
+                { label: tx('财务数据'), files: storage?.financials_files,   size: storage?.financials_size_mb },
               ].map((item) => (
                 <div key={item.label} className="flex items-center justify-between text-[11px]">
                   <span className="text-muted">{item.label}</span>
                   <div className="flex items-center gap-3">
-                    <span className="font-mono text-secondary">{item.files ?? 0} 文件</span>
+                    <span className="font-mono text-secondary">{item.files ?? 0} {tx('文件')}</span>
                     <span className="font-mono text-muted w-16 text-right">{(item.size ?? 0).toFixed(1)} MB</span>
                   </div>
                 </div>
@@ -931,9 +925,9 @@ export function Data() {
               {/* 扩展数据 */}
               {(extConfigs.data && (extConfigs.data.items?.length ?? 0) > 0) && (
                 <div className="flex items-center justify-between text-[11px] border-t border-border/50 pt-2 mt-1">
-                  <span className="text-muted">扩展数据</span>
+                  <span className="text-muted">{tx('扩展数据')}</span>
                   <div className="flex items-center gap-3">
-                    <span className="font-mono text-secondary">{storage?.ext_data_files ?? extConfigs.data.items.length} 文件</span>
+                    <span className="font-mono text-secondary">{storage?.ext_data_files ?? extConfigs.data.items.length} {tx('文件')}</span>
                     <span className="font-mono text-muted w-16 text-right">
                       {storage?.ext_data_size_mb != null ? `${storage.ext_data_size_mb.toFixed(1)} MB` : '—'}
                     </span>
@@ -947,11 +941,10 @@ export function Data() {
         {/* 数据画像 */}
         <div>
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <SectionTitle icon={Database}>数据画像</SectionTitle>
+            <SectionTitle icon={Database}>{tx('数据画像')}</SectionTitle>
             <button type="button" onClick={() => setShowImportExt(true)}
               className="inline-flex min-h-8 items-center gap-1.5 rounded-btn border border-border px-3 text-xs text-secondary transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
-              <Upload className="h-3.5 w-3.5" />导入扩展配置
-            </button>
+              <Upload className="h-3.5 w-3.5" />{tx('导入扩展配置')}</button>
           </div>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 items-stretch">
             {getCardOrder().filter(k => cardVisible[k]).map((k: CardKey) => (
@@ -971,7 +964,7 @@ export function Data() {
 
         {/* 同步历史 */}
         <div>
-          <SectionTitle icon={Clock}>同步历史</SectionTitle>
+          <SectionTitle icon={Clock}>{tx('同步历史')}</SectionTitle>
           <div className="mt-3 rounded-card border border-border overflow-hidden">
             {history.isLoading ? (
               <div className="px-5 py-6 space-y-3">
@@ -996,15 +989,14 @@ export function Data() {
               </div>
             ) : (
               <div className="px-5 py-8 text-center text-sm text-muted">
-                暂无同步记录 — 点右上角"立即同步"开始。
-              </div>
+                {tx('暂无同步记录 — 点右上角"立即同步"开始。')}</div>
             )}
           </div>
         </div>
 
         {startSync.isError && (
           <div className="rounded-btn border border-danger/40 bg-danger/5 px-3 py-2 text-sm text-danger">
-            启动失败:{String((startSync.error as any).message)}
+            {tx('启动失败:')}{String((startSync.error as any).message)}
           </div>
         )}
       </div>
@@ -1036,7 +1028,7 @@ export function Data() {
 
       <AnimatePresence>
         {openSettings === 'daily' && (
-          <SettingsModal title="日 K · 向前扩展历史" onClose={() => setOpenSettings(null)}>
+          <SettingsModal title={tx('日 K · 向前扩展历史')} onClose={() => setOpenSettings(null)}>
             <ExtendHistoryPanel
               hasCap={hasDailyBatchCap}
               isRunning={!!activeJobId}
@@ -1049,7 +1041,7 @@ export function Data() {
 
       <AnimatePresence>
         {showRepair && (
-          <SettingsModal title="日K数据自检与修补" width="max-w-3xl" onClose={() => setShowRepair(false)}>
+          <SettingsModal title={tx('日K数据自检与修补')} width="max-w-3xl" onClose={() => setShowRepair(false)}>
             <DataIntegrityPanel hasCap={hasDailyBatchCap} isRunning={!!activeJobId}
               job={job.data}
               defaultAssets={[
@@ -1059,7 +1051,7 @@ export function Data() {
               ]}
               onStart={id => { setActiveJobId(id); qc.invalidateQueries({ queryKey: QK.pipelineJobs }) }} />
             <details className="mt-5 border-t border-border pt-4">
-              <summary className="cursor-pointer text-xs text-secondary">手动指定起点修正数据</summary>
+              <summary className="cursor-pointer text-xs text-secondary">{tx('手动指定起点修正数据')}</summary>
               <div className="mt-4"><RepairDailyPanel
               hasCap={hasDailyBatchCap}
               isRunning={!!activeJobId}
@@ -1073,7 +1065,7 @@ export function Data() {
 
       <AnimatePresence>
         {openSettings === 'enriched' && (
-          <SettingsModal title="Enriched · 计算设置" onClose={() => setOpenSettings(null)}>
+          <SettingsModal title={tx('Enriched · 计算设置')} onClose={() => setOpenSettings(null)}>
             <EnrichedRebuildPanel
               isRunning={!!activeJobId}
               onStart={(jobId) => { setActiveJobId(jobId); setOpenSettings(null) }}
@@ -1084,7 +1076,7 @@ export function Data() {
 
       <AnimatePresence>
         {openSettings === 'financials' && (
-          <SettingsModal title="财务数据 · 换手率重算" onClose={() => setOpenSettings(null)}>
+          <SettingsModal title={tx('财务数据 · 换手率重算')} onClose={() => setOpenSettings(null)}>
             <EnrichedRebuildPanel
               isRunning={!!activeJobId}
               purpose="turnover"
@@ -1094,7 +1086,7 @@ export function Data() {
           </SettingsModal>
         )}
         {openSettings === 'financial-sync' && (
-          <SettingsModal title="财务数据 · 手动拉取" onClose={() => setOpenSettings(null)} width="max-w-lg">
+          <SettingsModal title={tx('财务数据 · 手动拉取')} onClose={() => setOpenSettings(null)} width="max-w-lg">
             <FinancialSyncPanel />
           </SettingsModal>
         )}
@@ -1102,7 +1094,7 @@ export function Data() {
 
       <AnimatePresence>
         {openSettings === 'regime' && (
-          <SettingsModal title="市场环境 · 计算设置" onClose={() => setOpenSettings(null)}>
+          <SettingsModal title={tx('市场环境 · 计算设置')} onClose={() => setOpenSettings(null)}>
             <RegimeConfigCard />
           </SettingsModal>
         )}
@@ -1110,7 +1102,7 @@ export function Data() {
 
       <AnimatePresence>
         {openSettings === 'pipeline-scope' && (
-          <SettingsModal title="盘后管道 · 拉取内容" onClose={() => setOpenSettings(null)}>
+          <SettingsModal title={tx('盘后管道 · 拉取内容')} onClose={() => setOpenSettings(null)}>
             <PipelineScopeConfig />
           </SettingsModal>
         )}
@@ -1118,7 +1110,7 @@ export function Data() {
 
       <AnimatePresence>
         {openSettings === 'page-settings' && (
-          <SettingsModal title="页面设置 · 数据画像卡片" onClose={() => setOpenSettings(null)}>
+          <SettingsModal title={tx('页面设置 · 数据画像卡片')} onClose={() => setOpenSettings(null)}>
             <PageSettingsModal caps={mergedCaps} />
           </SettingsModal>
         )}
@@ -1126,12 +1118,12 @@ export function Data() {
 
       <AnimatePresence>
         {openSettings === 'index' && (
-          <SettingsModal title="指数 · 手动获取" onClose={() => setOpenSettings(null)}>
+          <SettingsModal title={tx('指数 · 手动获取')} onClose={() => setOpenSettings(null)}>
             <div className="space-y-4">
               <div className="rounded-card border border-border bg-base/30 p-4 space-y-3">
                 <div>
-                  <div className="text-sm font-medium text-foreground">指数日 K</div>
-                  <div className="text-[11px] text-muted mt-1">获取数据时会先刷新 CN_Index 维表，再向前扩展指数历史；指数不需要复权。</div>
+                  <div className="text-sm font-medium text-foreground">{tx('指数日 K')}</div>
+                  <div className="text-[11px] text-muted mt-1">{tx('获取数据时会先刷新 CN_Index 维表，再向前扩展指数历史；指数不需要复权。')}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="flex items-center">
@@ -1159,21 +1151,21 @@ export function Data() {
                         className={`px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-40 ${
                           indexExtendUnit === u ? 'bg-accent/15 text-accent' : 'text-secondary hover:bg-elevated'
                         }`}
-                      >{u === 'month' ? '月' : '年'}</button>
+                      >{u === 'month' ? tx('月') : tx('年')}</button>
                     ))}
                   </div>
                 </div>
 
                 <div className="text-[10px] text-muted">
-                  预计扩展至 <span className="font-mono text-secondary">{indexTargetDateText}</span>
-                  {indexEarliestDate && <span> (当前最早: <span className="font-mono text-secondary">{indexEarliestDate}</span>)</span>}
+                  {tx('预计扩展至')} <span className="font-mono text-secondary">{indexTargetDateText}</span>
+                  {indexEarliestDate && <span> {tx('(当前最早:')} <span className="font-mono text-secondary">{indexEarliestDate}</span>)</span>}
                 </div>
 
                 <div className="rounded-btn border border-border bg-base/40 p-3 space-y-2">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-xs font-medium text-foreground">批次大小</div>
-                      <div className="text-[10px] text-muted mt-0.5">每批同步并计算的指数数量，默认 100。</div>
+                      <div className="text-xs font-medium text-foreground">{tx('批次大小')}</div>
+                      <div className="text-[10px] text-muted mt-0.5">{tx('每批同步并计算的指数数量，默认 100。')}</div>
                     </div>
                     <div className="flex items-center gap-2">
                       <input
@@ -1194,12 +1186,12 @@ export function Data() {
                         disabled={updateIndexBatchSize.isPending || !!activeJobId || syncIndexDaily.isPending}
                         className="px-2.5 py-1 rounded-btn bg-elevated border border-border text-xs text-secondary hover:text-foreground disabled:opacity-40 transition-colors"
                       >
-                        {updateIndexBatchSize.isPending ? '保存中…' : '保存'}
+                        {updateIndexBatchSize.isPending ? tx('保存中…') : tx('保存')}
                       </button>
                     </div>
                   </div>
                   <div className="text-[10px] text-muted">
-                    当前生效: <span className="font-mono text-secondary">{indexDailyBatchSize}</span>
+                    {tx('当前生效:')} <span className="font-mono text-secondary">{indexDailyBatchSize}</span>
                   </div>
                 </div>
                 <button
@@ -1210,10 +1202,9 @@ export function Data() {
                   {syncIndexDaily.isPending ? (
                     <>
                       <Loader2 className="h-3 w-3 animate-spin" />
-                      获取中…
-                    </>
+                      {tx('获取中…')}</>
                   ) : (
-                    <>获取数据</>
+                    <>{tx('获取数据')}</>
                   )}
                 </button>
                 {!hasDailyBatchCap && (
@@ -1227,7 +1218,7 @@ export function Data() {
 
       <AnimatePresence>
         {openSettings === 'minute' && (
-          <SettingsModal title="分钟 K · 同步设置" width="max-w-4xl" contentClassName="flex min-h-0 flex-1 flex-col overflow-hidden" onClose={() => setOpenSettings(null)}>
+          <SettingsModal title={tx('分钟 K · 同步设置')} width="max-w-4xl" contentClassName="flex min-h-0 flex-1 flex-col overflow-hidden" onClose={() => setOpenSettings(null)}>
             <MinuteSyncConfig hasCap={hasMinuteCap} onClose={() => setOpenSettings(null)} onJobStart={(jobId) => { setActiveJobId(jobId); setOpenSettings(null) }} />
           </SettingsModal>
         )}
@@ -1235,7 +1226,7 @@ export function Data() {
 
       <AnimatePresence>
         {openSettings === 'adj_factor' && (
-          <SettingsModal title="除权因子 · 同步设置" onClose={() => setOpenSettings(null)}>
+          <SettingsModal title={tx('除权因子 · 同步设置')} onClose={() => setOpenSettings(null)}>
             <AdjFactorSyncConfig
               hasCap={hasAdjCap}
               providerDisplay={routeProviderDisplay(matrix.data, 'adj_factor')}
@@ -1269,16 +1260,14 @@ export function Data() {
                   <AlertTriangle className="h-5 w-5 text-danger" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-semibold text-foreground mb-1.5">确认停止数据同步？</h3>
+                  <h3 className="text-sm font-semibold text-foreground mb-1.5">{tx('确认停止数据同步？')}</h3>
                   <p className="text-xs text-secondary leading-relaxed">
-                    当前任务将在<span className="text-foreground font-medium">正在拉取的分块完成后</span>中断（协作式停止，不会损坏已写入的数据）。
-                  </p>
+                    {tx('当前任务将在')}<span className="text-foreground font-medium">{tx('正在拉取的分块完成后')}</span>{tx('中断（协作式停止，不会损坏已写入的数据）。')}</p>
                   <p className="mt-2 text-[11px] text-danger/90 leading-relaxed">
-                    停止后再次拉取需要重新走完整管道（拉取 → 指标计算 → 监控规则），无法从停止处续跑。
-                  </p>
+                    {tx('停止后再次拉取需要重新走完整管道（拉取 → 指标计算 → 监控规则），无法从停止处续跑。')}</p>
                   <div className="mt-2 flex items-start gap-1.5 text-[11px] text-muted">
                     <Info className="h-3.5 w-3.5 shrink-0 mt-px text-muted" />
-                    <span>已写入的部分数据会保留，下次同步时覆盖或补齐。</span>
+                    <span>{tx('已写入的部分数据会保留，下次同步时覆盖或补齐。')}</span>
                   </div>
                 </div>
               </div>
@@ -1288,14 +1277,13 @@ export function Data() {
                   disabled={stopSync.isPending}
                   className="px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:bg-elevated/80 text-sm transition-colors disabled:opacity-50"
                 >
-                  取消
-                </button>
+                  {tx('取消')}</button>
                 <button
                   onClick={() => stopSync.mutate()}
                   disabled={stopSync.isPending}
                   className="px-3 py-1.5 rounded-btn bg-danger/90 text-white text-sm font-medium hover:bg-danger disabled:opacity-50 transition-colors"
                 >
-                  {stopSync.isPending ? '停止中…' : '确认停止'}
+                  {stopSync.isPending ? tx('停止中…') : tx('确认停止')}
                 </button>
               </div>
             </motion.div>
@@ -1328,21 +1316,19 @@ export function Data() {
                   <AlertTriangle className="h-5 w-5 text-danger" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-semibold text-foreground mb-1.5">确认清除本地数据？</h3>
+                  <h3 className="text-sm font-semibold text-foreground mb-1.5">{tx('确认清除本地数据？')}</h3>
                   <p className="text-xs text-secondary leading-relaxed">
-                    此操作将<span className="text-danger font-medium">永久删除</span>所有已同步的本地数据，包括：
-                  </p>
+                    {tx('此操作将')}<span className="text-danger font-medium">{tx('永久删除')}</span>{tx('所有已同步的本地数据，包括：')}</p>
                   <ul className="mt-2 text-[11px] text-muted leading-relaxed space-y-0.5">
-                    <li>· 个股维表、日 K、除权因子</li>
-                    <li>· Enriched 指标数据、分钟 K</li>
-                    <li>· 财务数据、指数、ETF</li>
+                    <li>{tx('· 个股维表、日 K、除权因子')}</li>
+                    <li>{tx('· Enriched 指标数据、分钟 K')}</li>
+                    <li>{tx('· 财务数据、指数、ETF')}</li>
                   </ul>
                   <p className="mt-2 text-[11px] text-danger/90">
-                    操作不可恢复，需重新执行同步才能恢复数据。
-                  </p>
+                    {tx('操作不可恢复，需重新执行同步才能恢复数据。')}</p>
                   <div className="mt-2 flex items-start gap-1.5 text-[11px] text-warning">
                     <Info className="h-3.5 w-3.5 shrink-0 mt-px text-warning" />
-                    <span>此操作不会清除扩展数据，如需删除请在扩展数据设置中单独操作。</span>
+                    <span>{tx('此操作不会清除扩展数据，如需删除请在扩展数据设置中单独操作。')}</span>
                   </div>
                 </div>
               </div>
@@ -1352,14 +1338,13 @@ export function Data() {
                   disabled={clearData.isPending}
                   className="px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:bg-elevated/80 text-sm transition-colors disabled:opacity-50"
                 >
-                  取消
-                </button>
+                  {tx('取消')}</button>
                 <button
                   onClick={() => clearData.mutate()}
                   disabled={clearData.isPending}
                   className="px-3 py-1.5 rounded-btn bg-danger/90 text-white text-sm font-medium hover:bg-danger disabled:opacity-50 transition-colors"
                 >
-                  {clearData.isPending ? '清除中…' : '清除数据'}
+                  {clearData.isPending ? tx('清除中…') : tx('清除数据')}
                 </button>
               </div>
             </motion.div>

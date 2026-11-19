@@ -172,6 +172,74 @@
 
 ---
 
+## 🌐 多语言界面(简体中文 / English / 日本語)
+
+- **切换入口**:侧栏底部语言按钮循环切换,「设置 → 系统」分段控件直接选择,登录页与引导页提供下拉选择
+- **结构化文案**:主文案走 `t('namespace.key')`,词库为 `frontend/src/locales/{zh-CN,en,ja}.ts`,三份键集合保持一致(217 键)
+- **中文短语映射**:业务页面的中文原句走 `tx('中文原句')`,由 `frontend/src/locales/phrases.ts` 映射到英文/日文
+- **已接入本地化的核心面**:应用外壳与导航、全部列表页表头与列分组(`col.*` / `colGroup.*`)、股票信号标签、图表副图标题与读数、弹窗与提示的通用词条
+- **持久化**:语言写入界面偏好(`tf-locale`),随偏好备份同步;未选择时默认简体中文,缺失译文回退中文而非空白
+- **AI 输出语言**:AI 助手与日美股市 AI 分析按当前界面语言输出报告
+
+### 多语言护栏(CI 强制)
+
+| 护栏 | 作用 |
+| --- | --- |
+| `src/lib/i18n.coverage.test.ts` | 已登记的结构化键/短语必须同时有英文与日文译文;并断言英文译文无汉字、日文译文无谚文、无夹带英文碎片、EN/JA 键集合一致(防写入过程把字符写成 U+FFFD / 谚文 / 错码点) |
+| `src/lib/i18n.hardcoded.test.ts` | 扫描渲染位置:没有走词库的硬编码中文即失败(待迁移清单之外) |
+| `src/lib/i18n.column.test.ts` | 每个中文表头的内置列在 `col.*` 三语词库中都有条目;并**渲染层断言**英文表头不含汉字、日文表头不得与中文原文完全相同(只查「键存在」会漏掉「译文仍是中文」) |
+| `scripts/i18n-audit.mjs` | 审计脚本,内核基于 **TypeScript AST**,精确区分字符串字面量 / 模板字面量 / JSX 文本,正则与注释不会误判成文案;输出未本地化清单,`--write` 刷新待办 |
+| `scripts/i18n-module-tx.mjs` | 扫描**模块作用域**里的 `tx()/t()` 调用——这类调用在 import 时求值,会把语言冻结在导入那一刻,审计器看不见,必须单独扫 |
+| `scripts/i18n-module-labels.mjs` | 扫描**模块级**「词库已覆盖」的中文常量——审计器对非 JSX 字面量采用「词库有条目就放行」策略,这类常量若是展示文案而渲染处没走 `tx()`,切语言后仍是中文,属于审计看不见的盲区,必须单独扫 |
+| `src/lib/i18n.pending.ts` | i18n 迁移待办清单(仍有硬编码中文的文件) |
+
+**当前进度**:护栏会拦截新增硬编码中文;存量欠账约 **1,068 处 / 127 个文件**(集中在回测工作台、设置页等次要页面),按 `src/lib/i18n.pending.ts` 逐文件迁移,每迁移完一个文件即从清单移除并由护栏锁定。
+
+> 口径说明:审计内核已从「朴素引号扫描」重写为 TypeScript AST,旧的扫描器会因引号配对错位而**漏报**(把整段代码当成一个字符串),也会把正则字面量里的引号误判成文案。因此新旧口径的数字不可直接相减——**以当前 AST 口径为准**。
+>
+> 当前 AST 口径的三条规则:①字符串字面量若紧邻 `t()/tx()` 则视为已本地化;②JSX 文本与 JSX 属性里的中文**必须**显式 `tx()` 化,不能因为「词库里已有该短语」而放行(这正是此前漏报的主因);③数组/对象字面量里的中文视为数据键(渲染处再翻译),词库有对应条目即可放行。
+
+**已完整迁移的页面/组件**:监控规则编辑器(`components/monitor/RuleEditor.tsx`)、策略设置弹窗(`StrategySettingsDialog.tsx`)、策略库弹窗(`StrategyPoolDialog.tsx`)、资源转移弹窗(`components/ResourceTransferDialog.tsx`)、扩展数据新建弹窗(`components/ext-data/CreateExtDialog.tsx`)、列自定义弹窗(`components/ListColumnCustomizerInner.tsx`);列表页表头与列分组、股票信号标签;日 K 与分时图表层(`LightweightDaily` / `LightweightIntraday` / `EChartsCandlestick` / `EChartsIntraday` / `EChartsMultiDayIntraday` / `StockDailyKChart` / `StockIntradayChart` / `StockMultiDayIntradayChart` / `CandlestickChart` / `FinancialPlot`)——含涨跌停/炸板/翘板标记、O-H-L-C、均线轨道、量比、换手、周期与加载/空数据提示;自选页(`pages/Watchlist.tsx` 及其子组件 `components/WatchlistGroups.tsx` / `components/WatchlistGroupTransfer.tsx`)、策略页(`pages/Screener.tsx`)、市场环境页(`pages/Regime.tsx`)、策略回测工作台(`pages/backtest/StrategyBacktest.tsx`)、指数页(`pages/Indices.tsx`)、导入与备份中心(`pages/settings/ImportCenter.tsx`)、因子发现页(`pages/backtest/FactorDiscovery.tsx`)、因子挖掘工作台(`pages/backtest/MiningWorkbench.tsx`)及其弹窗(`pages/backtest/AutoMiningDialog.tsx`、`pages/backtest/components/MiningLockControl.tsx`)、列自定义入口(`components/ColumnCustomizer.tsx`)、数据设置弹窗(`components/data/SettingsModal.tsx`)、监控设置页(`pages/settings/Monitoring.tsx`)、扩展数据拉取面板(`components/ext-data/ExtDataPullPanel.tsx`)、自定义数据源编辑器(`pages/settings/DataSourceEditor.tsx`)、AI 复盘页(`custom/review/Page.tsx`)、异动监控页(`custom/abnormal/Page.tsx`)、因子编辑器(`pages/factors/FactorEditor.tsx`)、因子库(`pages/factors/FactorLibrary.tsx`)、板块轮动卡片(`components/SectorRotationCard.tsx`)、AI 服务设置页(`pages/settings/AI.tsx`)、数据源页(`pages/settings/DataSources.tsx`)与能力标签库(`lib/capability-labels.tsx`)、模拟盘页(`custom/paper/Page.tsx`)、数据页(`pages/Data.tsx`)、监控中心(`custom/monitor/Page.tsx`)、策略生成弹窗(`components/screener/StrategyBuilderDialog.tsx`)、配置备份页(`pages/settings/Backup.tsx`)、涨跌停梯队页(`custom/limit-ladder/Page.tsx`)、系统设置页(`pages/settings/System.tsx`)、策略执行面板(`custom/paper/StrategyExecutionPanel.tsx`)、行业分析页(`custom/industry-analysis/Page.tsx`)、概念分析页(`custom/concept-analysis/Page.tsx`)、财务详情面板(`components/financials/StockFinancialDetail.tsx`)、因子回测页(`pages/backtest/FactorBacktest.tsx`)、稳健优化页(`pages/backtest/StrategyOptimizer.tsx`)、开发者诊断页(`pages/Dev.tsx`)、新手引导页(`pages/Onboarding.tsx`)、滚动样本外检验页(`pages/backtest/StrategyWalkForward.tsx`)、数据源插件页(`custom/source-packages/extension.tsx`)、策略守护页(`pages/backtest/StrategyGuardian.tsx`)、持仓提醒页(`custom/lots/Page.tsx`)、自选批量导入弹窗(`components/WatchlistImportDialog.tsx`)、回测证据面板(`pages/backtest/components/BacktestEvidencePanel.tsx`)、AI 助手消息区(`custom/assistant/ui/messages.tsx`)、研究候选方案弹窗(`pages/backtest/ResearchCandidatesDialog.tsx`)、扩展页面配置(`pages/settings/ExtPages.tsx`)、页面管理与分区外壳(`pages/settings/PageAdmin.tsx`)、页面插件上传面板(`pages/settings/PagePacks.tsx`)、仓位策略管理(`components/settings/PositionPoliciesPanel.tsx`)、分钟数据缺口体检(`components/data/MinuteGapPanel.tsx`)、五档盘口配置(`components/data/DepthConfigCard.tsx`)、涨跌停修正徽章(`components/SealedBadge.tsx`)、概念/行业共享组件(`components/analysis-shared.tsx`)、点位提醒弹窗(`components/stock-analysis/PriceAlertDialog.tsx`)、扩展数据配置卡片(`components/ext-data/ExtDataStatCard.tsx`)、API Token 面板(`pages/settings/ApiTokens.tsx`)、任务超时与传输压缩卡片(`pages/settings/JobTimeoutCard.tsx`)、个股分析图表模型(`components/stock-analysis/analysis-chart-model.ts`)、扩展数据维度分析页(`components/ExtDimensionAnalysis.tsx`)、分钟数据同步配置(`components/data/MinuteSyncConfig.tsx`)、维度成分股弹窗(`components/DimensionMembersDialogContent.tsx`)、扩展数据配置导入导出(`components/ext-data/ExtConfigTransfer.tsx`)、日K数据自检面板(`components/data/DataIntegrityPanel.tsx`)、左侧菜单编排面板(`pages/settings/MenuSettings.tsx`)、扩展数据源新建弹窗(`components/ext-data/CreateExtDialog.tsx`)、策略默认基础参数弹窗(`components/screener/DefaultStrategyParamsDialog.tsx`)、情绪评分口径配置弹窗(`components/dashboard/EmotionScoreConfigDialog.tsx`)、策略结果表格(`components/screener/ScreenerTable.tsx`)、合成策略弹窗(`components/screener/CompositeStrategyDialog.tsx`)、因子转信号弹窗(`pages/backtest/AddFactorSignalDialog.tsx`)、自定义分析菜单页(`pages/Analysis.tsx`)、AI 财务分析弹窗(`components/financials/AiAnalysisDialog.tsx`)、AI 助手抽屉(`custom/assistant/ui/AssistantDrawer.tsx`)、主看板页(`pages/Dashboard.tsx`)、API Key 设置页(`pages/settings/Keys.tsx`)、自定义信号弹窗(`components/signals/CustomSignalDialog.tsx`)。
+
+**后端错误文案本地化**:后端 `HTTPException` 的 detail 是中文句子,前端直接渲染会在英文/日文模式下露出中文。前端新增 `src/lib/api-errors.ts`:按「固定写法 + 可变参数」匹配已知后端文案(如 `分析菜单 'concept' 不存在`),命中就换成可本地化模板,未命中的原样返回(不丢信息)。`src/lib/api.ts` 的统一请求入口在构造错误消息时调用它,因此**所有**接口错误都自动本地化;后端文案本身保持中文不动,不引入 i18n 依赖也不破坏既有 API 契约。发现新的后端文案时往 `PATTERNS` 里加一条即可。
+
+**数据常量豁免**:像「沪主板 / 深主板 / 创业板」这类业务标识不能翻译,整行加 `// i18n-exempt` 注释即可被审计器跳过。跨多行的字面量(生成的 Python 策略代码模板等)把标记写在**语句前一行**同样生效。
+
+**迁移工具**:`scripts/i18n-apply-phrases.mjs` 用 **TypeScript AST** 判定每个中文字面量 / JSX 文本所处的位置,只对展示型位置自动接入 `tx()`,数据常量与比较值一律报告交人工判定。配套 `scripts/i18n-audit.mjs` 负责审计与待办清单生成;`scripts/i18n-collect.mjs` 列出单个文件里唯一的中文短语及其位置分类,便于逐条撰写译文;`scripts/i18n-add-phrases.mjs` 把人工补写的译文补进 `src/locales/phrases.ts`;`scripts/i18n-module-tx.mjs` 单独扫模块作用域里的 `tx()` 调用(语言冻结类问题审计器看不见);`scripts/i18n-detail.mjs` 按文件打印审计明细,便于定位残留的少数几处。全部都必须紧跟 `tsc -b` 与上述护栏测试,一旦变红立即回退该文件。
+
+**两条必须遵守的迁移约定**:
+
+1. **模块级常量不能直接调 `tx()`**——`const MAP = { a: tx('中文') }` 在模块加载时求值,会冻结住当时的语言,切语言后不刷新。正确做法是常量里存中文键,在渲染处再 `tx()`(与 `lib/stock-table.ts` 的 `SIGNAL_FIELDS` 一致)。
+2. **含变量的文案用 `tx('中文 {n} 个', { n })`**,不要用模板字符串拼接中文,否则模板整体会被审计器判为未本地化。
+3. **图表文案要随语言切换重算**:ECharts 配置放在 `useMemo` 里时,必须把 `locale` 加进依赖数组(用 `useI18n()` 取),否则切换语言后图例/轴名仍是旧语言。
+4. **组件要用 `useI18n()` 取 `tx`**:直接 import 的 `tx()` 虽然每次调用都读当前语言,但组件不会因语言变化而重新渲染。`scripts/i18n-reactive.mjs` 可自动给使用了 `tx()` 的**顶层组件**补上 `const { tx } = useI18n()`——它只扫组件自身的语句,不会进入嵌套函数(在嵌套函数里调 Hook 会直接崩掉)。
+5. **字符串字面量里的首尾空格是有语义的**:`'本机 ' + version` 包裹成 `tx('本机')` 会把空格吃掉,渲染变成「本机0.8.0」。迁移器已改为把空格还原到 `tx()` 调用两侧(`tx('本机') + ' '`),但**回退到旧版迁移器生成过的文件时必须复查这类拼接**。
+6. **迁移一个页面要连带它的子组件**:页面文件本身归零不代表整页归零——弹窗、分组条、工具条等常在独立文件里,必须按「用户实际看到的路径」整条链一起迁。
+7. **业务数据不翻译,但要确认它确实是数据**:因子目录里的「超买超卖」「乖离」、板块名「沪主板」这类是后端返回的业务数据,保持原样;但页面**外壳**文案必须翻译。浏览器实测能快速区分两者。
+8. **模块级 helper 也要能用 `tx()`**:若模块作用域里有函数调用 `tx()`,`i18n-reactive` 会保留 `import { tx, useI18n }` 以免组件内的同名变量遮蔽后找不到 `tx`。
+9. **外部 URL 不翻译**:像 GitHub 文档锚点 `#用-ai-生成映射配置` 这种路径片段属于数据,整行加 `// i18n-exempt` 豁免。
+10. **比较值绝不能包 `tx()`**:`boardFilter === tx('主板')` 在英文下会拿英文标签去比中文状态,筛选直接失效。筛选键、状态枚举、分组名这类**稳定中文键**要原样保留,只把**展示位**翻译(`label: tx(b)`);若渲染处还要复用同一个键,就把中文键提成模块常量(`const LATEST_LABEL = '最新'`)再比较。
+11. **模块级 `tx()` 是语言冻结的隐形 bug**:模块常量里的 `tx('中文')` 在 import 时求值,切语言后不刷新。常量里存中文键、渲染处再 `tx()`;确实要在模块级 helper 里翻译时,`i18n-reactive` 会保留 `import { tx, useI18n }`,并用 `scripts/i18n-module-tx.mjs` 复查残留。
+12. **批量写多语言文本要防字符损坏**:撰写译文时个别日文字符可能被写成 U+FFFD(替换字符)、谚文区码点或夹带英文碎片,肉眼像日文但实际是坏字符;`i18n.coverage.test.ts` 里的 U+FFFD / 谚文 / 英文碎片 / EN-JA 键集合一致性断言专门拦这一类。发现后**按码点修复**(`String.fromCodePoint`),不要重新手打整句。注意:**不要相信工具输出里显示的日文**,必须用脚本按码点核对。
+13. **迁移器写入源码前必须转义**:多行字符串直接写进 `tx('…')` 或 JSX 属性会直接造成语法错误(换行/制表符/反斜杠都要转义);`i18n-apply-phrases.mjs` 已统一用模块级 `q()` 转义。
+14. **「词库已覆盖」不等于「已翻译」**
+15. **`tx(cond ? 'A' : 'B')` 这种写法审计器识别不到**:字面量的父节点是三元表达式而不是 `tx()` 调用,审计器会继续把它当未本地化。要写成 `cond ? tx('A') : tx('B')`,每支各自包一层。同理 `tx(变量)` 里的中文字面量也必须直接作为 `tx()` 的实参。:审计器对非 JSX 字面量采用「词库里有该短语就放行」策略(视作数据键)。但模块级常量若其实是展示文案(例如 `const SECTIONS = [{ label: '扩展页面' }]`),词库一旦有该短语,审计就会放行,而渲染处若只写 `{s.label}`,切语言后仍是中文。正确做法:常量里存中文键、渲染处写 `{tx(s.label)}`;已迁完的文件用 `scripts/i18n-module-labels.mjs` 复查。
+
+---
+
+## 🌏 日美股市 AI 分析(Japan / US)
+
+侧栏「日美股市 AI」为独立扩展页(`official.global-analysis`),覆盖日本与美国股市的市场概览与个股分析:
+
+- **行情来源**:`backend/app/services/global_market_data.py` 以 Yahoo Finance 日线为外部来源,按交易所本地交易日归一(JP `Asia/Tokyo`,US `America/New_York`),复用既有指标与关键价位计算(`compute_indicators` / `compute_levels`)
+- **市场概览**:基准指数与宏观锚(USD/JPY、VIX、美债 10Y)、行业 ETF、代表性龙头股、最新财经头条;JP / US 各自维护标的目录
+- **个股分析**:日 K + MA/MACD/KDJ/RSI/布林带/ATR/量比 + 关键价位 + 52 周位置 + 新闻标题
+- **AI 报告**:NDJSON 流式输出,市场与个股两套提示词,按界面语言生成;提示词硬性禁止买卖、目标价、仓位类指令,只输出客观技术状态与风险情景
+- **报告存档**:可保存、查看、删除历史报告(最多 50 条),区分市场与报告类型
+- **依赖**:AI 分析复用「设置 → AI」已配置的模型服务;未配置时前端给出明确提示,不产生空报告
+
+---
+
 ## 🏆 连板梯队 & 概念分析
 
 - **连板梯队**:实时统计各连板层级(首板 / 2 连板 / 3 连板...)的标的与封单,捕捉市场情绪与题材热度

@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import type { SeriesMarker, Time } from 'lightweight-charts'
 import type { ChartMarker, DailyChartProps, OHLC } from '@/lib/chart-types'
-import { SUB_CHART_META, volMaN, volumeRatioAt } from '@/lib/chart-indicators'
+import { SUB_CHART_META, subChartLabel, volMaN, volumeRatioAt } from '@/lib/chart-indicators'
 import { CHART_COLORS as C, lineData, validDailyRows, type PlotSeries } from '@/lib/lightweight-model'
 import { fmtVolume, fmtPct, pricePrecision } from '@/lib/format'
 import { CHART_LAYOUT, plotPaneHeights } from '@/lib/chart-layout'
 import { useTheme, type Theme } from '@/lib/theme'
+import { useI18n } from '@/lib/i18n'
 import { FinancialPlot } from './FinancialPlot'
 import type { AnnotationData } from './ChartAnnotations'
 
@@ -54,6 +55,7 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
   const rows = useMemo(() => validDailyRows(data), [data])
   const precision = pricePrecision(assetType)
   const theme = useTheme()
+  const { locale, tx } = useI18n()
   const color = (key: keyof typeof LINE_COLORS) => LINE_COLORS[key][theme]
   const volumeMAs = useMemo(() => ({ 5: volMaN(rows, 5), 10: volMaN(rows, 10) }), [rows])
   const scope = `${symbol}:${rows[0]?.date ?? ''}:${ranges?.map(range => `${range.start}:${range.end}`).join(';') ?? ''}`
@@ -130,15 +132,15 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     const ratio = volumeRatioAt(rows, idx, volumeCompare.days)
     return ratio == null ? [] : [{ time: row.date, value: row.volume ?? 0, text: `${ratio.toFixed(1)}x` }]
   }) : [], [rows, volumeCompare.enabled, volumeCompare.days])
-  const paneTitles = useMemo(() => ['', ...selected.map(key => SUB_CHART_META.find(d => d.key === key)!.label)], [selected])
+  const paneTitles = useMemo(() => ['', ...selected.map(key => subChartLabel(SUB_CHART_META.find(d => d.key === key)!))], [selected, locale])
   const paneReadouts = useMemo(() => [[], ...selected.map(key => {
     const result: NonNullable<AnnotationData['readouts']> = []
     if (key === 'vol') {
-      result.push({ text: `量 ${volume(current?.volume)}`, color: current ? color(current.close >= current.open ? 'up' : 'down') : undefined })
+      result.push({ text: tx('量 {v}', { v: volume(current?.volume) }), color: current ? color(current.close >= current.open ? 'up' : 'down') : undefined })
       for (const [n, token] of [[5, 'yellow'], [10, 'purple']] as const) result.push({ text: `VOL${n} ${volume(volumeMAs[n][i])}`, color: color(token) })
       if (volumeCompare.enabled) {
         const ratio = volumeRatioAt(rows, i, volumeCompare.days)
-        result.push({ text: `量比 ${ratio == null ? '—' : `${ratio.toFixed(2)}x`}` })
+        result.push({ text: tx('量比 {v}', { v: ratio == null ? '—' : `${ratio.toFixed(2)}x` }) })
       }
     } else {
       for (const [field, label, token] of fields[key as keyof typeof fields]) result.push({ text: `${label} ${price(current?.[field], key === 'macd' ? 3 : 1)}`, color: color(token) })
@@ -154,23 +156,23 @@ export function LightweightDaily({ data, assetType, symbol = '', height = 480, a
     {showInfoBar && <div className="min-h-16 border-b border-border/50 px-3 py-2 text-[11px] font-mono tabular-nums xl:h-16">
       <div className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1">
         <span className="font-medium text-foreground">{current?.date ?? '—'}</span>
-        {currentEvent && <span style={{ color: eventTextColor(currentEvent, current, theme) }} title="阴阳按收盘价与开盘价判断，影线保留原来的涨跌色">
-          {currentEvent.event === 'limit_down' ? '跌停' : currentEvent.event === 'broken_limit_up' || currentEvent.event === 'limit_down_recovery'
-            ? `${currentEvent.event === 'broken_limit_up' ? '炸板' : '翘板'} · ${current.close > current.open ? '收阳' : current.close < current.open ? '收阴' : '开收同价'}`
-            : currentEvent.label && /^\d+$/.test(currentEvent.label) ? `${currentEvent.label}连板` : '涨停'}
+        {currentEvent && <span style={{ color: eventTextColor(currentEvent, current, theme) }} title={tx('阴阳按收盘价与开盘价判断，影线保留原来的涨跌色')}>
+          {currentEvent.event === 'limit_down' ? tx('跌停') : currentEvent.event === 'broken_limit_up' || currentEvent.event === 'limit_down_recovery'
+            ? `${currentEvent.event === 'broken_limit_up' ? tx('炸板') : tx('翘板')} · ${current.close > current.open ? tx('收阳') : current.close < current.open ? tx('收阴') : tx('开收同价')}`
+            : currentEvent.label && /^\d+$/.test(currentEvent.label) ? tx('{v1}连板', { v1: currentEvent.label }) : tx('涨停')}
         </span>}
-        {([['开', current?.open], ['高', current?.high], ['低', current?.low], ['收', current?.close]] as const).map(([name, value]) =>
+        {([[tx('开'), current?.open], [tx('高'), current?.high], [tx('低'), current?.low], [tx('收'), current?.close]] as const).map(([name, value]) =>
           <span key={name} className="text-muted">{name} <span className="text-secondary">{price(value, precision)}</span></span>)}
         {change != null && <span style={{ color: change >= 0 ? C.up : C.down }}>{fmtPct(change)}</span>}
-        {turnover != null && <span className="text-muted">换手 {fmtPct(turnover)}</span>}
+        {turnover != null && <span className="text-muted">{tx('换手')} {fmtPct(turnover)}</span>}
       </div>
       <div className="mt-1 flex min-h-4 flex-wrap gap-x-4 gap-y-1 text-[10px]">
         {showMA && maFields.map(([field, token]) => <span key={field} style={{ color: color(token) }}>{field.toUpperCase()} {price(current?.[field], precision)}</span>)}
-        {activeIndicators.includes('boll') && <span className="inline-flex flex-wrap gap-x-3" aria-label="BOLL 读数">
+        {activeIndicators.includes('boll') && <span className="inline-flex flex-wrap gap-x-3" aria-label={tx('BOLL 读数')}>
           <span className="text-muted">BOLL</span>
-          {bollFields.map(([field, label, token]) => <span key={field} style={{ color: color(token) }}>{`${label} ${price(current?.[field], precision)}`}</span>)}
+          {bollFields.map(([field, label, token]) => <span key={field} style={{ color: color(token) }}>{`${tx(label)} ${price(current?.[field], precision)}`}</span>)}
         </span>}
-        {index >= 0 && previous && <span className="text-secondary">至今 <span style={{ color: rows.at(-1)!.close >= previous.close ? C.up : C.down }}>{fmtPct(rows.at(-1)!.close / previous.close - 1)}</span> · 周期 {rows.length - index}</span>}
+        {index >= 0 && previous && <span className="text-secondary">{tx('至今')} <span style={{ color: rows.at(-1)!.close >= previous.close ? C.up : C.down }}>{fmtPct(rows.at(-1)!.close / previous.close - 1)}</span> · {tx('周期')} {rows.length - index}</span>}
       </div>
     </div>}
     <FinancialPlot scope={scope} series={model} height={plotHeight} paneHeights={paneHeights} pricePrecision={precision}

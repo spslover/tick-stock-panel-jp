@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from app.market_time import CN_TZ, cn_today
 from app.plugins.tdxquant import client as tc
 from app.plugins.tdxquant import provider as tp
 from app.plugins.tdxquant.provider import TdxQuantProvider
@@ -778,8 +779,9 @@ def test_minute_zero_parse_diagnostic_rate_limited(caplog):
 
 def test_get_intraday_batch_today_only():
     fake = _FakeClient()
-    today = date.today().strftime("%Y%m%d")
-    yday = (date.today() - timedelta(days=1)).strftime("%Y%m%d")
+    today_d = cn_today()
+    today = today_d.strftime("%Y%m%d")
+    yday = (today_d - timedelta(days=1)).strftime("%Y%m%d")
     fake.his = {"600519.SH": _minute_raw([
         (yday, "150000", 1250.0, 1250.0, 1250.0, 1250.0, 100_000.0, 12_500.0),  # 前日余量 → 过滤
         (today, "093100", 1255.0, 1256.0, 1254.9, 1255.5, 123_400.0, 15_500.0),
@@ -793,7 +795,7 @@ def test_get_intraday_batch_today_only():
 def test_get_intraday_latest_universe_default():
     fake = _FakeClient()
     fake.universe = ["600000.SH", "000001.SZ"]
-    today = date.today().strftime("%Y%m%d")
+    today = cn_today().strftime("%Y%m%d")
     for sym in fake.universe:
         fake.his[sym] = _minute_raw([
             (today, "093100", 10.0, 10.1, 9.9, 10.0, 50_000.0, 500.0),
@@ -808,6 +810,7 @@ def test_get_intraday_latest_universe_default():
 def test_test_dataset_minute(monkeypatch):
     # 试拉窗口 [now-3d, now] 依赖真实时钟, 冻结到 _FixedDT 保证任意时区/时刻可复现
     monkeypatch.setattr(tp, "datetime", _FixedDT)
+    monkeypatch.setattr(tp, "cn_now", lambda: _FixedDT.now(CN_TZ))
     fake = _FakeClient()
     fake.his = {"600519.SH": _minute_raw([
         ("20261011", "093100", 1255.0, 1256.0, 1254.9, 1255.5, 123_400.0, 15_500.0),

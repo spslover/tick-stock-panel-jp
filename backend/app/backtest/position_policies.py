@@ -21,11 +21,16 @@ import secrets
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
-from app.backtest.position_sizing import ComputeFn, smoke_compute
+from app.backtest.position_sizing import ComputeFn, PositionSizingContext, PositionSizingResult
 from app.services.fs_utils import atomic_write_text
 from app.strategy.ai_generator import AIStrategyGenerator
+from app.strategy.sandbox_runner import (
+    SandboxSession,
+    create_session,
+    run_position_policy,
+    smoke_position_policy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -160,8 +165,41 @@ def _safety_issues(code: str) -> list[str]:
         return [f"安全校验失败: {e}"]
 
 
+_POLICY_MEMORY_LIMIT_BYTES = 768 * 1024 * 1024
+
+
+class _SandboxedPolicyCallable:
+    """Out-of-process sandbox proxy for PolicyDefinition.compute(ctx)."""
+
+    def __init__(self, code: str, source_hint: str) -> None:
+        self._code = code
+        self._source_hint = source_hint
+        self._lock = threading.Lock()
+        self._session: SandboxSession | None = None
+
+    def __call__(self, ctx: PositionSizingContext) -> PositionSizingResult:
+        with self._lock:
+            if self._session is None:
+                self._session = create_session(
+                    memory_limit_bytes=_POLICY_MEMORY_LIMIT_BYTES,
+                    cpu_limit_s=30,
+                )
+            return run_position_policy(
+                self._code,
+                ctx,
+                source_hint=self._source_hint,
+                session=self._session,
+            )
+
+    def close(self) -> None:
+        with self._lock:
+            if self._session is not None:
+                self._session.close()
+                self._session = None
+
+
 def validate_policy_code(code: str) -> dict:
-    """三关校验 (安全 → 结构 → 冒烟); 返回 {ok, issues, smoke}。"""
+    """三关校验 (安全 → 结构 → 沙箱冒烟); 返回 {ok, issues, smoke}。"""
     issues: list[str] = []
     if len(code) > MAX_CODE_CHARS:
         issues.append(f"代码超过 {MAX_CODE_CHARS} 字符上限")
@@ -170,34 +208,25 @@ def validate_policy_code(code: str) -> dict:
     issues.extend(_structural_issues(code))
     smoke: dict | None = None
     if not issues:
-        loaded = _exec_policy(code, source_hint="<validate>")
-        if isinstance(loaded, Exception):
-            issues.append(f"加载失败: {loaded}")
+        sandbox_res = smoke_position_policy(code, source_hint="<validate>")
+        if not sandbox_res["ok"]:
+            issues.extend(sandbox_res["issues"])
         else:
-            smoke = smoke_compute(loaded.compute)
-            if not smoke["ok"]:
-                issues.extend(smoke["issues"])
-                smoke = None
+            smoke = sandbox_res["smoke"]
     return {"ok": not issues, "issues": issues, "smoke": smoke}
 
 
-def _exec_policy(code: str, *, source_hint: str) -> PolicyDefinition | Exception:
-    """编译执行策略文件 → PolicyDefinition; 任何失败返回异常本体 (不抛)。"""
+def _build_policy_definition(code: str, *, source_hint: str) -> PolicyDefinition | Exception:
+    """纯静态解析策略元数据并绑定沙箱执行代理 (不在宿主进程 exec 用户代码)。"""
     try:
         meta, _ = parse_policy_file(code)
         meta = _normalize_meta(meta)
-        module_name = f"position_policy_{meta['id']}_{secrets.token_hex(4)}"
-        ns: dict[str, Any] = {"__name__": module_name}
-        exec(compile(code, source_hint, "exec"), ns)
-        compute = ns.get("compute")
-        if not callable(compute):
-            raise ValueError("compute 不是可调用对象")
         return PolicyDefinition(
             id=meta["id"],
             label=meta["label"],
             description=meta["description"],
             params=tuple(meta["params"]),
-            compute=compute,
+            compute=_SandboxedPolicyCallable(code, source_hint),
             source_file=source_hint,
         )
     except Exception as e:  # noqa: BLE001 — 调用方按 fail-closed 处理
@@ -215,6 +244,15 @@ class _Snapshot:
 
 _LOCK = threading.Lock()
 _CACHE: dict[str, _Snapshot] = {}
+
+
+def _close_snapshot_sessions(snap: _Snapshot | None) -> None:
+    if snap is None:
+        return
+    for policy in snap.policies.values():
+        close_fn = getattr(policy.compute, "close", None)
+        if callable(close_fn):
+            close_fn()
 
 
 def _dir_signature(d: Path) -> tuple:
@@ -247,7 +285,7 @@ def _snapshot(data_dir: Path) -> _Snapshot:
             if issues:
                 errors[f.name] = "; ".join(issues)
                 continue
-            loaded = _exec_policy(code, source_hint=str(f))
+            loaded = _build_policy_definition(code, source_hint=str(f))
             if isinstance(loaded, Exception):
                 errors[f.name] = f"加载失败: {loaded}"
                 continue
@@ -257,7 +295,10 @@ def _snapshot(data_dir: Path) -> _Snapshot:
             policies[loaded.id] = loaded
     snap = _Snapshot(signature=sig, policies=policies, errors=errors)
     with _LOCK:
+        old = _CACHE.get(key)
         _CACHE[key] = snap
+    if old is not None and old is not snap:
+        _close_snapshot_sessions(old)
     return snap
 
 
@@ -284,7 +325,10 @@ def get_policy(data_dir: Path, policy_id: str) -> PolicyDefinition | None:
 
 def invalidate_cache() -> None:
     with _LOCK:
+        old_snaps = list(_CACHE.values())
         _CACHE.clear()
+    for snap in old_snaps:
+        _close_snapshot_sessions(snap)
 
 
 # ── 保存 / 删除 (API 层调用, 三关全过才写盘) ────────────────────

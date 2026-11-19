@@ -1498,6 +1498,7 @@ _UI_PREFS_KEYS = (
     # JSON 文本沿用标量契约，保存统一策略池的 ID 顺序与显式空选择。
     "strategy_pool",
     "theme",
+    "locale",
 )
 _UI_PREFS_MAX_JSON = 16 * 1024
 
@@ -1526,6 +1527,8 @@ def set_ui_prefs(updates: dict) -> dict:
                 continue
             if key == "theme" and value not in ("light", "dark", None):
                 raise ValueError("ui_prefs.theme 仅接受 light / dark")
+            if key == "locale" and value not in ("zh-CN", "en", "ja", None):
+                raise ValueError("ui_prefs.locale 仅接受 zh-CN / en / ja")
             if key == "strategy_pool" and value is not None:
                 try:
                     pool = json.loads(value)

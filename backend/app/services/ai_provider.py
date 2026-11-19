@@ -134,6 +134,23 @@ def build_focus_instruction(focus: str, *, report_name: str = "分析报告") ->
     return "\n".join(lines)
 
 
+def language_instruction(locale: str | None) -> str:
+    """Return an optional output-language directive for non-zh-CN UI locales."""
+    val = str(locale or "").strip().lower()
+    if val == "en" or val.startswith("en-"):
+        return (
+            "\n\n## Output Language Requirement\n"
+            "Write the entire response and all section headings in natural, "
+            "professional **English**."
+        )
+    if val == "ja" or val.startswith("ja-"):
+        return (
+            "\n\n## 出力言語の指定\n"
+            "レポート全文および各セクション見出しを自然で専門的な**日本語**で出力してください。"
+        )
+    return ""
+
+
 def current_ai_provider() -> str:
     return secrets_store.get_ai_config("ai_provider", settings.ai_provider) or OPENAI_COMPAT_PROVIDER
 

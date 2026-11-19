@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { MarkdownRenderer } from '@/components/financials/MarkdownRenderer'
 import { cn } from '@/lib/cn'
+import { tx, useI18n } from '@/lib/i18n'
 import type { ChatMessage, ToolCallRecord } from '../store'
 import { decideAction } from '../store'
 import { DailyChartCard } from './DailyChartCard'
@@ -55,13 +56,13 @@ export const AssistantMessage = memo(function AssistantMessage({
 
 /** 回答完成后的固定合规提示: 风险 + 数据口径。前端固定渲染, 不依赖模型自觉追加。 */
 function AnswerDisclaimer() {
+  const { tx } = useI18n()
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 border-t border-border/60 pt-1.5 text-[10px] leading-relaxed text-muted">
       <span className="inline-flex items-center gap-1">
         <ShieldAlert className="h-3 w-3 shrink-0" />
-        风险提示: AI 生成内容仅供参考, 不构成投资建议
-      </span>
-      <span>数据为本地快照, 可能存在延迟或口径差异, 请以交易所官方披露为准</span>
+        {tx('风险提示: AI 生成内容仅供参考, 不构成投资建议')}</span>
+      <span>{tx('数据为本地快照, 可能存在延迟或口径差异, 请以交易所官方披露为准')}</span>
     </div>
   )
 }
@@ -71,8 +72,9 @@ function Cursor() {
 }
 
 function ThinkingDots() {
+  const { tx } = useI18n()
   return (
-    <div className="flex items-center gap-1 py-1" aria-label="思考中">
+    <div className="flex items-center gap-1 py-1" aria-label={tx('思考中')}>
       {[0, 1, 2].map(i => (
         <motion.span
           key={i}
@@ -115,7 +117,7 @@ const TOOL_LABELS: Record<string, string> = {
 }
 
 function toolLabel(name: string): string {
-  return TOOL_LABELS[name]
+  return tx(TOOL_LABELS[name] ?? name)
 }
 
 /** 足迹组: 工具足迹卡 + 附带可绘图数据的走势小卡(始终可见, 不藏在展开区)。 */
@@ -142,6 +144,7 @@ export const FootprintGroup = memo(function FootprintGroup({ calls }: { calls: T
 })
 
 export const FootprintCard = memo(function FootprintCard({ calls }: { calls: ToolCallRecord[] }) {
+  const { tx } = useI18n()
   const [expanded, setExpanded] = useState(false)
   if (!calls.length) return null
 
@@ -165,18 +168,18 @@ export const FootprintCard = memo(function FootprintCard({ calls }: { calls: Too
         <Wrench className="h-3.5 w-3.5 shrink-0 text-muted" />
         <span className={cn(active && 'animate-pulse')}>
           {awaiting
-            ? `等待确认操作 (${done.length}/${calls.length})…`
+            ? tx('等待确认操作 ({done}/{total})…', { done: done.length, total: calls.length })
             : running
-              ? `正在调用工具 (${done.length}/${calls.length})…`
-              : `已调用 ${calls.length} 个工具`}
+              ? tx('正在调用工具 ({done}/{total})…', { done: done.length, total: calls.length })
+              : tx('已调用 {n} 个工具', { n: calls.length })}
         </span>
         {!active && done.length > 0 && (
           <span className="font-mono text-muted">
             · {totalMs >= 1000 ? `${(totalMs / 1000).toFixed(1)}s` : `${totalMs}ms`}
           </span>
         )}
-        {hasError && !active && <span className="text-danger">· 部分失败</span>}
-        {awaiting && <span className="text-danger">· 需要确认</span>}
+        {hasError && !active && <span className="text-danger">{tx('· 部分失败')}</span>}
+        {awaiting && <span className="text-danger">{tx('· 需要确认')}</span>}
         <ChevronDown
           className={cn('ml-auto h-3.5 w-3.5 shrink-0 text-muted transition-transform duration-150 ease-smooth', expanded && 'rotate-180')}
         />
@@ -193,6 +196,7 @@ export const FootprintCard = memo(function FootprintCard({ calls }: { calls: Too
 })
 
 function ToolCallRow({ call }: { call: ToolCallRecord }) {
+  const { tx } = useI18n()
   const hasArgs = Object.keys(call.args ?? {}).length > 0
   return (
     <div className="text-xs">
@@ -219,7 +223,7 @@ function ToolCallRow({ call }: { call: ToolCallRecord }) {
       )}
       {hasArgs && (
         <details className="mt-0.5 pl-5 text-muted">
-          <summary className="cursor-pointer select-none text-[11px] hover:text-secondary">参数</summary>
+          <summary className="cursor-pointer select-none text-[11px] hover:text-secondary">{tx('参数')}</summary>
           <pre className="mt-1 overflow-x-auto rounded-btn bg-elevated/60 p-2 font-mono text-[11px] leading-relaxed text-secondary">
             {JSON.stringify(call.args, null, 2)}
           </pre>
@@ -234,13 +238,14 @@ function ToolCallRow({ call }: { call: ToolCallRecord }) {
  * 可核对铁律), 确认/取消 POST 决策端点; 120 秒未决策后端自动拒绝。
  */
 function ConfirmCard({ call }: { call: ToolCallRecord }) {
+  const { tx } = useI18n()
   const confirm = call.confirm!
   const isRounds = call.name === '__rounds'
   return (
     <div className="mt-1 ml-5 rounded-card border border-border bg-elevated/60 p-2">
       <div className="flex items-center gap-1.5 text-foreground">
         <ShieldAlert className="h-3.5 w-3.5 shrink-0 text-danger" />
-        <span className="font-medium">{confirm.label}{isRounds ? ' · 需要你的选择' : ' · 需要你的确认'}</span>
+        <span className="font-medium">{confirm.label}{isRounds ? ' ' + tx('· 需要你的选择') : ' ' + tx('· 需要你的确认')}</span>
       </div>
       <div className="mt-1 leading-relaxed text-secondary">{confirm.risk}</div>
       {Object.keys(call.args ?? {}).length > 0 && (
@@ -254,17 +259,17 @@ function ConfirmCard({ call }: { call: ToolCallRecord }) {
           onClick={() => { void decideAction(call.callId, true) }}
           className="cursor-pointer rounded-btn bg-accent/15 px-2.5 py-1 font-medium text-accent transition-colors duration-150 ease-smooth hover:bg-accent/25"
         >
-          {isRounds ? '继续' : '确认执行'}
+          {isRounds ? tx('继续') : tx('确认执行')}
         </button>
         <button
           type="button"
           onClick={() => { void decideAction(call.callId, false) }}
           className="cursor-pointer rounded-btn px-2.5 py-1 text-secondary transition-colors duration-150 ease-smooth hover:bg-elevated hover:text-foreground"
         >
-          {isRounds ? '停止' : '取消'}
+          {isRounds ? tx('停止') : tx('取消')}
         </button>
         <span className="text-[10px] text-muted">
-          {isRounds ? '120 秒内未选择将自动停止' : '120 秒内未确认将自动取消'}
+          {isRounds ? tx('120 秒内未选择将自动停止') : tx('120 秒内未确认将自动取消')}
         </span>
       </div>
     </div>
@@ -282,7 +287,8 @@ export const ErrorBubble = memo(function ErrorBubble({
   hint?: string
   onRetry?: () => void
 }) {
-  const title = ERROR_TITLES[kind] ?? '出错了'
+  const { tx } = useI18n()
+  const title = tx(ERROR_TITLES[kind] ?? '出错了')
   return (
     <div className="border-l-2 border-danger pl-3 text-sm">
       <div className="flex items-center gap-1.5 font-medium text-danger">
@@ -297,8 +303,7 @@ export const ErrorBubble = memo(function ErrorBubble({
             onClick={onRetry}
             className="cursor-pointer rounded-btn px-2 py-0.5 text-accent transition-colors duration-150 ease-smooth hover:bg-accent/10"
           >
-            重试
-          </button>
+            {tx('重试')}</button>
         )}
         {hint && <span className="font-mono text-muted">{hint}</span>}
       </div>

@@ -3,6 +3,7 @@ import type { KlineRow, LevelSeries } from '@/lib/api'
 import type { OHLC } from '@/lib/chart-types'
 import type { PlotSeries } from '@/lib/lightweight-model'
 import { validDailyRows } from '@/lib/lightweight-model'
+import { tx } from '@/lib/i18n'
 
 /**
  * 个股分析「关键价位」图表的纯数据模型。
@@ -268,7 +269,7 @@ export function buildAnalysisChartModel(input: AnalysisChartInput): AnalysisChar
     const state = curveState(hoveredKey, def.group)
     lines.push({
       value: lastValue,
-      label: `${def.endLabel} ${lastValue.toFixed(precision)}`,
+      label: `${tx(def.endLabel)} ${lastValue.toFixed(precision)}`,
       color: curveLabelColor(def.color, state),
       noLine: true,
       opacity: 1,

@@ -44,15 +44,34 @@ def export_backup(categories: str = "") -> Response:
 
 
 async def _read_upload(file: UploadFile) -> bytes:
-    data = await file.read()
-    if not data:
-        raise HTTPException(status_code=400, detail="空文件")
-    if len(data) > config_backup.MAX_ARCHIVE_BYTES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"备份文件超过 {config_backup.MAX_ARCHIVE_BYTES // 1024 // 1024}MB 上限",
-        )
-    return data
+    max_bytes = config_backup.MAX_ARCHIVE_BYTES
+    limit_mb = max_bytes // 1024 // 1024
+    try:
+        file_size = getattr(file, "size", None)
+        if isinstance(file_size, int) and file_size > max_bytes:
+            raise HTTPException(
+                status_code=400,
+                detail=f"备份文件超过 {limit_mb}MB 上限",
+            )
+        chunks: list[bytes] = []
+        total = 0
+        chunk_size = 64 * 1024
+        while True:
+            chunk = await file.read(chunk_size)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_bytes:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"备份文件超过 {limit_mb}MB 上限",
+                )
+            chunks.append(chunk)
+        if total == 0:
+            raise HTTPException(status_code=400, detail="空文件")
+        return b"".join(chunks)
+    finally:
+        await file.close()
 
 
 @router.post("/inspect")
@@ -85,20 +104,81 @@ def _apply_backup(request: Request, data: bytes, allow_overwrite: bool, categori
         )
     except config_backup.ConfigBackupError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    _reload_states(request, result.get("reload_hints") or {})
+    _reload_states(request, result)
     return result
 
 
-def _reload_states(request: Request, hints: dict) -> None:
-    """按导入结果刷新进程内状态 (与 monitor_rules API 的 _sync_engine 同模式)。"""
-    if hints.get("strategies"):
-        engine = getattr(request.app.state, "strategy_engine", None)
-        if engine is not None:
-            engine.reload()
-    if hints.get("monitor_rules"):
-        monitor_engine = getattr(request.app.state, "monitor_engine", None)
-        if monitor_engine is not None:
-            rules = monitor_rules.load_all(request.app.state.repo.store.data_dir)
-            monitor_engine.set_rules(rules)
-    if hints.get("data_sources"):
+def _reload_states(request: Request, result: dict) -> None:
+    """按导入结果刷新进程内状态、缓存与会话 (与 monitor_rules API 同模式)。"""
+    hints = result.get("reload_hints") if "reload_hints" in result else result
+    if not isinstance(hints, dict):
+        hints = {}
+    imported_cats = {
+        c.get("key")
+        for c in (result.get("categories") or [])
+        if isinstance(c, dict) and c.get("imported", 0) > 0
+    }
+    secrets_merged = bool(result.get("secrets_merged"))
+    preferences_merged = bool(result.get("preferences_merged"))
+
+    app_state = getattr(getattr(request, "app", None), "state", None)
+    engine = getattr(app_state, "strategy_engine", None)
+    monitor_engine = getattr(app_state, "monitor_engine", None)
+    repo = getattr(app_state, "repo", None)
+    data_dir = getattr(getattr(repo, "store", None), "data_dir", None)
+
+    if hints.get("strategies") and engine is not None:
+        engine.reload()
+    if hints.get("monitor_rules") and monitor_engine is not None and data_dir is not None:
+        rules = monitor_rules.load_all(data_dir)
+        monitor_engine.set_rules(rules)
+    if (hints.get("strategies") or hints.get("monitor_rules")) and (
+        monitor_engine is not None and engine is not None and data_dir is not None
+    ):
+        try:
+            from app.strategy import paper_watch
+
+            paper_watch.sync(data_dir, monitor_engine, engine)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("config backup paper_watch sync failed (ignored): %s", e)
+
+    if hints.get("data_sources") or secrets_merged or "secrets" in imported_cats:
         custom_loader.load_all()
+
+    if hints.get("watchlist") or "watchlist" in imported_cats:
+        from app.services import watchlist
+
+        with watchlist._LOCK:
+            watchlist._REVISION += 1
+
+    if "auth" in imported_cats:
+        from app.services import auth as auth_service
+
+        auth_service.invalidate_all_sessions()
+
+    if secrets_merged or "secrets" in imported_cats:
+        from app import secrets_store
+        from app.tickflow import client as tf_client
+
+        secrets_store._cache = None
+        secrets_store._cache_sig = None
+        tf_client.reset_clients()
+
+    if preferences_merged or "preferences" in imported_cats:
+        from app.services import preferences
+
+        preferences._invalidate_cache()
+
+    if "history" in imported_cats:
+        from app.custom.assistant import sessions as assistant_sessions
+
+        assistant_sessions._cache = None
+        assistant_sessions._cache_sig = None
+
+    if "custom_factors" in imported_cats and data_dir is not None:
+        try:
+            from app.factors.store import load_runtime_registry
+
+            load_runtime_registry(data_dir)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("config backup custom_factors reload failed (ignored): %s", e)

@@ -12,7 +12,7 @@ const fixtures = vi.hoisted(() => ({
   resizes: [] as (() => void)[],
 }))
 
-vi.mock('echarts', () => ({
+vi.mock('@/lib/echarts', () => ({
   init: (dom: HTMLElement) => {
     const instance = {
       dom, option: null as any, disposed: false,

@@ -470,7 +470,7 @@ def test_limit_price_on_ex_div_with_later_event_uses_exchange_reference():
     assert d3["consecutive_limit_ups"][0] == 0
 
     d4 = df.filter(pl.col("date") == date(2024, 1, 5))
-    assert d4["limit_up_price"][0] == pytest.approx(7.725)
+    assert d4["limit_up_price"][0] == pytest.approx(7.735)
     assert d4["signal_limit_up"][0] is True
     assert d4["consecutive_limit_ups"][0] == 1
 

@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate, useSearchParams } from 'react-router-dom
 import { Layout } from './components/Layout'
 import { useSettings } from './lib/useSharedQueries'
 import { Logo } from './components/Logo'
+import { t } from './lib/i18n'
 import { ExtensionBoundary } from './extensions/ExtensionBoundary'
 import {
   finalizeFrontendExtensions,
@@ -80,7 +81,7 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
       <div className="min-h-full bg-base grid place-items-center">
         <div className="flex flex-col items-center gap-3 text-muted">
           <Logo size={28} className="text-foreground" />
-          <div className="text-xs">加载中…</div>
+          <div className="text-xs">{t('common.loading')}</div>
         </div>
       </div>
     )

@@ -34,7 +34,7 @@ _TOKEN_BYTES = 32
 # 会话有效期: 30 天(自托管单用户, 长一点减少重登频率)
 SESSION_TTL = 30 * 24 * 3600
 
-_lock = threading.Lock()
+_lock = threading.RLock()
 # 内存中的有效会话: { token: expire_ts }。进程重启后从磁盘恢复。
 _sessions: dict[str, float] = {}
 
@@ -42,12 +42,24 @@ _sessions: dict[str, float] = {}
 # 磁盘 (阻塞事件循环)。此处懒加载缓存, set_password 后失效重算 (仍返回最新真值)。
 _configured_cache: bool | None = None
 
+_MAX_FAILS = 5
+_LOCK_SECONDS = 300
+MAX_LOCKOUT_ENTRIES = 1024
+# 持久化失败计数: { ip: (fail_count, lock_until_ts, updated_at_ts) }
+_fail_counter: dict[str, tuple[int, float, float]] = {}
+_fail_loaded_path: Path | None = None
+
 
 def _path() -> Path:
     from app.config import settings
     p = settings.data_dir / "user_data" / "auth.json"
     p.parent.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def _lockouts_path() -> Path:
+    from app.config import settings
+    return settings.data_dir / "user_data" / "auth_lockouts.json"
 
 
 def _load() -> dict:
@@ -97,8 +109,23 @@ def invalidate_runtime_caches() -> None:
     否则新设备恢复的密码/会话在本进程内不可见。
     """
     global _configured_cache
-    _configured_cache = None
-    _restore_sessions()
+    with _lock:
+        _configured_cache = None
+        _restore_sessions()
+
+
+def invalidate_all_sessions() -> int:
+    """清空全部内存与持久化会话并重置配置缓存 (备份恢复/安全重置时强制重登)。"""
+    global _configured_cache
+    with _lock:
+        count = len(_sessions)
+        _sessions.clear()
+        _configured_cache = None
+        d = _load()
+        if d.get("sessions"):
+            d["sessions"] = {}
+            _save(d)
+        return count
 
 
 def is_configured() -> bool:
@@ -108,10 +135,11 @@ def is_configured() -> bool:
     首次或 set_password 失效后, 懒加载重读一次 auth.json, 保证返回最新真值。
     """
     global _configured_cache
-    if _configured_cache is None:
-        d = _load()
-        _configured_cache = bool(d.get("password_hash"))
-    return _configured_cache
+    with _lock:
+        if _configured_cache is None:
+            d = _load()
+            _configured_cache = bool(d.get("password_hash"))
+        return _configured_cache
 
 
 def set_password(password: str) -> None:
@@ -128,7 +156,7 @@ def set_password(password: str) -> None:
             "updated_at": int(time.time()),
             "sessions": {},  # 清空持久化会话
         })
-    _configured_cache = None  # 失效缓存, 下次 is_configured 重读最新真值
+        _configured_cache = None  # 失效缓存, 下次 is_configured 重读最新真值
     logger.info("access password set")
 
 
@@ -170,14 +198,20 @@ def bootstrap_from_env() -> bool:
 
 def verify_and_create_session(password: str) -> str | None:
     """验证密码, 成功则创建会话并返回 token, 失败返回 None。"""
-    d = _load()
-    if not d.get("password_hash"):
+    with _lock:
+        d = _load()
+        password_hash = d.get("password_hash")
+        password_salt = d.get("password_salt", "")
+    if not password_hash or not isinstance(password_hash, str):
         return None
-    if not _verify_password(password, d.get("password_salt", ""), d["password_hash"]):
+    if not _verify_password(password, str(password_salt), password_hash):
         return None
     token = _secrets.token_urlsafe(_TOKEN_BYTES)
     expire = time.time() + SESSION_TTL
     with _lock:
+        latest = _load()
+        if latest.get("password_hash") != password_hash:
+            return None
         _sessions[token] = expire
         _persist_sessions_locked()
     return token
@@ -215,15 +249,137 @@ def _persist_sessions_locked() -> None:
 def _restore_sessions() -> None:
     """启动时从 auth.json 恢复未过期会话(支持进程重启不丢登录态)。"""
     with _lock:
+        _sessions.clear()
         d = _load()
         now = time.time()
         saved = d.get("sessions") or {}
-        for token, expire in saved.items():
-            if isinstance(expire, (int, float)) and expire > now:
-                _sessions[token] = expire
-        if len(_sessions) != len(saved):
-            # 有过期会话被清理, 落盘一次
-            _persist_sessions_locked()
+        if isinstance(saved, dict):
+            for token, expire in saved.items():
+                if (
+                    isinstance(token, str)
+                    and isinstance(expire, (int, float))
+                    and expire > now
+                ):
+                    _sessions[token] = float(expire)
+            if len(_sessions) != len(saved):
+                # 有过期会话被清理, 落盘一次
+                _persist_sessions_locked()
+
+
+# ================================================================
+# 登录失败限流 (RLock + 有界持久化)
+# ================================================================
+
+def _ensure_lockouts_loaded_locked() -> None:
+    global _fail_loaded_path
+    p = _lockouts_path()
+    if _fail_loaded_path == p:
+        if not p.exists() and _fail_counter:
+            _fail_counter.clear()
+        return
+    _fail_counter.clear()
+    _fail_loaded_path = p
+    if not p.exists():
+        return
+    try:
+        raw = json.loads(p.read_text(encoding="utf-8"))
+        entries = raw.get("entries") if isinstance(raw, dict) else None
+        if isinstance(entries, dict):
+            now = time.time()
+            for ip, rec in entries.items():
+                if not isinstance(ip, str) or not isinstance(rec, dict):
+                    continue
+                try:
+                    count = int(rec.get("count", 0))
+                    until = float(rec.get("until", 0.0))
+                    updated_at = float(rec.get("updated_at", now))
+                except (TypeError, ValueError):
+                    continue
+                if until > now or (until == 0.0 and now - updated_at <= _LOCK_SECONDS):
+                    _fail_counter[ip] = (count, until, updated_at)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("auth_lockouts.json malformed: %s", e)
+
+
+def _save_lockouts_locked() -> None:
+    p = _lockouts_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "entries": {
+            ip: {"count": c, "until": u, "updated_at": ts}
+            for ip, (c, u, ts) in _fail_counter.items()
+        }
+    }
+    atomic_write_text(
+        p, json.dumps(payload, indent=2, ensure_ascii=False), mode=0o600,
+    )
+
+
+def _prune_lockouts_locked(now: float, lock_seconds: int = _LOCK_SECONDS) -> bool:
+    stale = [
+        ip
+        for ip, (_, until, updated_at) in _fail_counter.items()
+        if (until > 0.0 and until <= now) or (until == 0.0 and now - updated_at > lock_seconds)
+    ]
+    for ip in stale:
+        _fail_counter.pop(ip, None)
+    evicted = bool(stale)
+    if len(_fail_counter) > MAX_LOCKOUT_ENTRIES:
+        oldest = sorted(_fail_counter.items(), key=lambda item: item[1][2])
+        for ip, _ in oldest[: len(_fail_counter) - MAX_LOCKOUT_ENTRIES]:
+            _fail_counter.pop(ip, None)
+        evicted = True
+    return evicted
+
+
+def check_login_rate_limit(ip: str) -> int | None:
+    """检查登录失败限流; 若处于锁定期返回剩余等待秒数, 否则返回 None。"""
+    with _lock:
+        _ensure_lockouts_loaded_locked()
+        rec = _fail_counter.get(ip)
+        if rec is None:
+            return None
+        _, until, _ = rec
+        now = time.time()
+        if until > now:
+            return max(1, int(until - now))
+        if until and until <= now:
+            _fail_counter.pop(ip, None)
+            _save_lockouts_locked()
+        return None
+
+
+def record_login_fail(
+    ip: str,
+    *,
+    max_fails: int = _MAX_FAILS,
+    lock_seconds: int = _LOCK_SECONDS,
+) -> tuple[int, float]:
+    """记录一次登录失败, 达阈值则锁定。返回 (count, until)。"""
+    with _lock:
+        _ensure_lockouts_loaded_locked()
+        now = time.time()
+        _prune_lockouts_locked(now, lock_seconds=lock_seconds)
+        count, until, _ = _fail_counter.get(ip, (0, 0.0, now))
+        if until and until <= now:
+            count = 0
+            until = 0.0
+        count += 1
+        if count >= max_fails:
+            until = now + lock_seconds
+            logger.warning("auth login locked for %s after %d fails", ip, count)
+        _fail_counter[ip] = (count, until, now)
+        _prune_lockouts_locked(now, lock_seconds=lock_seconds)
+        _save_lockouts_locked()
+        return count, until
+
+
+def clear_login_fails(ip: str) -> None:
+    """登录/改密成功后清除该 IP 的失败计数。"""
+    with _lock:
+        _ensure_lockouts_loaded_locked()
+        if _fail_counter.pop(ip, None) is not None:
+            _save_lockouts_locked()
 
 
 # 模块加载时恢复会话

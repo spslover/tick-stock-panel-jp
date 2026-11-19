@@ -17,8 +17,11 @@ import { Eye, EyeOff, Loader2, Lock, ShieldCheck, ShieldAlert, Sparkles } from '
 import { api } from '@/lib/api'
 import { Logo } from '@/components/Logo'
 import { cn } from '@/lib/cn'
+import { useI18n } from '@/lib/i18n'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 
 export function Auth() {
+  const { t } = useI18n()
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')  // 仅设密码时用
@@ -51,7 +54,7 @@ export function Auth() {
       navigate(redirect, { replace: true })
     },
     onError: (err: any) => {
-      const msg = err?.message || (isSetup ? '设置失败' : '登录失败')
+      const msg = err?.message || (isSetup ? t('auth.setupFail') : t('auth.loginFail'))
       // 设密码/登录失败必须显示: 401(密码错)/403(公网设密码被拒)/429(限流) 都要提示
       setLocalError(msg)
     },
@@ -61,8 +64,8 @@ export function Auth() {
     e.preventDefault()
     setLocalError('')
     if (isSetup) {
-      if (password.length < 6) { setLocalError('密码至少 6 位'); return }
-      if (password !== confirmPassword) { setLocalError('两次密码不一致'); return }
+      if (password.length < 6) { setLocalError(t('auth.pwdMinLen')); return }
+      if (password !== confirmPassword) { setLocalError(t('auth.pwdMismatch')); return }
     }
     submitMut.mutate()
   }
@@ -77,6 +80,9 @@ export function Auth() {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-base px-4">
+      <div className="absolute right-4 top-4 z-10">
+        <LanguageSwitcher variant="select" />
+      </div>
       {/* 背景辉光(与 Onboarding 风格一致) */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(139,92,246,0.15),transparent_40%),radial-gradient(circle_at_70%_80%,rgba(59,130,246,0.12),transparent_40%)]" />
 
@@ -103,10 +109,10 @@ export function Auth() {
             </div>
             <div>
               <div className="text-sm font-medium text-foreground">
-                {isSetup ? '设置访问密码' : '登录访问'}
+                {isSetup ? t('auth.setupTitle') : t('auth.loginTitle')}
               </div>
               <div className="text-[11px] text-muted">
-                {isSetup ? '首次使用, 请为面板设置访问密码' : '请输入访问密码以继续'}
+                {isSetup ? t('auth.setupSubtitle') : t('auth.loginSubtitle')}
               </div>
             </div>
           </div>
@@ -118,7 +124,7 @@ export function Auth() {
                 type={showPwd ? 'text' : 'password'}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="访问密码"
+                placeholder={t('auth.passwordPlaceholder')}
                 autoFocus
                 className="h-10 w-full rounded-btn border border-border bg-base px-3 pr-9 text-sm text-foreground outline-none transition-colors focus:border-accent/50"
               />
@@ -138,7 +144,7 @@ export function Auth() {
                 type={showPwd ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
-                placeholder="再次输入密码"
+                placeholder={t('auth.confirmPasswordPlaceholder')}
                 className="h-10 w-full rounded-btn border border-border bg-base px-3 text-sm text-foreground outline-none transition-colors focus:border-accent/50"
               />
             )}
@@ -157,9 +163,9 @@ export function Auth() {
               className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-btn bg-accent text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-50"
             >
               {submitMut.isPending ? (
-                <><Loader2 className="h-4 w-4 animate-spin" />处理中…</>
+                <><Loader2 className="h-4 w-4 animate-spin" />{t('auth.processing')}</>
               ) : (
-                <>{isSetup ? '设置并进入' : '登录'}</>
+                <>{isSetup ? t('auth.setupBtn') : t('auth.loginBtn')}</>
               )}
             </button>
           </form>
@@ -168,17 +174,17 @@ export function Auth() {
           {isSetup && (
             <div className="mt-3 space-y-1.5 text-[10px] leading-relaxed text-muted/70">
               <p>
-                出于安全考虑, 首次设置密码需在服务器本机或内网访问时操作。公网环境下仅可登录。
+                {t('auth.localOnlyHint')}
               </p>
               <p>
-                详细配置说明见{' '}
+                {t('auth.docPrefix')}{' '}
                 <a
                   href="https://github.com/shy3130/tickflow-stock-panel/blob/main/docs/deploy-password.md"
                   target="_blank"
                   rel="noreferrer"
                   className="text-accent underline-offset-2 hover:underline"
                 >
-                  访问密码部署文档
+                  {t('auth.deployDoc')}
                 </a>
               </p>
             </div>
@@ -187,7 +193,7 @@ export function Auth() {
 
         <div className="mt-4 flex items-center justify-center gap-1.5 text-[10px] text-muted/60">
           <Sparkles className="h-3 w-3" />
-          自托管量化工作台 · 数据完全掌握在自己手里
+          {t('auth.footerTagline')}
         </div>
       </motion.div>
     </div>

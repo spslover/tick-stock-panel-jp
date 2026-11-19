@@ -15,6 +15,7 @@ import { createAppPersister, shouldPersistQuery, PERSIST_BUSTER } from './lib/qu
 import { hydrateUiPrefs } from './lib/uiPrefs'
 import { applyPageZoom, getPageZoom } from './lib/pageZoom'
 import { applyTheme, getTheme } from './lib/theme'
+import { applyLocale, getLocale } from './lib/i18n'
 // 字体自托管 (@fontsource): 替代 rsms.me / Google Fonts 渲染阻塞外链,
 // 内网/离线部署不再白屏等字体。权重覆盖 tailwind 全部用量 (300-900)。
 import '@fontsource/inter/300.css'
@@ -75,6 +76,7 @@ async function bootstrap() {
   void hydrateUiPrefs().then(() => {
     applyPageZoom(getPageZoom())
     applyTheme(getTheme())
+    applyLocale(getLocale())
   })
   await initializeFrontendExtensions()
   // 页面插件能力桥: 共享 api/QK/cn/format 和宿主 UI 操作，不复制弹窗状态。

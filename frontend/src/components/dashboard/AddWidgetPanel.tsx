@@ -12,6 +12,7 @@ import { Plus } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { sanitizeExtUrl, type WidgetType } from './layout'
 import { WIDGET_DEFS } from './registry'
+import { useI18n } from '@/lib/i18n'
 
 const PANEL_W = 288 // w-72
 
@@ -22,6 +23,7 @@ export function AddWidgetPanel({
   placedTypes: Set<WidgetType>
   onAdd: (t: WidgetType, props?: Record<string, string>) => void
 }) {
+  const { tx } = useI18n()
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [url, setUrl] = useState('')
@@ -72,7 +74,7 @@ export function AddWidgetPanel({
   const addExtLink = () => {
     const clean = sanitizeExtUrl(url)
     if (!clean) {
-      setUrlError('仅支持 http(s) 链接, 且不能是本站地址')
+      setUrlError(tx('仅支持 http(s) 链接, 且不能是本站地址'))
       return
     }
     onAdd('ext-link', { title: title.trim() || new URL(clean).hostname, url: clean })
@@ -95,7 +97,7 @@ export function AddWidgetPanel({
             : 'border-border bg-elevated text-secondary hover:text-foreground hover:border-accent/40',
         )}
       >
-        <Plus className="h-3 w-3" />添加组件
+        <Plus className="h-3 w-3" />{tx('添加组件')}
       </button>
 
       {open && anchor && createPortal(
@@ -104,7 +106,7 @@ export function AddWidgetPanel({
           style={{ left: anchor.left, top: anchor.top, width: PANEL_W }}
           className="fixed z-[9999] rounded-card border border-border bg-surface p-2 shadow-2xl shadow-black/40"
         >
-          <div className="mb-1.5 px-0.5 text-[10px] font-medium text-muted">内置组件</div>
+          <div className="mb-1.5 px-0.5 text-[10px] font-medium text-muted">{tx('内置组件')}</div>
           <div className="max-h-56 space-y-0.5 overflow-y-auto">
             {WIDGET_DEFS.filter(d => d.id !== 'ext-link').map(d => {
               const placed = placedTypes.has(d.id)
@@ -120,30 +122,30 @@ export function AddWidgetPanel({
                       ? 'cursor-default text-muted/50'
                       : 'cursor-pointer text-secondary hover:bg-elevated hover:text-foreground',
                   )}
-                  title={placed ? '已在布局中' : undefined}
+                  title={placed ? tx('已在布局中') : undefined}
                 >
                   <d.icon className="h-3.5 w-3.5 shrink-0 text-accent" />
-                  <span className="flex-1 truncate">{d.label}</span>
-                  {placed && <span className="text-[9px]">已添加</span>}
+                  <span className="flex-1 truncate">{tx(d.label)}</span>
+                  {placed && <span className="text-[9px]">{tx('已添加')}</span>}
                 </button>
               )
             })}
           </div>
 
           <div className="mt-2 border-t border-border/60 pt-2">
-            <div className="mb-1.5 px-0.5 text-[10px] font-medium text-muted">外部链接(可加多个)</div>
+            <div className="mb-1.5 px-0.5 text-[10px] font-medium text-muted">{tx('外部链接(可加多个)')}</div>
             <div className="space-y-1.5">
               <input
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-                placeholder="标题, 如: 东财行情"
+                placeholder={tx('标题, 如: 东财行情')}
                 maxLength={30}
                 className="w-full rounded-btn bg-base px-2 py-1.5 text-xs text-foreground ring-1 ring-border/40 placeholder:text-muted/40 focus:outline-none focus:ring-2 focus:ring-accent/40"
               />
               <input
                 value={url}
                 onChange={e => { setUrl(e.target.value); setUrlError('') }}
-                placeholder="https://… (仅 http/https)"
+                placeholder={tx('https://… (仅 http/https)')}
                 className="w-full rounded-btn bg-base px-2 py-1.5 font-mono text-xs text-foreground ring-1 ring-border/40 placeholder:text-muted/40 focus:outline-none focus:ring-2 focus:ring-accent/40"
               />
               {urlError && <div className="text-[10px] text-danger">{urlError}</div>}
@@ -152,7 +154,7 @@ export function AddWidgetPanel({
                 onClick={addExtLink}
                 className="w-full rounded-btn bg-accent/15 px-2 py-1.5 text-xs font-medium text-accent transition-colors hover:bg-accent/25"
               >
-                添加到看板
+                {tx('添加到看板')}
               </button>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import * as echarts from 'echarts'
-import type { ECharts, EChartsOption } from 'echarts'
+import * as echarts from '@/lib/echarts'
+import { tx } from '@/lib/i18n'
+import type { ECharts, EChartsOption } from '@/lib/echarts'
 import type { MinuteKlineRow, MinuteKlineSession } from '@/lib/api'
 import { computeIntradayAverage, formatMinuteTime, FULL_DAY_TIMES } from '@/lib/intraday-chart'
 import { useChartTheme } from '@/lib/theme'
@@ -34,8 +35,8 @@ interface InfoPoint {
 
 function formatAmount(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return '—'
-  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}亿`
-  if (value >= 10_000) return `${(value / 10_000).toFixed(0)}万`
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}${tx('亿')}`
+  if (value >= 10_000) return `${(value / 10_000).toFixed(0)}${tx('万')}`
   return value.toFixed(0)
 }
 
@@ -268,7 +269,7 @@ export function EChartsMultiDayIntraday({
       const data = new Array(totalLength).fill(null) as (number | null)[]
       for (let index = 0; index < averages.length; index++) data[start + index] = averages[index]
       return {
-        name: `${session.date} 均价`,
+        name: tx('{v} 均价', { v: session.date }),
         type: 'line',
         data,
         symbol: 'none',
@@ -416,20 +417,20 @@ export function EChartsMultiDayIntraday({
           {info ? (
             <>
               <span className="text-muted">{info.date} {formatMinuteTime(info.row.datetime)}</span>
-              <span className="text-muted">开</span><span style={{ color: infoColor }}>{info.row.open != null ? info.row.open.toFixed(digits) : '—'}</span>
-              <span className="text-muted">高</span><span style={{ color: infoColor }}>{info.row.high.toFixed(digits)}</span>
-              <span className="text-muted">低</span><span style={{ color: infoColor }}>{info.row.low.toFixed(digits)}</span>
-              <span className="text-muted">收</span><span className="font-semibold" style={{ color: infoColor }}>{info.row.close.toFixed(digits)}</span>
+              <span className="text-muted">{tx('开')}</span><span style={{ color: infoColor }}>{info.row.open != null ? info.row.open.toFixed(digits) : '—'}</span>
+              <span className="text-muted">{tx('高')}</span><span style={{ color: infoColor }}>{info.row.high.toFixed(digits)}</span>
+              <span className="text-muted">{tx('低')}</span><span style={{ color: infoColor }}>{info.row.low.toFixed(digits)}</span>
+              <span className="text-muted">{tx('收')}</span><span className="font-semibold" style={{ color: infoColor }}>{info.row.close.toFixed(digits)}</span>
               {changePct != null && (
                 <span style={{ color: infoColor }}>{changePct >= 0 ? '+' : ''}{changePct.toFixed(2)}%</span>
               )}
-              {assetType !== 'index' && <><span className="text-muted">均价</span><span style={{ color: COLORS.average }}>{info.average != null ? info.average.toFixed(digits) : '—'}</span></>}
+              {assetType !== 'index' && <><span className="text-muted">{tx('均价')}</span><span style={{ color: COLORS.average }}>{info.average != null ? info.average.toFixed(digits) : '—'}</span></>}
               <span className="text-muted">量</span><span className="text-secondary">{info.row.volume.toFixed(0)}</span>
-              <span className="text-muted">额</span><span className="text-secondary">{formatAmount(info.row.amount)}</span>
+              <span className="text-muted">{tx('额')}</span><span className="text-secondary">{formatAmount(info.row.amount)}</span>
             </>
           ) : <span className="text-muted">—</span>}
         </div>
-        <div className="shrink-0 text-[10px] text-muted">{sessions.length} 个交易日 · {rowCount} 分钟</div>
+        <div className="shrink-0 text-[10px] text-muted">{tx('{v} 个交易日', { v: sessions.length })} · {tx('{v} 分钟', { v: rowCount })}</div>
       </div>
       <div ref={containerRef} className="w-full" style={{ height: height - 40, cursor: 'crosshair' }} />
     </div>

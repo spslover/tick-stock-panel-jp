@@ -27,6 +27,7 @@ import {
   X,
 } from 'lucide-react'
 import { api, type ExtDataField } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
 import type { DimensionGroup, QuoteMap } from '@/lib/analysis-adapter'
@@ -64,6 +65,7 @@ export function AnalysisConfigDialog({
   onClose: () => void
   showHierarchyLevel?: boolean
 }) {
+  const { tx } = useI18n()
   const [draft, setDraft] = useState<AnalysisFieldConfig>(currentConfig)
   const backdrop = useDialogBackdrop(onClose)
   const { data: extList } = useQuery({
@@ -97,7 +99,7 @@ export function AnalysisConfigDialog({
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 pt-3 pb-2">
-          <span className="text-sm font-medium">配置数据源</span>
+          <span className="text-sm font-medium">{tx('配置数据源')}</span>
           <button onClick={onClose} className="p-0.5 text-muted hover:text-foreground">
             <X className="h-4 w-4" />
           </button>
@@ -106,13 +108,13 @@ export function AnalysisConfigDialog({
         <div className="px-4 pb-4 space-y-3">
           {/* 数据源选择 */}
           <div className="space-y-1.5">
-            <span className="text-xs text-secondary">扩展数据源</span>
+            <span className="text-xs text-secondary">{tx('扩展数据源')}</span>
             <select
               value={draft.configId ?? ''}
               onChange={e => setDraft(d => ({ ...d, configId: e.target.value || undefined, dimensionField: undefined }))}
               className="w-full h-8 bg-elevated border border-border rounded text-xs text-foreground px-2 focus:outline-none focus:border-accent/50"
             >
-              <option value="">自动选择</option>
+              <option value="">{tx('自动选择')}</option>
               {configs.map(c => (
                 <option key={c.id} value={c.id}>{c.label}</option>
               ))}
@@ -122,13 +124,13 @@ export function AnalysisConfigDialog({
           {/* 维度字段选择 */}
           {nonMetaFields.length > 0 && (
             <div className="space-y-1.5">
-              <span className="text-xs text-secondary">维度字段（留空自动探测）</span>
+              <span className="text-xs text-secondary">{tx('维度字段（留空自动探测）')}</span>
               <select
                 value={draft.dimensionField ?? ''}
                 onChange={e => setDraft(d => ({ ...d, dimensionField: e.target.value || undefined }))}
                 className="w-full h-8 bg-elevated border border-border rounded text-xs text-foreground px-2 focus:outline-none focus:border-accent/50"
               >
-                <option value="">自动探测</option>
+                <option value="">{tx('自动探测')}</option>
                 {nonMetaFields.map(f => (
                   <option key={f.name} value={f.name}>{f.label || f.name}</option>
                 ))}
@@ -138,33 +140,31 @@ export function AnalysisConfigDialog({
 
           {showHierarchyLevel && (
             <div className="space-y-1.5">
-              <span className="text-xs text-secondary">统计层级</span>
+              <span className="text-xs text-secondary">{tx('统计层级')}</span>
               <select
                 value={draft.hierarchyLevel ?? 2}
                 onChange={e => setDraft(d => ({ ...d, hierarchyLevel: Number(e.target.value) as 1 | 2 | 3 }))}
                 className="w-full h-8 bg-elevated border border-border rounded text-xs text-foreground px-2 focus:outline-none focus:border-accent/50"
               >
-                <option value={1}>一级行业</option>
-                <option value={2}>二级行业（默认）</option>
-                <option value={3}>三级行业</option>
+                <option value={1}>{tx('一级行业')}</option>
+                <option value={2}>{tx('二级行业（默认）')}</option>
+                <option value={3}>{tx('三级行业')}</option>
               </select>
             </div>
           )}
 
           <div className="text-[10px] text-muted leading-relaxed">
-            系统自动检测数据结构：支持"个股→概念/行业"和"概念/行业→成分股列表"两种模式。
-            {showHierarchyLevel ? ' 行业字段按 “-” 拆分为 1/2/3 级。' : ''}
+            {tx('系统自动检测数据结构：支持"个股→概念/行业"和"概念/行业→成分股列表"两种模式。')}{showHierarchyLevel ? tx(' 行业字段按 “-” 拆分为 1/2/3 级。') : ''}
           </div>
         </div>
 
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-border">
-          <button onClick={onClose} className="px-3 py-1.5 text-xs text-secondary hover:text-foreground">取消</button>
+          <button onClick={onClose} className="px-3 py-1.5 text-xs text-secondary hover:text-foreground">{tx('取消')}</button>
           <button
             onClick={() => { onSave(draft); onClose() }}
             className="px-3 py-1.5 text-xs bg-accent/15 text-accent rounded hover:bg-accent/25"
           >
-            保存
-          </button>
+            {tx('保存')}</button>
         </div>
       </motion.div>
     </div>
@@ -186,14 +186,15 @@ export function OverviewStatCards({
   dateStr?: string | null
   accentColor: string
 }) {
+  const { tx } = useI18n()
   const cards = [
-    { label: '数据源', value: configLabel, hint: dateStr ?? '快照', icon: Database },
-    { label: '维度数量', value: groups.length, hint: '按维度聚合分组', icon: Tags },
-    { label: '覆盖标的', value: totalStocks, hint: '去重股票数', icon: BarChart3 },
+    { label: tx('数据源'), value: configLabel, hint: dateStr ?? tx('快照'), icon: Database },
+    { label: tx('维度数量'), value: groups.length, hint: tx('按维度聚合分组'), icon: Tags },
+    { label: tx('覆盖标的'), value: totalStocks, hint: tx('去重股票数'), icon: BarChart3 },
     {
-      label: '最大分组',
+      label: tx('最大分组'),
       value: groups[0]?.key ?? '—',
-      hint: groups[0] ? `${groups[0].count} 只` : '',
+      hint: groups[0] ? tx('{n} 只', { n: groups[0].count }) : '',
       icon: TrendingUp,
     },
   ]
@@ -231,6 +232,7 @@ export function DimensionHeatmap({
   onSelect: (key: string | null) => void
   colorScheme: 'blue' | 'amber'
 }) {
+  const { tx } = useI18n()
   const [showAll, setShowAll] = useState(false)
   // 收起时最大高度（约 3 行标签高度）
   const collapsedMaxH = '8rem'
@@ -250,12 +252,12 @@ export function DimensionHeatmap({
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-muted">热度分布（按标的覆盖数）</span>
+        <span className="text-xs text-muted">{tx('热度分布（按标的覆盖数）')}</span>
         <button
           onClick={() => setShowAll(v => !v)}
           className="text-[10px] text-muted hover:text-foreground flex items-center gap-0.5"
         >
-          {showAll ? '收起' : `展开全部 (${enriched.length})`}
+          {showAll ? tx('收起') : tx('展开全部 ({n})', { n: enriched.length })}
           <ChevronDown className={`h-3 w-3 transition-transform ${showAll ? 'rotate-180' : ''}`} />
         </button>
       </div>
@@ -285,7 +287,7 @@ export function DimensionHeatmap({
                 outline: active ? `1px solid rgba(${r},${gr},${b},0.8)` : 'none',
                 outlineOffset: 1,
               }}
-              title={`${g.key}: ${g.count}只, 涨${qm.upCount}/跌${qm.downCount}, 均幅${qm.avgPct != null ? fmtPct(qm.avgPct) : '—'}`}
+              title={tx('{key}: {n}只, 涨{up}/跌{down}, 均幅{avg}', { key: g.key, n: g.count, up: qm.upCount, down: qm.downCount, avg: qm.avgPct != null ? fmtPct(qm.avgPct) : '—' })}
             >
               {g.key}
               <span className="ml-1 opacity-60">{g.count}</span>
@@ -323,6 +325,7 @@ export function DimensionGroupSidebar({
   kindLabel: string
   colorScheme: 'blue' | 'amber'
 }) {
+  const { tx } = useI18n()
   const q = searchValue.trim().toLowerCase()
   const filtered = q
     ? groups.filter(g => g.key.toLowerCase().includes(q))
@@ -335,8 +338,8 @@ export function DimensionGroupSidebar({
   return (
     <section className="rounded-card border border-border bg-surface overflow-hidden">
       <div className="px-4 py-3 border-b border-border">
-        <h3 className="text-sm font-medium text-foreground">{kindLabel}榜单</h3>
-        <p className="mt-0.5 text-[11px] text-muted">按覆盖标的数量排序</p>
+        <h3 className="text-sm font-medium text-foreground">{tx('{kind}榜单', { kind: kindLabel })}</h3>
+        <p className="mt-0.5 text-[11px] text-muted">{tx('按覆盖标的数量排序')}</p>
       </div>
       <div className="p-3 border-b border-border/60">
         <div className="relative">
@@ -344,14 +347,14 @@ export function DimensionGroupSidebar({
           <input
             value={searchValue}
             onChange={e => onSearchChange(e.target.value)}
-            placeholder={`搜索${kindLabel}`}
+            placeholder={tx('搜索{kind}', { kind: kindLabel })}
             className="h-8 w-full rounded-btn border border-border bg-base pl-8 pr-3 text-xs text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent/50"
           />
         </div>
       </div>
       <div className="max-h-[560px] overflow-auto p-2 space-y-1">
         {filtered.length === 0 ? (
-          <div className="px-3 py-8 text-center text-xs text-muted">没有可展示的分组</div>
+          <div className="px-3 py-8 text-center text-xs text-muted">{tx('没有可展示的分组')}</div>
         ) : filtered.slice(0, 200).map((group, i) => {
           const active = selectedKey === group.key
           const qm = computeQuoteMetrics(group.stocks, quoteMap)
@@ -384,14 +387,14 @@ export function DimensionGroupSidebar({
               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted">
                 {qm.avgPct != null && (
                   <span className={priceColorClass(qm.avgPct)}>
-                    均幅 {fmtPct(qm.avgPct)}
+                    {tx('均幅')} {fmtPct(qm.avgPct)}
                   </span>
                 )}
                 {qm.upCount + qm.downCount > 0 && (
                   <span>
-                    <span className="text-bull">{qm.upCount}涨</span>
+                    <span className="text-bull">{qm.upCount} {tx('涨')}</span>
                     <span className="mx-0.5 text-muted/40">/</span>
-                    <span className="text-bear">{qm.downCount}跌</span>
+                    <span className="text-bear">{qm.downCount} {tx('跌')}</span>
                   </span>
                 )}
               </div>
@@ -412,6 +415,7 @@ export function QuoteSummaryBar({
   groups: DimensionGroup[]
   quoteMap: Map<string, QuoteMap>
 }) {
+  const { tx } = useI18n()
   const stats = useMemo(() => {
     let upTotal = 0, downTotal = 0, flatTotal = 0
     for (const g of groups) {
@@ -436,9 +440,9 @@ export function QuoteSummaryBar({
         <div className="flex-1" />
         <div className="h-full bg-bear/70 rounded-r-full" style={{ width: `${downPct}%` }} />
       </div>
-      <span className="text-bull font-mono">{stats.upTotal}涨</span>
+      <span className="text-bull font-mono">{stats.upTotal} {tx('涨')}</span>
       <span className="text-muted">/</span>
-      <span className="text-bear font-mono">{stats.downTotal}跌</span>
+      <span className="text-bear font-mono">{stats.downTotal} {tx('跌')}</span>
     </div>
   )
 }
@@ -446,11 +450,12 @@ export function QuoteSummaryBar({
 // ===== 配置按钮 =====
 
 export function ConfigButton({ onClick }: { onClick: () => void }) {
+  const { tx } = useI18n()
   return (
     <button
       onClick={onClick}
       className="p-1.5 hover:bg-surface text-muted hover:text-accent transition-colors"
-      title="配置数据源"
+      title={tx('配置数据源')}
     >
       <Settings2 className="h-3.5 w-3.5" />
     </button>
@@ -479,6 +484,7 @@ export function PresetFetchState({
   error: unknown
   onFetch: () => void
 }) {
+  const { tx } = useI18n()
   const errMsg = error instanceof Error ? error.message : error ? String(error) : ''
   // 缺 Key 是「配置问题」而非「拉取失败」: 换引导文案 + 直达设置
   const needKey = /API Key|凭据|未配置.*Key/i.test(errMsg)
@@ -494,9 +500,9 @@ export function PresetFetchState({
           className="mt-5 inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:brightness-110 disabled:opacity-60"
         >
           {isLoading ? (
-            <><RefreshCw className="h-4 w-4 animate-spin" /> 获取中...</>
+            <><RefreshCw className="h-4 w-4 animate-spin" /> {tx('获取中...')}</>
           ) : (
-            <><DownloadCloud className="h-4 w-4" /> 获取数据</>
+            <><DownloadCloud className="h-4 w-4" /> {tx('获取数据')}</>
           )}
         </button>
         {errMsg && (
@@ -505,15 +511,14 @@ export function PresetFetchState({
               <p className="flex items-start gap-1.5 text-xs text-warning">
                 <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
                 <span>
-                  该数据源需要 <span className="font-mono font-medium">fuyao API Key</span>
-                  ；其余功能不受影响。
-                </span>
+                  {tx('该数据源需要')} <span className="font-mono font-medium">fuyao API Key</span>
+                  {tx('；其余功能不受影响。')}</span>
               </p>
               <Link
                 to="/settings?tab=data-sources&highlight=fuyao"
                 className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
               >
-                前往 设置 → 数据源 配置 <ArrowRight className="h-3 w-3" />
+                {tx('前往 设置 → 数据源 配置')} <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
           ) : (
@@ -523,10 +528,8 @@ export function PresetFetchState({
           )
         )}
         <p className="mt-5 text-[11px] leading-relaxed text-muted">
-          这张表的完整拉取配方 (URL / 鉴权 / 两级请求) 可在
-          <Link to="/data" className="mx-0.5 text-accent hover:underline">数据</Link>
-          页展开本表 → <span className="text-secondary">拉取</span> 查看, 供接入自有源参考。
-        </p>
+          {tx('这张表的完整拉取配方 (URL / 鉴权 / 两级请求) 可在')}<Link to="/data" className="mx-0.5 text-accent hover:underline">{tx('数据')}</Link>
+          {tx('页展开本表 →')} <span className="text-secondary">{tx('拉取')}</span> {tx('查看, 供接入自有源参考。')}</p>
       </div>
     </div>
   )

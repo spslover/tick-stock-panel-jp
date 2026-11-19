@@ -613,6 +613,64 @@ def summarize_levels(levels: dict[str, list[dict]], close: float | None) -> str:
     return " · ".join(parts)
 
 
+def _to_float_list(series: pl.Series) -> list[float | None]:
+    """polars Series → JSON 安全的 float 列表(null/NaN → None)。"""
+    import math
+
+    out: list[float | None] = []
+    for v in series.to_list():
+        if v is None:
+            out.append(None)
+            continue
+        try:
+            f = float(v)
+            out.append(round(f, 2) if math.isfinite(f) else None)
+        except (TypeError, ValueError):
+            out.append(None)
+    return out
+
+
+def build_level_series(df: pl.DataFrame) -> dict[str, dict]:
+    """提取带状指标(布林带 / Keltner通道 / ATR止损)的每日时间序列。"""
+    if df.is_empty() or "close" not in df.columns:
+        return {}
+
+    out: dict[str, dict] = {}
+    close = df["close"]
+    has_atr = "atr_14" in df.columns
+
+    if "boll_upper" in df.columns and "boll_lower" in df.columns:
+        out["boll"] = {
+            "upper": _to_float_list(df["boll_upper"]),
+            "lower": _to_float_list(df["boll_lower"]),
+            "mid": _to_float_list(df["ma20"]) if "ma20" in df.columns else None,
+        }
+
+    if has_atr:
+        atr = df["atr_14"]
+        ma120 = df.select(pl.col("close").rolling_mean(120))["close"] if df.height >= 120 else None
+
+        def _channel(ma: pl.Series, n: float) -> dict:
+            return {
+                "upper": _to_float_list(ma + n * atr),
+                "lower": _to_float_list(ma - n * atr),
+            }
+
+        if "ma20" in df.columns:
+            out["keltner_s"] = _channel(df["ma20"], 2.0)
+        if "ma60" in df.columns:
+            out["keltner_m"] = _channel(df["ma60"], 2.5)
+        if ma120 is not None:
+            out["keltner_l"] = _channel(ma120, 3.0)
+
+        out["atr"] = {
+            "stop_loss": _to_float_list(close - 2 * atr),
+            "take_profit": _to_float_list(close + 2 * atr),
+        }
+
+    return out
+
+
 # ================================================================
 # 内部工具
 # ================================================================

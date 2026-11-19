@@ -4,8 +4,9 @@ import { createRoot, type Root } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { QK } from '@/lib/queryKeys'
+import * as registry from '@/extensions/registry'
 import type { FrontendSlotContextMap, FrontendSlotRegistration } from '@/extensions/types'
-import type { Props } from './StockPreviewDialogContent'
+import { StockPreviewDialogContent, type Props } from './StockPreviewDialogContent'
 
 vi.mock('./StockPanel', () => ({
   getDefaultRange: () => ({ start: '2025-01-01', end: '2025-06-30' }),
@@ -18,6 +19,8 @@ vi.mock('./StockMultiDayIntradayChart', () => ({
     <span>分钟线 {symbol} {days}日</span>,
 }))
 vi.mock('./monitor/RuleEditor', () => ({ RuleEditor: () => null }))
+vi.mock('./stock-analysis/PriceAlertDialog', () => ({ PriceAlertDialog: () => null }))
+vi.mock('@/lib/uiPrefs', () => ({ hydrateUiPrefs: () => Promise.resolve(), setUiPref: vi.fn() }))
 
 const first = { symbol: '600000.SH', name: '浦发银行' }
 const second = { symbol: '000001.SZ' }
@@ -25,6 +28,7 @@ let host: HTMLDivElement, root: Root, client: QueryClient
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  registry.resetFrontendExtensionsForTests()
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -36,16 +40,15 @@ beforeEach(() => {
   client.setQueryData(QK.preferences, {})
 })
 
-afterEach(() => {
-  act(() => root.unmount())
+afterEach(async () => {
+  await act(async () => { root.unmount() })
   client.clear()
   host.remove()
+  registry.resetFrontendExtensionsForTests()
   vi.restoreAllMocks()
-  vi.resetModules()
 })
 
 async function setup(slots: FrontendSlotRegistration[] = []) {
-  const registry = await import('@/extensions/registry')
   if (slots.length) {
     await registry.loadFrontendExtensions({
       example: async () => ({ default: { id: 'example', apiVersion: 1, slots } }),
@@ -53,7 +56,6 @@ async function setup(slots: FrontendSlotRegistration[] = []) {
   }
   registry.finalizeFrontendExtensions(new Set())
   expect(registry.getFrontendExtensionLoadErrors()).toEqual([])
-  const { StockPreviewDialogContent } = await import('./StockPreviewDialogContent')
   const render = (stock: Pick<Props, 'symbol' | 'name'>) => {
     root.render(<QueryClientProvider client={client}>
       <StockPreviewDialogContent {...stock} onClose={() => {}} navList={[first, second]}

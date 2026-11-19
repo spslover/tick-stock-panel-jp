@@ -12,13 +12,32 @@ V2 用短期票据解决)、watchlist/监控规则管理、数据同步、设置
 """
 from __future__ import annotations
 
+import functools
+import ipaddress
+import logging
 import os
 import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
 from pathlib import Path
+from typing import TYPE_CHECKING
+from urllib.parse import unquote
 
 from app.services import api_tokens
+
+if TYPE_CHECKING:
+    from fastapi import Request
+
+logger = logging.getLogger(__name__)
+
+_LOCAL_NETWORKS: tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...] = (
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+)
 
 # (method, 路径前缀, scope) — method 用 "*" 表示任意; 顺序敏感, 具体规则在前
 _RULES: list[tuple[str, str, str]] = [
@@ -87,26 +106,133 @@ def rate_limit_per_min() -> int:
 
 # ── 网络门禁: Token 通道默认仅本机/内网 (auth.setup 端点的同源判据) ──
 
-def is_local_network(host: str | None) -> bool:
-    """是否本机或内网地址: 127.0.0.1 / ::1 / localhost、10.x、172.16-31.x、192.168.x。
+def parse_ip(
+    raw: str | None,
+) -> ipaddress.IPv4Address | ipaddress.IPv6Address | None:
+    """解析单个 IP 字符串 (支持 [ipv6]:port, ipv4:port, %zone_id, ::ffff:x.x.x.x)."""
+    if not raw or not isinstance(raw, str):
+        return None
+    token = raw.strip()
+    if not token:
+        return None
+    if token.startswith("["):
+        end = token.find("]")
+        if end == -1:
+            return None
+        token = token[1:end]
+    elif token.count(":") == 1 and "." in token:
+        token = token.split(":", 1)[0]
+    if "%" in token:
+        token = token.split("%", 1)[0]
+    try:
+        addr = ipaddress.ip_address(token)
+    except ValueError:
+        return None
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped is not None:
+        return addr.ipv4_mapped
+    return addr
 
-    反向代理(Nginx)场景下 request.client.host 是代理本身(127.0.0.1),
-    真实客户端由 _client_ip 经 X-Forwarded-For 还原(仅当直连 peer 可信时采信)。
-    """
-    if not host:
-        return False
-    if host in ("127.0.0.1", "::1", "localhost"):
-        return True
-    if host.startswith("10.") or host.startswith("192.168."):
-        return True
-    if host.startswith("172."):
+
+@functools.lru_cache(maxsize=16)
+def compile_trusted_cidrs(
+    raw: str,
+) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
+    """解析可信反代 CIDR 列表 (无效条目记录警告并跳过, 不放开)."""
+    nets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
+    for part in (raw or "").split(","):
+        item = part.strip()
+        if not item:
+            continue
         try:
-            second = int(host.split(".")[1])
-            if 16 <= second <= 31:
-                return True
-        except (IndexError, ValueError):
-            pass
-    return False
+            nets.append(ipaddress.ip_network(item, strict=False))
+        except ValueError:
+            logger.warning("忽略无效 TRUSTED_PROXY_CIDRS 项: %r", item)
+    return tuple(nets)
+
+
+def is_trusted_proxy_ip(
+    ip_obj: ipaddress.IPv4Address | ipaddress.IPv6Address | str | None,
+    cidrs: tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...] | None = None,
+) -> bool:
+    """判断给定 IP 是否命中可信反向代理 CIDR 列表。"""
+    addr = parse_ip(ip_obj) if isinstance(ip_obj, str) or ip_obj is None else ip_obj
+    if addr is None:
+        return False
+    if cidrs is None:
+        from app.config import settings
+
+        cidrs = compile_trusted_cidrs(settings.trusted_proxy_cidrs)
+    return any(addr.version == net.version and addr in net for net in cidrs)
+
+
+def resolve_client_ip(
+    direct_ip: str | None,
+    xff_header: str | None,
+    trusted_cidrs: str | None = None,
+) -> str:
+    """基于可信反代 CIDR 从右向左剥离 X-Forwarded-For 还原客户端 IP。
+
+    仅当直连 peer 属于 TRUSTED_PROXY_CIDRS 时才采信 X-Forwarded-For；
+    从最右侧逐跳剥离可信反代 IP，遇到第一个非可信有效 IP 即返回。
+    若最右侧/非可信跳格式非法，fail-closed 返回 "unknown"。
+    """
+    direct_raw = (direct_ip or "").strip()
+    if not direct_raw:
+        return "unknown"
+    direct_addr = parse_ip(direct_raw)
+    if direct_addr is None:
+        return direct_raw
+    if trusted_cidrs is None:
+        from app.config import settings
+
+        trusted_cidrs = settings.trusted_proxy_cidrs
+    cidrs = compile_trusted_cidrs(trusted_cidrs)
+    if not is_trusted_proxy_ip(direct_addr, cidrs):
+        return str(direct_addr)
+    if not xff_header or not xff_header.strip():
+        return str(direct_addr)
+
+    last_trusted: str | None = None
+    for raw_hop in reversed(xff_header.split(",")):
+        hop = parse_ip(raw_hop)
+        if hop is None:
+            return "unknown"
+        if is_trusted_proxy_ip(hop, cidrs):
+            last_trusted = str(hop)
+            continue
+        return str(hop)
+    return last_trusted or str(direct_addr)
+
+
+def extract_client_ip(request: Request) -> str:
+    """从 FastAPI Request 提取经可信反代校验后的真实客户端 IP。"""
+    direct = request.client.host if request.client else ""
+    headers = request.headers
+    if hasattr(headers, "getlist"):
+        xff_list = [v for v in headers.getlist("x-forwarded-for") if v is not None]
+        xff = ",".join(xff_list) if xff_list else None
+    else:
+        xff = headers.get("x-forwarded-for")
+    return resolve_client_ip(direct, xff)
+
+
+def is_local_network(host: str | None) -> bool:
+    """是否本机或内网地址: localhost / 127.0.0.0/8 / ::1 / RFC1918 / ULA.
+
+    显式枚举本地网段 (禁用 .is_private, 避免把 CGNAT 100.64.0.0/10
+    或云元数据链路本地 169.254.0.0/16 误判为内网)。
+    """
+    if not host or not isinstance(host, str):
+        return False
+    stripped = host.strip()
+    if not stripped:
+        return False
+    if stripped.lower() == "localhost":
+        return True
+    addr = parse_ip(stripped)
+    if addr is None:
+        return False
+    return any(addr.version == net.version and addr in net for net in _LOCAL_NETWORKS)
 
 
 def token_channel_local_only() -> bool:
@@ -143,33 +269,100 @@ def required_scope(method: str, path: str) -> str | None:
 
     返回 "*" 表示仅需有效 Token (不做特定 scope 校验)。
     """
+    if not isinstance(path, str) or not path or not path.startswith("/"):
+        return None
+    lower_path = path.lower()
+    if (
+        "\\" in path
+        or "//" in path
+        or "\x00" in path
+        or "?" in path
+        or "#" in path
+        or "%2f" in lower_path
+        or "%5c" in lower_path
+        or "%00" in lower_path
+    ):
+        return None
+    for seg in path.split("/"):
+        decoded = seg
+        for _ in range(3):
+            next_decoded = unquote(decoded)
+            if (
+                decoded in (".", "..")
+                or next_decoded in (".", "..")
+                or "/" in next_decoded
+                or "\\" in next_decoded
+                or "\x00" in next_decoded
+            ):
+                return None
+            if next_decoded == decoded:
+                break
+            decoded = next_decoded
+    norm_method = (method or "").upper()
+    norm_path = path.rstrip("/") or "/"
     for m, prefix, scope in _RULES:
-        if (m == "*" or m == method) and (path == prefix or path.startswith(prefix.rstrip("/") + "/")):
+        if (m == "*" or m == norm_method) and (
+            path == prefix or path.startswith(prefix.rstrip("/") + "/")
+        ):
             # read:ext 域内的拉取 Key 状态子路径属管理面 (脱敏也不外露)
-            if scope == "read:ext" and path.endswith(("/api-key", "/config/export")):
+            if scope == "read:ext" and norm_path.endswith(("/api-key", "/config/export")):
                 return None
             return scope
     if path.startswith("/api/ext-data/"):
         for m, suffix, scope in _SUFFIX_RULES:
-            if (m == "*" or m == method) and path.endswith(suffix):
+            if (m == "*" or m == norm_method) and norm_path.endswith(suffix):
                 return scope
     return None
 
 
-# ── 限流: 进程内滑动窗口 (每 token_id 一个 deque; 重启清零无害) ──
-_BUCKETS: dict[str, deque[float]] = {}
-_BUCKET_LOCK = threading.Lock()
+# ── 限流: 进程内有界 LRU+TTL 滑动窗口 (每 token_id 一个 deque) ──
+_MAX_BUCKETS: int = 4096
+_BUCKETS: OrderedDict[str, deque[float]] = OrderedDict()
+_BUCKET_LOCK = threading.RLock()
+
+
+def clear_rate_limit_buckets() -> None:
+    """清空限流桶 (供测试隔离使用)。"""
+    with _BUCKET_LOCK:
+        _BUCKETS.clear()
 
 
 def _allow(key: str, limit: int) -> tuple[bool, int, int]:
     """返回 (是否放行, 剩余额度, 重试等待秒)。"""
     now = time.monotonic()
     with _BUCKET_LOCK:
-        q = _BUCKETS.setdefault(key, deque())
+        # 从 LRU 头部渐进清理已过期的桶
+        for _ in range(32):
+            if not _BUCKETS:
+                break
+            oldest_key, oldest_q = next(iter(_BUCKETS.items()))
+            if oldest_key == key:
+                break
+            if not oldest_q or now - oldest_q[-1] >= _RATE_WINDOW_S:
+                _BUCKETS.popitem(last=False)
+            else:
+                break
+
+        if key in _BUCKETS:
+            q = _BUCKETS[key]
+            _BUCKETS.move_to_end(key)
+        else:
+            if len(_BUCKETS) >= _MAX_BUCKETS:
+                stale_keys = [
+                    bk for bk, bq in _BUCKETS.items()
+                    if not bq or now - bq[-1] >= _RATE_WINDOW_S
+                ]
+                for bk in stale_keys:
+                    _BUCKETS.pop(bk, None)
+                while len(_BUCKETS) >= _MAX_BUCKETS:
+                    _BUCKETS.popitem(last=False)
+            q = deque()
+            _BUCKETS[key] = q
+
         while q and now - q[0] >= _RATE_WINDOW_S:
             q.popleft()
         if len(q) >= limit:
-            retry = max(1, int(_RATE_WINDOW_S - (now - q[0])) + 1)
+            retry = max(1, int(_RATE_WINDOW_S - (now - q[0])) + 1) if q else int(_RATE_WINDOW_S)
             return False, 0, retry
         q.append(now)
         return True, limit - len(q), 0
@@ -188,17 +381,27 @@ def evaluate(data_dir: Path, method: str, path: str, plaintext: str) -> dict:
             "detail": f"该端点 ({method} {path}) 未对外开放; 开放清单见 /api/openapi.json?tier=a",
             "headers": {},
         }
+    raw_scopes = record.get("scopes")
+    scopes = (
+        [s for s in raw_scopes if isinstance(s, str)]
+        if isinstance(raw_scopes, (list, tuple, set))
+        else []
+    )
     if scope == "*":
         pass  # 仅需有效 Token (票据签发): 已通过认证, 不校验具体 scope
-    elif scope not in record.get("scopes", []):
+    elif scope not in scopes:
         return {
             "status": 403,
-            "detail": f"Token 缺少所需 scope: {scope} (持有: {record.get('scopes', [])})",
+            "detail": f"Token 缺少所需 scope: {scope} (持有: {scopes})",
             "headers": {},
         }
 
+    bucket_key = record.get("id")
+    if not isinstance(bucket_key, str) or not bucket_key:
+        return {"status": 401, "detail": "API Token 无效或已吊销", "headers": {}}
+
     limit = rate_limit_per_min()
-    ok, remaining, retry = _allow(record["id"], limit)
+    ok, remaining, retry = _allow(bucket_key, limit)
     if not ok:
         return {
             "status": 429,

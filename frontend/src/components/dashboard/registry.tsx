@@ -21,6 +21,7 @@ import {
 } from './widgets'
 import type { DashboardItem, WidgetType } from './layout'
 import { ExternalLinkWidget } from './ExternalLinkWidget'
+import { tx } from '@/lib/i18n'
 
 /** 渲染上下文: 数据切片与交互回调(由 Dashboard 页提供, 组件不自取数据) */
 export interface WidgetCtx {
@@ -69,10 +70,10 @@ function EmotionRadarCard({ ctx }: { ctx: WidgetCtx }) {
         <>
           <SectionTitle
             icon={Sparkles}
-            title="情绪雷达"
-            hint={`情绪评分 ${ctx.score}`}
+            title={tx('情绪雷达')}
+            hint={`${tx('情绪评分')} ${ctx.score}`}
             onConfig={() => setConfigOpen(true)}
-            configTitle="配置情绪评分的计算方式"
+            configTitle={tx('配置情绪评分的计算方式')}
           />
           <EmotionRadar radar={ctx.data.radar} score={ctx.score} />
         </>,
@@ -89,17 +90,17 @@ function KpiWidget({ ctx }: { ctx: WidgetCtx }) {
   const strongDown = data.breadth.strong_down ?? 0
   return (
     <div className="grid h-full grid-cols-3 gap-1 xl:grid-cols-6">
-      <KpiCell label="个股涨 / 平 / 跌" value={<><span className="text-bull">{data.breadth.up}</span><span className="text-muted">/</span><span className="text-muted">{data.breadth.flat}</span><span className="text-muted">/</span><span className="text-bear">{data.breadth.down}</span></>} sub={`上涨率 ${data.breadth.up_pct.toFixed(1)}%`} />
-      <KpiCell label="强势 / 弱势" value={<><span className="text-bull">{strongUp}</span><span className="text-muted">/</span><span className="text-bear">{strongDown}</span></>} sub="涨跌 ≥3%" />
-      <KpiCell label={<span className="inline-flex items-center gap-1">涨停 / 跌停<SealedBadge degraded={isSealedDegrade} hasDepth={hasDepth} isHistorical={false} sealedReady={sealedReady} sealedCountsUp={{ real: data.limit.limit_up, fake: data.limit.fake_up ?? 0, pending: 0 }} sealedCountsDown={{ real: data.limit.limit_down, fake: data.limit.fake_down ?? 0, pending: 0 }} rawUp={data.limit.limit_up + (data.limit.fake_up ?? 0)} rawDown={data.limit.limit_down + (data.limit.fake_down ?? 0)} invalidateKeys={['overview-market', 'limit-ladder']} /></span>} value={<><span className="text-bull">{data.limit.limit_up}</span><span className="text-muted">/</span><span className="text-bear">{data.limit.limit_down}</span></>} sub={`封板率 ${(data.limit.seal_rate ?? 0).toFixed(0)}%`} />
-      <KpiCell label="最高连板" value={`${data.limit.max_boards || 0}板`} sub={(() => {
+      <KpiCell label={tx('个股涨 / 平 / 跌')} value={<><span className="text-bull">{data.breadth.up}</span><span className="text-muted">/</span><span className="text-muted">{data.breadth.flat}</span><span className="text-muted">/</span><span className="text-bear">{data.breadth.down}</span></>} sub={`${tx('上涨率')} ${data.breadth.up_pct.toFixed(1)}%`} />
+      <KpiCell label={tx('强势 / 弱势')} value={<><span className="text-bull">{strongUp}</span><span className="text-muted">/</span><span className="text-bear">{strongDown}</span></>} sub={tx('涨跌 ≥3%')} />
+      <KpiCell label={<span className="inline-flex items-center gap-1">{tx('涨停 / 跌停')}<SealedBadge degraded={isSealedDegrade} hasDepth={hasDepth} isHistorical={false} sealedReady={sealedReady} sealedCountsUp={{ real: data.limit.limit_up, fake: data.limit.fake_up ?? 0, pending: 0 }} sealedCountsDown={{ real: data.limit.limit_down, fake: data.limit.fake_down ?? 0, pending: 0 }} rawUp={data.limit.limit_up + (data.limit.fake_up ?? 0)} rawDown={data.limit.limit_down + (data.limit.fake_down ?? 0)} invalidateKeys={['overview-market', 'limit-ladder']} /></span>} value={<><span className="text-bull">{data.limit.limit_up}</span><span className="text-muted">/</span><span className="text-bear">{data.limit.limit_down}</span></>} sub={`${tx('封板率')} ${(data.limit.seal_rate ?? 0).toFixed(0)}%`} />
+      <KpiCell label={tx('最高连板')} value={`${data.limit.max_boards || 0}${tx('板')}`} sub={(() => {
         const top = data.limit.tiers.find(t => t.boards === data.limit.max_boards)
         const stocks = top?.stocks ?? []
         if (stocks.length > 0 && stocks.length <= 3) return stocks.map(s => s.name || s.symbol).join(' · ')
-        return `梯队 ${data.limit.tiers.length}`
+        return `${tx('梯队')} ${data.limit.tiers.length}`
       })()} tone="accent" />
-      <KpiCell label="成交额" value={fmtBigNum(data.amount.total)} sub={`均额 ${fmtBigNum(data.amount.avg)}`} />
-      <KpiCell label="换手 / 量比" value={`${fmtPrice(data.activity.avg_turnover, 1)}% / ${fmtPrice(data.activity.vol_ratio, 2)}`} sub={`高换手 ${data.activity.high_turnover} · 放量占比 ${fmtPrice(data.activity.high_vol_ratio, 1)}%`} tone="accent" />
+      <KpiCell label={tx('成交额')} value={fmtBigNum(data.amount.total)} sub={`${tx('均额')} ${fmtBigNum(data.amount.avg)}`} />
+      <KpiCell label={tx('换手 / 量比')} value={`${fmtPrice(data.activity.avg_turnover, 1)}% / ${fmtPrice(data.activity.vol_ratio, 2)}`} sub={`${tx('高换手')} ${data.activity.high_turnover} · ${tx('放量占比')} ${fmtPrice(data.activity.high_vol_ratio, 1)}%`} tone="accent" />
     </div>
   )
 }
@@ -109,25 +110,25 @@ function TrendWidget({ ctx }: { ctx: WidgetCtx }) {
   return (
     <div className="flex h-full flex-col">
       <div>
-        <SectionTitle icon={LineChart} title="趋势强度" hint="均线/新高低" />
+        <SectionTitle icon={LineChart} title={tx('趋势强度')} hint={tx('均线/新高低')} />
         <div className="grid grid-cols-3 gap-1.5">
-          <MiniMetric label="站上MA5" value={`${data.trend.above_ma5_pct.toFixed(0)}%`} cls="text-accent" />
-          <MiniMetric label="站上MA20" value={`${data.trend.above_ma20_pct.toFixed(0)}%`} cls="text-accent" />
-          <MiniMetric label="站上MA60" value={`${data.trend.above_ma60_pct.toFixed(0)}%`} cls="text-accent" />
-          <MiniMetric label="60日新高" value={`${compactCount(data.trend.new_high)}`} cls="text-bull" />
-          <MiniMetric label="60日新低" value={`${compactCount(data.trend.new_low)}`} cls="text-bear" />
-          <MiniMetric label="高低比" value={`${data.trend.new_high + data.trend.new_low > 0 ? Math.round(data.trend.new_high / (data.trend.new_high + data.trend.new_low) * 100) : 50}%`} cls={data.trend.new_high >= data.trend.new_low ? 'text-bull' : 'text-bear'} />
+          <MiniMetric label={tx('站上MA5')} value={`${data.trend.above_ma5_pct.toFixed(0)}%`} cls="text-accent" />
+          <MiniMetric label={tx('站上MA20')} value={`${data.trend.above_ma20_pct.toFixed(0)}%`} cls="text-accent" />
+          <MiniMetric label={tx('站上MA60')} value={`${data.trend.above_ma60_pct.toFixed(0)}%`} cls="text-accent" />
+          <MiniMetric label={tx('60日新高')} value={`${compactCount(data.trend.new_high)}`} cls="text-bull" />
+          <MiniMetric label={tx('60日新低')} value={`${compactCount(data.trend.new_low)}`} cls="text-bear" />
+          <MiniMetric label={tx('高低比')} value={`${data.trend.new_high + data.trend.new_low > 0 ? Math.round(data.trend.new_high / (data.trend.new_high + data.trend.new_low) * 100) : 50}%`} cls={data.trend.new_high >= data.trend.new_low ? 'text-bull' : 'text-bear'} />
         </div>
       </div>
       <div className="mt-1.5 border-t border-border pt-1.5">
-        <SectionTitle icon={Target} title="实用监控" hint="盘中观察" />
+        <SectionTitle icon={Target} title={tx('实用监控')} hint={tx('盘中观察')} />
         <div className="grid grid-cols-3 gap-1.5">
-          <MiniMetric label="炸板" value={`${data.limit.broken ?? 0}`} cls="text-warning" />
-          <MiniMetric label="跌停" value={`${data.limit.limit_down ?? 0}`} cls="text-bear" />
-          <MiniMetric label="站上MA60" value={`${data.trend.above_ma60_pct.toFixed(0)}%`} cls="text-accent" />
-          <MiniMetric label="新高/新低" value={`${compactCount(data.trend.new_high)}/${compactCount(data.trend.new_low)}`} cls={data.trend.new_high >= data.trend.new_low ? 'text-bull' : 'text-bear'} />
-          <MiniMetric label="高换手数" value={`${data.activity.high_turnover}`} cls="text-accent" />
-          <MiniMetric label="放量占比" value={`${fmtPrice(data.activity.high_vol_ratio, 1)}%`} cls="text-accent" />
+          <MiniMetric label={tx('炸板')} value={`${data.limit.broken ?? 0}`} cls="text-warning" />
+          <MiniMetric label={tx('跌停')} value={`${data.limit.limit_down ?? 0}`} cls="text-bear" />
+          <MiniMetric label={tx('站上MA60')} value={`${data.trend.above_ma60_pct.toFixed(0)}%`} cls="text-accent" />
+          <MiniMetric label={tx('新高/新低')} value={`${compactCount(data.trend.new_high)}/${compactCount(data.trend.new_low)}`} cls={data.trend.new_high >= data.trend.new_low ? 'text-bull' : 'text-bear'} />
+          <MiniMetric label={tx('高换手数')} value={`${data.activity.high_turnover}`} cls="text-accent" />
+          <MiniMetric label={tx('放量占比')} value={`${fmtPrice(data.activity.high_vol_ratio, 1)}%`} cls="text-accent" />
         </div>
       </div>
     </div>
@@ -140,10 +141,10 @@ function MonitorSection({ ctx }: { ctx: WidgetCtx }) {
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           <BellRing className="h-3.5 w-3.5 text-accent" />
-          <h2 className="text-xs font-semibold text-foreground">监控中心</h2>
-          <span className="font-mono text-[10px] text-muted">实时信号</span>
+          <h2 className="text-xs font-semibold text-foreground">{tx('监控中心')}</h2>
+          <span className="font-mono text-[10px] text-muted">{tx('实时信号')}</span>
         </div>
-        <Link to="/monitor" className="inline-flex items-center justify-center h-5 w-5 rounded text-muted hover:text-accent hover:bg-accent/10 transition-colors" title="进入监控中心">
+        <Link to="/monitor" className="inline-flex items-center justify-center h-5 w-5 rounded text-muted hover:text-accent hover:bg-accent/10 transition-colors" title={tx('进入监控中心')}>
           <ArrowUpRight className="h-3.5 w-3.5" />
         </Link>
       </div>
@@ -176,14 +177,14 @@ export const WIDGET_DEFS: WidgetDef[] = [
     id: 'distribution', label: '涨跌分布 / 广度', icon: BarChart3, minW: 3, minH: 6, defW: 4, defH: 8,
     render: ctx => sectionCard(
       <>
-        <SectionTitle icon={BarChart3} title="涨跌分布 / 广度" hint={`${ctx.data.breadth.total}只`} />
+        <SectionTitle icon={BarChart3} title={tx('涨跌分布 / 广度')} hint={`${ctx.data.breadth.total}`} />
         <DistributionBars rows={ctx.data.distribution} />
         <div className="mt-2">
           <BreadthBar data={ctx.data.breadth} />
         </div>
         <div className="mt-2 grid grid-cols-2 gap-1.5">
-          <MiniMetric label="平均涨跌" value={fmtStockPct(ctx.data.breadth.avg_pct)} cls={pctClass(ctx.data.breadth.avg_pct)} />
-          <MiniMetric label="中位涨跌" value={fmtStockPct(ctx.data.breadth.median_pct)} cls={pctClass(ctx.data.breadth.median_pct)} />
+          <MiniMetric label={tx('平均涨跌')} value={fmtStockPct(ctx.data.breadth.avg_pct)} cls={pctClass(ctx.data.breadth.avg_pct)} />
+          <MiniMetric label={tx('中位涨跌')} value={fmtStockPct(ctx.data.breadth.median_pct)} cls={pctClass(ctx.data.breadth.median_pct)} />
         </div>
       </>,
     ),
@@ -199,7 +200,7 @@ export const WIDGET_DEFS: WidgetDef[] = [
   {
     id: 'concept-rank', label: '概念热度', icon: Flame, minW: 3, minH: 6, defW: 6, defH: 8,
     render: ctx => (
-      <HotRankCard title="概念热度" rank={ctx.data.concept_rank} configUrl="/concept-analysis"
+      <HotRankCard title={tx('概念热度')} rank={ctx.data.concept_rank} configUrl="/concept-analysis"
         activeSymbol={ctx.activeSymbol('concept')}
         onStockClick={(symbol, name) => ctx.openStock('concept', symbol, name, rankNav(ctx.data.concept_rank))}
         onDimensionClick={ctx.openDimension} />
@@ -208,7 +209,7 @@ export const WIDGET_DEFS: WidgetDef[] = [
   {
     id: 'industry-rank', label: '行业热度', icon: Flame, minW: 3, minH: 6, defW: 6, defH: 8,
     render: ctx => (
-      <HotRankCard title="行业热度" rank={ctx.data.industry_rank} configUrl="/industry-analysis"
+      <HotRankCard title={tx('行业热度')} rank={ctx.data.industry_rank} configUrl="/industry-analysis"
         activeSymbol={ctx.activeSymbol('industry')}
         onStockClick={(symbol, name) => ctx.openStock('industry', symbol, name, rankNav(ctx.data.industry_rank))}
         onDimensionClick={ctx.openDimension} />
@@ -217,7 +218,7 @@ export const WIDGET_DEFS: WidgetDef[] = [
   {
     id: 'gainers', label: '涨幅榜', icon: TrendingUp, minW: 2, minH: 7, defW: 3, defH: 10,
     render: ctx => (
-      <StockList title="涨幅榜" rows={ctx.data.top_gainers} mode="gain"
+      <StockList title={tx('涨幅榜')} rows={ctx.data.top_gainers} mode="gain"
         activeSymbol={ctx.activeSymbol('gain')}
         onStockClick={(symbol, name) => ctx.openStock('gain', symbol, name, stockListNav(ctx.data.top_gainers))} />
     ),
@@ -225,7 +226,7 @@ export const WIDGET_DEFS: WidgetDef[] = [
   {
     id: 'losers', label: '跌幅榜', icon: TrendingDown, minW: 2, minH: 7, defW: 3, defH: 10,
     render: ctx => (
-      <StockList title="跌幅榜" rows={ctx.data.top_losers} mode="loss"
+      <StockList title={tx('跌幅榜')} rows={ctx.data.top_losers} mode="loss"
         activeSymbol={ctx.activeSymbol('loss')}
         onStockClick={(symbol, name) => ctx.openStock('loss', symbol, name, stockListNav(ctx.data.top_losers))} />
     ),
@@ -233,7 +234,7 @@ export const WIDGET_DEFS: WidgetDef[] = [
   {
     id: 'turnover', label: '成交额榜', icon: Coins, minW: 2, minH: 7, defW: 3, defH: 10,
     render: ctx => (
-      <StockList title="成交额榜" rows={ctx.data.turnover_leaders} mode="amount"
+      <StockList title={tx('成交额榜')} rows={ctx.data.turnover_leaders} mode="amount"
         activeSymbol={ctx.activeSymbol('amount')}
         onStockClick={(symbol, name) => ctx.openStock('amount', symbol, name, stockListNav(ctx.data.turnover_leaders))} />
     ),
@@ -241,7 +242,7 @@ export const WIDGET_DEFS: WidgetDef[] = [
   {
     id: 'activity', label: '活跃换手', icon: Repeat, minW: 2, minH: 7, defW: 3, defH: 10,
     render: ctx => (
-      <StockList title="活跃换手" rows={ctx.data.active_leaders} mode="active"
+      <StockList title={tx('活跃换手')} rows={ctx.data.active_leaders} mode="active"
         activeSymbol={ctx.activeSymbol('active')}
         onStockClick={(symbol, name) => ctx.openStock('active', symbol, name, stockListNav(ctx.data.active_leaders))} />
     ),
@@ -250,7 +251,7 @@ export const WIDGET_DEFS: WidgetDef[] = [
     id: 'ladder', label: '涨停梯队', icon: Flame, minW: 3, minH: 6, defW: 4, defH: 8,
     render: ctx => sectionCard(
       <>
-        <SectionTitle icon={Flame} title="涨停梯队" hint={<span className="inline-flex items-center gap-1">{`涨停 ${ctx.data.limit.limit_up}`}{ctx.isSealedDegrade && <span className="text-[9px] px-1 rounded bg-yellow-500/10 text-yellow-600 dark:text-yellow-500">{ctx.hasDepth ? '未修正' : '降级'}</span>}</span>} />
+        <SectionTitle icon={Flame} title={tx('涨停梯队')} hint={<span className="inline-flex items-center gap-1">{`${tx('涨停')} ${ctx.data.limit.limit_up}`}{ctx.isSealedDegrade && <span className="text-[9px] px-1 rounded bg-yellow-500/10 text-yellow-600 dark:text-yellow-500">{ctx.hasDepth ? tx('未修正') : tx('降级')}</span>}</span>} />
         <LadderMini limit={ctx.data.limit} />
       </>,
     ),
@@ -261,7 +262,7 @@ export const WIDGET_DEFS: WidgetDef[] = [
   },
   {
     id: 'ext-link', label: '外部链接', icon: Link2, minW: 2, minH: 5, defW: 6, defH: 10,
-    render: (_ctx, item) => <ExternalLinkWidget title={item.p?.title ?? '外部链接'} url={item.p?.url ?? 'about:blank'} />,
+    render: (_ctx, item) => <ExternalLinkWidget title={item.p?.title ?? tx('外部链接')} url={item.p?.url ?? 'about:blank'} />,
   },
 ]
 

@@ -6,6 +6,7 @@ import {
   Terminal, ChevronDown, Sparkles, Atom, Waves, Cloud, Gem, Moon,
 } from 'lucide-react'
 import { useSettings } from '@/lib/useSharedQueries'
+import { tx, useI18n } from '@/lib/i18n'
 import { api, type SettingsState, type SponsorModelItem } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 import { AnchorWrap } from '@/lib/useCardFlash'
@@ -15,7 +16,7 @@ import { DEEPSEEK_FALLBACK_RANGE, MAX_DISCOUNT_FALLBACK_PCT, bandDiscountLabel, 
 // 折扣率 → 中文折数: 0.6→"6折", 0.35→"3.5折", 0.2→"2折"
 const fmtDiscount = (rate: number) => {
   const fold = Math.round(rate * 100) / 10
-  return `${Number.isInteger(fold) ? fold : fold.toFixed(1)}折`
+  return tx('{v}折', { v: Number.isInteger(fold) ? fold : fold.toFixed(1) })
 }
 
 // 上下文长度 → 紧凑显示: 1050000→"1M", 262144→"256K"
@@ -68,9 +69,9 @@ const CODEX_MODEL_OPTIONS: CodexModelOption[] = [
 ]
 
 const codexModelLabel = (model?: string, effort?: string) => {
-  if (!model && !effort) return '默认模型'
-  const modelLabel = model || '默认模型'
-  const effortLabel = effort ? CODEX_REASONING_LABELS[effort] ?? effort : ''
+  if (!model && !effort) return tx('默认模型')
+  const modelLabel = model || tx('默认模型')
+  const effortLabel = effort ? tx(CODEX_REASONING_LABELS[effort] ?? effort) : ''
   return effortLabel ? `${modelLabel} · ${effortLabel}` : modelLabel
 }
 
@@ -101,15 +102,15 @@ const presetMeta = (p: AiPreset) => {
 
 /** RunningHub 预设描述: 折扣区间取自实时模型定价; 取不到时回退到集中的兜底文案。 */
 function SponsorIntro() {
+  const { tx } = useI18n()
   const items = useSponsorModelItems()
   const range = (items && discountRangeLabel(items)) ?? DEEPSEEK_FALLBACK_RANGE
   const maxPct = (items && maxDiscountPct(items)) ?? MAX_DISCOUNT_FALLBACK_PCT
   return (
     <>
-      本项目赞助商 · OpenAI 兼容中转，单一接口直连 400+ 主流大模型，<span className="font-medium text-amber-600 dark:text-amber-400">Claude、ChatGPT、Gemini</span> 等国际模型直连稳定不掉线。
-      <span className="font-medium text-amber-600 dark:text-amber-400">DeepSeek v4.1 Flash {range}</span>，
-      <span className="text-muted">全场最高</span><span className="font-medium text-amber-600 dark:text-amber-400">优惠 {maxPct}%</span>，
-      <span>邀请链接注册享</span><span className="font-medium text-amber-600 dark:text-amber-400">首充满减</span><span className="text-muted">(满减额度以官网邀请页为准)</span>。
+      {tx('本项目赞助商 · OpenAI 兼容中转，单一接口直连 400+ 主流大模型，')}<span className="font-medium text-amber-600 dark:text-amber-400">Claude、ChatGPT、Gemini</span> {tx('等国际模型直连稳定不掉线。')}<span className="font-medium text-amber-600 dark:text-amber-400">DeepSeek v4.1 Flash {range}</span>，
+      <span className="text-muted">{tx('全场最高')}</span><span className="font-medium text-amber-600 dark:text-amber-400">{tx('优惠')} {maxPct}%</span>，
+      <span>{tx('邀请链接注册享')}</span><span className="font-medium text-amber-600 dark:text-amber-400">{tx('首充满减')}</span><span className="text-muted">{tx('(满减额度以官网邀请页为准)')}</span>。
     </>
   )
 }
@@ -132,6 +133,7 @@ const findPreset = (provider: string, baseUrl: string, codexCommand: string) => 
 }) ?? PRESETS[0]
 
 export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const settings = useSettings()
   const s = settings.data
@@ -189,11 +191,11 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
   const savedCodexOption: CodexModelOption | null =
     (savedCodexModel || savedCodexEffort) && !savedCodexOptionKnown
       ? {
-          label: `${codexModelLabel(savedCodexModel, savedCodexEffort)}（当前配置）`,
+          label: tx('{model}（当前配置）', { model: codexModelLabel(savedCodexModel, savedCodexEffort) }),
           value: SAVED_CODEX_OPTION_VALUE,
           model: savedCodexModel,
           effort: savedCodexEffort,
-          hint: '保留项目中已保存的模型与推理档；此兼容项不可编辑',
+          hint: tx('保留项目中已保存的模型与推理档；此兼容项不可编辑'),
         }
       : null
   const codexModelOptions = savedCodexOption
@@ -429,7 +431,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
       setModelItems(items)
     } catch (error) {
       setModelItems([])
-      setModelsError(error instanceof Error ? error.message : '获取模型列表失败')
+      setModelsError(error instanceof Error ? error.message : tx('获取模型列表失败'))
     } finally {
       setModelsLoading(false)
     }
@@ -472,10 +474,10 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
       )
       setTestResult({
         ok: r.ok,
-        msg: r.ok ? `连通成功 · ${r.model ?? provider}` : (r.error ?? '未知错误'),
+        msg: r.ok ? tx('连通成功 · {model}', { model: r.model ?? provider }) : (r.error ?? tx('未知错误')),
       })
     } catch (e: any) {
-      setTestResult({ ok: false, msg: String(e?.message ?? '测试失败') })
+      setTestResult({ ok: false, msg: String(e?.message ?? tx('测试失败')) })
     } finally {
       setTesting(false)
     }
@@ -495,37 +497,37 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2.5">
             <Sparkles className="h-4 w-4 shrink-0 text-secondary" />
-            <h2 className="text-sm font-medium text-foreground">AI 服务</h2>
+            <h2 className="text-sm font-medium text-foreground">{tx('AI 服务')}</h2>
           </div>
           <div className="mt-2 flex items-center gap-2">
             <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${configured ? 'bg-bear' : 'bg-warning'}`} />
             <span className="min-w-0 truncate text-xs text-secondary">
-              <span className="font-medium text-foreground">{configured ? '已配置' : '未配置'}</span>
+              <span className="font-medium text-foreground">{configured ? tx('已配置') : tx('未配置')}</span>
               {' · '}
               {configured ? (
                 savedCodexProvider
                   ? <><span className="font-mono">{s?.ai_codex_command ?? CODEX_COMMAND}</span> · <span className="font-mono">{codexModelLabel(s?.ai_model, s?.ai_codex_reasoning_effort)}</span></>
                   : <><span className="font-mono">{s?.ai_model}</span><span className="text-muted"> · {s?.ai_api_key_masked}</span></>
               ) : (
-                <span className="text-muted">{isCodexProvider ? '使用本机 codex exec, 无需填写 Key' : '填写下方参数并保存即可启用'}</span>
+                <span className="text-muted">{isCodexProvider ? tx('使用本机 codex exec, 无需填写 Key') : tx('填写下方参数并保存即可启用')}</span>
               )}
             </span>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 pt-0.5">
           {testResult && (
-            <span role="status" title="测试只验证当前表单, 不会保存配置; 通过后请点「保存配置」生效"
+            <span role="status" title={tx('测试只验证当前表单, 不会保存配置; 通过后请点「保存配置」生效')}
               className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] ${testResult.ok ? 'border-bear/25 bg-bear/[0.06] text-bear' : 'border-danger/25 bg-danger/[0.06] text-danger'}`}>
               <span className={`h-1 w-1 rounded-full ${testResult.ok ? 'bg-bear' : 'bg-danger'}`} />
-              {testResult.ok ? testResult.msg : '测试失败'}
+              {testResult.ok ? testResult.msg : tx('测试失败')}
             </span>
           )}
           {(configured || canTest) && (
             <button onClick={handleTest} disabled={testing}
-              title="测试当前表单的连接, 不保存配置"
+              title={tx('测试当前表单的连接, 不保存配置')}
               className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs text-secondary transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-1 focus-visible:ring-offset-surface active:scale-[0.98] disabled:opacity-50">
               {testing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wifi className="h-3 w-3" />}
-              {testing ? '测试中' : '测试'}
+              {testing ? tx('测试中') : tx('测试')}
             </button>
           )}
         </div>
@@ -534,7 +536,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
       <section className="overflow-hidden rounded-card border border-border bg-surface">
         {/* 服务商 */}
         <div className="px-5 py-4">
-          <SectionHeader label="服务商" />
+          <SectionHeader label={tx('服务商')} />
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {PRESETS.map(p => {
               const active = selectedPreset?.label === p.label
@@ -557,21 +559,21 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
                     }`}>
                       <Icon className="h-3.5 w-3.5" />
                     </span>
-                    <span className={`truncate text-xs font-medium ${active ? 'text-foreground' : 'text-secondary'}`}>{p.label}</span>
-                    {p.sponsor && <span className="ml-auto shrink-0 rounded-full bg-amber-400/15 px-1.5 py-px text-[9px] font-semibold leading-none text-amber-600 dark:text-amber-400">优惠</span>}
+                    <span className={`truncate text-xs font-medium ${active ? 'text-foreground' : 'text-secondary'}`}>{tx(p.label)}</span>
+                    {p.sponsor && <span className="ml-auto shrink-0 rounded-full bg-amber-400/15 px-1.5 py-px text-[9px] font-semibold leading-none text-amber-600 dark:text-amber-400">{tx('优惠')}</span>}
                   </span>
-                  <span className="truncate font-mono text-[10px] text-muted">{presetMeta(p)}</span>
+                  <span className="truncate font-mono text-[10px] text-muted">{tx(presetMeta(p))}</span>
                 </button>
               )
             })}
           </div>
           {selectedPreset && (
             <div className="mt-2.5 rounded-lg bg-base/40 px-3.5 py-2.5">
-              <p className="text-[11px] leading-relaxed text-secondary">{selectedPreset.description}</p>
+              <p className="text-[11px] leading-relaxed text-secondary">{typeof selectedPreset.description === 'string' ? tx(selectedPreset.description) : selectedPreset.description}</p>
               {selectedPreset.website && (
                 <a href={selectedPreset.website} target="_blank" rel="noreferrer"
                   className={`mt-1.5 inline-flex items-center gap-1 text-[11px] transition-colors ${selectedPreset.sponsor ? 'font-medium text-orange-500 hover:text-orange-600 dark:text-orange-400 dark:hover:text-orange-300' : 'text-muted hover:text-accent'}`}>
-                  {selectedPreset.websiteLabel}
+                  {tx(selectedPreset.websiteLabel)}
                   <ExternalLink className="h-3 w-3" />
                 </a>
               )}
@@ -585,10 +587,10 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
         <div className="px-5 py-4">
           {/* 标题行: 左侧区段名, 右侧请求方式 (属于本区段内可编辑项, 与下方表单同组) */}
           <div className="mb-3 flex items-center gap-3">
-            <SectionHeader label={isCodexProvider ? '本地 CLI 配置' : '接口配置'} inline />
+            <SectionHeader label={isCodexProvider ? tx('本地 CLI 配置') : tx('接口配置')} inline />
             {!isCodexProvider && (
               <div className="ml-auto flex items-center rounded-full border border-border/40 bg-base/50 p-0.5"
-                title="Chat Completions 兼容面最广; Responses 为 OpenAI 官方新协议, 仅官方及少数网关支持。不确定就保持默认。">
+                title={tx('Chat Completions 兼容面最广; Responses 为 OpenAI 官方新协议, 仅官方及少数网关支持。不确定就保持默认。')}>
                 {(['chat_completions', 'responses'] as const).map(p => (
                   <button key={p} type="button" onClick={() => setProtocol(p)} aria-pressed={protocol === p}
                     className={`rounded-full px-2.5 py-1 font-mono text-[10px] leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
@@ -609,14 +611,14 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
           <div className="space-y-4">
           {isCodexProvider ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="CLI 命令" hint="固定使用默认 codex 命令, 由后端自动解析本机 Codex Desktop/CLI, 不支持自定义可执行路径。">
+              <Field label={tx('CLI 命令')} hint={tx('固定使用默认 codex 命令, 由后端自动解析本机 Codex Desktop/CLI, 不支持自定义可执行路径。')}>
                 <div className={`${INPUT_CLS} flex items-center text-muted/80 select-none`} aria-label="Codex CLI command">
                   {CODEX_COMMAND}
                 </div>
               </Field>
               <Field
-                label="模型 / 推理档"
-                hint={selectedCodexModelOption.hint}
+                label={tx('模型 / 推理档')}
+                hint={tx(selectedCodexModelOption.hint)}
               >
                 <select
                   value={codexModelSelectValue}
@@ -629,7 +631,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
                   className={INPUT_CLS}
                 >
                   {codexModelOptions.map(option => (
-                    <option key={option.value || 'codex-local-default'} value={option.value}>{option.label}</option>
+                    <option key={option.value || 'codex-local-default'} value={option.value}>{tx(option.label)}</option>
                   ))}
                 </select>
               </Field>
@@ -637,14 +639,14 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
           ) : (
             <>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field label="API 地址">
+                <Field label={tx('API 地址')}>
                   <input type="text" value={baseUrl} onChange={e => handleBaseUrlChange(e.target.value)} placeholder="https://llm.runninghub.ai/v1" className={INPUT_CLS} />
                 </Field>
-                <Field label="模型">
+                <Field label={tx('模型')}>
                   <div ref={modelBoxRef} className="relative">
                     <input type="text" value={model} onChange={e => handleModelChange(e.target.value)} placeholder="gpt-5.6-sol" className={`${INPUT_CLS} ${selectedPreset?.sponsor ? 'pr-9' : ''}`} />
                     {selectedPreset?.sponsor && (
-                      <button type="button" onClick={fetchModelOptions} aria-label="获取模型列表"
+                      <button type="button" onClick={fetchModelOptions} aria-label={tx('获取模型列表')}
                         className="absolute right-1.5 top-1/2 flex h-6 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-border/40 bg-base text-muted transition-colors hover:border-accent/40 hover:text-accent">
                         {modelsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5" />}
                       </button>
@@ -653,26 +655,25 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
                       <div className="absolute z-20 mt-1 w-full rounded-lg border border-border/40 bg-base shadow-lg">
                         <div className="border-b border-border/30 p-2">
                           <input type="text" value={modelFilter} onChange={e => setModelFilter(e.target.value)}
-                            placeholder="搜索模型..." autoFocus
+                            placeholder={tx('搜索模型...')} autoFocus
                             className="h-7 w-full rounded-md bg-base px-2 text-xs ring-1 ring-border/30 focus:outline-none focus:ring-accent/40" />
                         </div>
                         <div className="max-h-56 overflow-y-auto py-1">
                           {modelsLoading ? (
                             <div className="flex items-center justify-center gap-1.5 py-6 text-xs text-muted">
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />加载中...
-                            </div>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />{tx('加载中...')}</div>
                           ) : modelsError ? (
-                            <div className="px-3 py-4 text-center text-xs text-muted">获取失败: {modelsError}</div>
+                            <div className="px-3 py-4 text-center text-xs text-muted">{tx('获取失败:')} {modelsError}</div>
                           ) : sortedModelItems.length === 0 ? (
-                            <div className="px-3 py-4 text-center text-xs text-muted">{modelItems.length ? '无匹配模型' : '未获取到模型'}</div>
+                            <div className="px-3 py-4 text-center text-xs text-muted">{modelItems.length ? tx('无匹配模型') : tx('未获取到模型')}</div>
                           ) : sortedModelItems.map(m => {
                             const discounted = m.discount_rate != null && m.discount_rate < 1
                             const bands = bandDiscountLabel(m)
                             const priceHint = [
                               bands ?? undefined,
-                              m.offpeak_label ? `闲时时段: ${m.offpeak_label}` : undefined,
+                              m.offpeak_label ? tx('闲时时段: {label}', { label: m.offpeak_label }) : undefined,
                               [m.input_price, m.output_price].some(v => v != null)
-                                ? `输入 $${m.input_price ?? '-'}/1K tokens · 输出 $${m.output_price ?? '-'}/1K tokens`
+                                ? tx('输入 ${in}/1K tokens · 输出 ${out}/1K tokens', { in: m.input_price ?? '-', out: m.output_price ?? '-' })
                                 : undefined,
                             ].filter(Boolean).join('\n') || undefined
                             const isOffPeak = m.current_band === 'OFF_PEAK'
@@ -691,9 +692,9 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
                                           ? 'bg-emerald-400/15 text-emerald-600 dark:text-emerald-400'
                                           : 'bg-amber-400/15 text-amber-600 dark:text-amber-400'
                                       }`}
-                                      title={m.offpeak_label ? `闲时时段: ${m.offpeak_label}` : undefined}
+                                      title={m.offpeak_label ? tx('闲时时段: {label}', { label: m.offpeak_label }) : undefined}
                                     >
-                                      {bands}{isOffPeak ? ' · 当前闲时' : ' · 当前忙时'}
+                                      {bands}{isOffPeak ? tx('· 当前闲时') : tx('· 当前忙时')}
                                     </span>
                                   ) : discounted && (
                                     <span className="rounded-full bg-amber-400/15 px-1.5 py-px text-[10px] font-medium text-amber-600 dark:text-amber-400">
@@ -713,7 +714,7 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
 
               {isOpenAIProvider && (
                 <div className="max-w-[220px]">
-                  <Field label="推理强度" hint="模型支持的推理档位 (如 high / xhigh); 非推理模型留空即可。">
+                  <Field label={tx('推理强度')} hint={tx('模型支持的推理档位 (如 high / xhigh); 非推理模型留空即可。')}>
                     <input type="text" value={reasoningEffort} onChange={e => setReasoningEffort(e.target.value)} placeholder={DEFAULT_REASONING_EFFORT} className={INPUT_CLS} />
                   </Field>
                 </div>
@@ -721,24 +722,23 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
 
               <Field label="API Key">
                 <div className="relative">
-                  <input type={showKey ? 'text' : 'password'} value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={configured ? `${s?.ai_api_key_masked} · 留空不修改` : 'sk-...'} className={`${INPUT_CLS} pr-9`} />
-                  <button onClick={() => setShowKey(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted/40 hover:text-muted" tabIndex={-1} aria-label={showKey ? '隐藏' : '显示'}>
+                  <input type={showKey ? 'text' : 'password'} value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={configured ? tx('{masked} · 留空不修改', { masked: s?.ai_api_key_masked ?? '' }) : 'sk-...'} className={`${INPUT_CLS} pr-9`} />
+                  <button onClick={() => setShowKey(v => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted/40 hover:text-muted" tabIndex={-1} aria-label={showKey ? tx('隐藏') : tx('显示')}>
                     {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                   </button>
                 </div>
               </Field>
 
               <div className="flex items-center gap-2 border-t border-border/30 pt-3.5">
-                <span className="text-xs font-medium text-secondary">自定义 User-Agent</span>
-                <span className="text-[10px] text-muted">绕过 CDN/WAF 的 Bot 拦截</span>
+                <span className="text-xs font-medium text-secondary">{tx('自定义 User-Agent')}</span>
+                <span className="text-[10px] text-muted">{tx('绕过 CDN/WAF 的 Bot 拦截')}</span>
                 <div className="ml-auto"><Toggle checked={customUa} onChange={() => setCustomUa(v => !v)} /></div>
               </div>
               {customUa && (
                 <div className="flex gap-2">
-                  <input type="text" value={userAgent} onChange={e => setUserAgent(e.target.value)} placeholder="粘贴浏览器 User-Agent" className={`${INPUT_CLS} flex-1`} />
-                  <button type="button" onClick={genRandomUa} title="随机生成浏览器 User-Agent" className="h-9 px-2.5 rounded-lg border border-border/50 text-xs text-secondary hover:text-accent hover:border-accent/30 transition-all flex items-center gap-1.5 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 active:scale-[0.98]">
-                    <Shuffle className="h-3 w-3" /> 随机
-                  </button>
+                  <input type="text" value={userAgent} onChange={e => setUserAgent(e.target.value)} placeholder={tx('粘贴浏览器 User-Agent')} className={`${INPUT_CLS} flex-1`} />
+                  <button type="button" onClick={genRandomUa} title={tx('随机生成浏览器 User-Agent')} className="h-9 px-2.5 rounded-lg border border-border/50 text-xs text-secondary hover:text-accent hover:border-accent/30 transition-all flex items-center gap-1.5 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 active:scale-[0.98]">
+                    <Shuffle className="h-3 w-3" /> {tx('随机')}</button>
                 </div>
               )}
             </>
@@ -752,18 +752,18 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
         <div>
           <button type="button" onClick={() => setAdvancedOpen(v => !v)} aria-expanded={advancedOpen}
             className="flex w-full items-center gap-2 px-5 py-3.5 text-left transition-colors hover:bg-elevated/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60">
-            <SectionHeader label="高级参数" inline />
+            <SectionHeader label={tx('高级参数')} inline />
             <ChevronDown className={`ml-auto h-3.5 w-3.5 text-muted transition-transform duration-200 ${advancedOpen ? 'rotate-180' : ''}`} />
           </button>
           {advancedOpen && (
             <div className="grid grid-cols-1 gap-4 px-5 pb-4 md:grid-cols-3">
-              <Field label="输出上限 max_tokens" hint="任务请求会被钳制到此值; 默认 16384">
+              <Field label={tx('输出上限 max_tokens')} hint={tx('任务请求会被钳制到此值; 默认 16384')}>
                 <input type="number" min={1} value={maxOutputTokens} onChange={e => setMaxOutputTokens(e.target.value)} placeholder="16384" className={INPUT_CLS} />
               </Field>
-              <Field label="上下文窗口 (输入上限)" hint="超出时报错提示调大; 默认 128000">
+              <Field label={tx('上下文窗口 (输入上限)')} hint={tx('超出时报错提示调大; 默认 128000')}>
                 <input type="number" min={1} value={contextWindow} onChange={e => setContextWindow(e.target.value)} placeholder="128000" className={INPUT_CLS} />
               </Field>
-              <Field label="助手工具轮数检查点" hint="连续 N 轮未完成时询问; 0 = 不检查; 默认 100">
+              <Field label={tx('助手工具轮数检查点')} hint={tx('连续 N 轮未完成时询问; 0 = 不检查; 默认 100')}>
                 <input type="number" min={0} value={roundCheckpoint} onChange={e => setRoundCheckpoint(e.target.value)} placeholder="100" className={INPUT_CLS} />
               </Field>
             </div>
@@ -779,13 +779,13 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
             <Shield className="mt-px h-3.5 w-3.5 shrink-0 text-muted/70" />
             <p className="text-[11px] leading-relaxed text-muted">
               {isCodexProvider
-                ? 'Codex CLI 会复用本机已登录账户, 分析上下文将发送给 OpenAI/Codex。'
-                : 'API Key 仅保存在本机项目文件, 不会上传到任何服务器。'}
+                ? tx('Codex CLI 会复用本机已登录账户, 分析上下文将发送给 OpenAI/Codex。')
+                : tx('API Key 仅保存在本机项目文件, 不会上传到任何服务器。')}
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             {testResult?.ok && (
-              <span title="测试只验证当前表单, 不会保存配置; 通过后请点「保存配置」生效"
+              <span title={tx('测试只验证当前表单, 不会保存配置; 通过后请点「保存配置」生效')}
                 className="inline-flex max-w-[280px] items-center gap-1.5 rounded-full border border-bear/25 bg-bear/[0.06] px-2 py-0.5 text-[10px] text-bear">
                 <span className="h-1 w-1 shrink-0 rounded-full bg-bear" />
                 <span className="min-w-0 truncate">{testResult.msg}</span>
@@ -794,16 +794,15 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
             {configured && (
               <button onClick={() => setConfirmClear(true)} disabled={clear.isPending} className="h-9 px-3.5 rounded-lg text-secondary hover:bg-danger/10 hover:text-danger text-sm flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/60 focus-visible:ring-offset-1 focus-visible:ring-offset-surface active:scale-[0.98]" title="Clear AI provider configuration">
                 <Trash2 className="h-3.5 w-3.5" />
-                清空
-              </button>
+                {tx('清空')}</button>
             )}
-            <button onClick={handleTest} disabled={testing || !canTest} className="h-9 px-3.5 rounded-lg text-secondary hover:bg-elevated hover:text-foreground text-sm flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-1 focus-visible:ring-offset-surface active:scale-[0.98]" title="测试当前表单的连接, 不保存配置">
+            <button onClick={handleTest} disabled={testing || !canTest} className="h-9 px-3.5 rounded-lg text-secondary hover:bg-elevated hover:text-foreground text-sm flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-1 focus-visible:ring-offset-surface active:scale-[0.98]" title={tx('测试当前表单的连接, 不保存配置')}>
               {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wifi className="h-3.5 w-3.5" />}
-              {testing ? '测试中' : '测试连接'}
+              {testing ? tx('测试中') : tx('测试连接')}
             </button>
             <button onClick={() => save.mutate()} disabled={save.isPending || !canSave} className="h-9 px-5 rounded-lg bg-accent text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-accent/90 disabled:opacity-40 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-1 focus-visible:ring-offset-surface active:scale-[0.98]">
               {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-              {save.isPending ? '保存中...' : saved ? '已保存' : '保存配置'}
+              {save.isPending ? tx('保存中...') : saved ? tx('已保存') : tx('保存配置')}
             </button>
           </div>
         </div>
@@ -816,10 +815,10 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
 
         {/* 配置文件: Key 统一存放位置, 支持外部编辑后热加载 */}
         {s?.secrets_path && (
-          <div className="border-t border-border/40 px-5 py-3" title="AI 与数据源 Key 统一存放在此文件; 外部编辑保存后点「重新加载」即生效, 无需重启。">
+          <div className="border-t border-border/40 px-5 py-3" title={tx('AI 与数据源 Key 统一存放在此文件; 外部编辑保存后点「重新加载」即生效, 无需重启。')}>
             <div className="flex items-center gap-2">
               <FileCog className="h-3.5 w-3.5 shrink-0 text-muted/70" />
-              <span className="shrink-0 text-[11px] text-muted">配置文件</span>
+              <span className="shrink-0 text-[11px] text-muted">{tx('配置文件')}</span>
               <code className="min-w-0 truncate rounded bg-base/70 px-1.5 py-0.5 font-mono text-[11px] text-secondary" title={s.secrets_path}>
                 {s.secrets_path}
               </code>
@@ -827,18 +826,17 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
                 <button type="button" onClick={copySecretsPath}
                   className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-muted transition-colors hover:bg-elevated hover:text-secondary">
                   {pathCopied ? <Check className="h-3 w-3 text-bear" /> : null}
-                  {pathCopied ? '已复制' : '复制路径'}
+                  {pathCopied ? tx('已复制') : tx('复制路径')}
                 </button>
                 <button type="button" onClick={reloadFromFile} disabled={settings.isFetching}
                   className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-muted transition-colors hover:bg-elevated hover:text-secondary disabled:opacity-50">
                   {reloaded ? <Check className="h-3 w-3 text-bear" /> : <RefreshCw className={`h-3 w-3 ${settings.isFetching ? 'animate-spin' : ''}`} />}
-                  {reloaded ? '已同步' : '重新加载'}
+                  {reloaded ? tx('已同步') : tx('重新加载')}
                 </button>
               </span>
             </div>
             <p className="mt-1.5 pl-[22px] text-[10px] leading-relaxed text-muted/80">
-              可直接用编辑器修改本文件, 保存后点「重新加载」同步; 所有 AI 与数据源 Key 均在此统一管理。
-            </p>
+              {tx('可直接用编辑器修改本文件, 保存后点「重新加载」同步; 所有 AI 与数据源 Key 均在此统一管理。')}</p>
           </div>
         )}
       </section>
@@ -849,16 +847,14 @@ export function SettingsAIPanel({ highlight }: { highlight?: string } = {}) {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setConfirmClear(false)} />
           <div className="relative w-[90vw] max-w-[380px] rounded-card border border-border bg-base shadow-2xl p-6">
-            <h3 className="text-sm font-medium text-foreground mb-2">清空 AI 配置</h3>
+            <h3 className="text-sm font-medium text-foreground mb-2">{tx('清空 AI 配置')}</h3>
             <p className="text-xs text-secondary mb-5 leading-relaxed">
-              这会清空已保存的 provider、API Key、API 地址、模型和 Codex CLI 命令。之后可以重新配置。
-            </p>
+              {tx('这会清空已保存的 provider、API Key、API 地址、模型和 Codex CLI 命令。之后可以重新配置。')}</p>
             <div className="flex items-center justify-end gap-2">
               <button onClick={() => setConfirmClear(false)} className="px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:bg-elevated/80 text-sm transition-colors">
-                取消
-              </button>
+                {tx('取消')}</button>
               <button onClick={() => clear.mutate()} disabled={clear.isPending} className="px-3 py-1.5 rounded-btn bg-danger/15 text-danger hover:bg-danger/25 text-sm font-medium transition-colors disabled:opacity-50">
-                {clear.isPending ? '清空中...' : '确认'}
+                {clear.isPending ? tx('清空中...') : tx('确认')}
               </button>
             </div>
           </div>

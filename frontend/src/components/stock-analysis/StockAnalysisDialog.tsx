@@ -7,6 +7,7 @@ import {
 import { cn } from '@/lib/cn'
 import { copyText } from '@/lib/clipboard'
 import { toast } from '@/components/Toast'
+import { formatRelativeTime, useI18n } from '@/lib/i18n'
 import { MarkdownRenderer } from '@/components/financials/MarkdownRenderer'
 import {
   type ActiveTask, type HistoryReport,
@@ -42,6 +43,7 @@ function getMeta(task: ActiveTask | HistoryReport | null) {
 }
 
 export function StockAnalysisDialog({ task, mode, minimized }: Props) {
+  const { locale, t, tx } = useI18n()
   const scrollRef = useRef<HTMLDivElement>(null)
   const [focus, setFocus] = useState('')
   const [copied, setCopied] = useState(false)
@@ -73,11 +75,11 @@ export function StockAnalysisDialog({ task, mode, minimized }: Props) {
     if (!content) return
     const success = await copyText(content)
     if (!success) {
-      toast('复制失败,请手动选择文本', 'error')
+      toast(t('common.copyFailed'), 'error')
       return
     }
     setCopied(true)
-    toast('已复制到剪贴板', 'success')
+    toast(t('common.copied'), 'success')
     setTimeout(() => setCopied(false), 2000)
   }
 
@@ -110,7 +112,7 @@ export function StockAnalysisDialog({ task, mode, minimized }: Props) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-foreground truncate">
-                    {isHistory ? '历史分析报告' : 'AI 个股分析'}
+                    {isHistory ? tx('历史分析报告') : tx('AI 个股分析')}
                   </span>
                   {task && <span className="text-xs text-secondary truncate">{task.name}</span>}
                   {task && <span className="text-[10px] font-mono text-muted shrink-0">{task.symbol}</span>}
@@ -121,32 +123,32 @@ export function StockAnalysisDialog({ task, mode, minimized }: Props) {
                       <Sparkles className="h-2.5 w-2.5 shrink-0" />
                       <span className="truncate">{meta.summary}</span>
                     </span>
-                  ) : isWorking ? <span>正在读取行情与价位数据…</span> : null}
+                  ) : isWorking ? <span>{tx('正在读取行情与价位数据…')}</span> : null}
                   {phase === 'streaming' && (
                     <span className="flex items-center gap-1 text-sky-300 shrink-0">
-                      <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-pulse" />生成中
+                      <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-pulse" />{t('common.generating')}
                     </span>
                   )}
                   {isHistory && task && 'created_at' in task && (
-                    <span className="shrink-0">{fmtRelative(task.created_at)}</span>
+                    <span className="shrink-0">{formatRelativeTime(task.created_at, locale)}</span>
                   )}
                 </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {content && !isWorking && (
-                  <button onClick={handleCopy} title="复制全文"
+                  <button onClick={handleCopy} title={t('common.copyFull')}
                     className="p-1.5 rounded-lg hover:bg-elevated text-muted hover:text-foreground transition-colors">
                     {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
                   </button>
                 )}
                 {!isHistory && isWorking && (
-                  <button onClick={minimizeDialog} title="最小化为气泡,后台继续生成"
+                  <button onClick={minimizeDialog} title={t('common.minimizeBubble')}
                     className="p-1.5 rounded-lg hover:bg-elevated text-muted hover:text-foreground transition-colors">
                     <Minimize2 className="h-4 w-4" />
                   </button>
                 )}
                 {(!isWorking || isHistory) && (
-                  <button onClick={closeDialog} title="关闭"
+                  <button onClick={closeDialog} title={t('common.close')}
                     className="p-1.5 rounded-lg hover:bg-elevated text-muted hover:text-foreground transition-colors">
                     <X className="h-4 w-4" />
                   </button>
@@ -165,8 +167,8 @@ export function StockAnalysisDialog({ task, mode, minimized }: Props) {
                   </div>
                   <Loader2 className="absolute -inset-1 h-12 w-12 text-sky-400/40 animate-spin" style={{ animationDuration: '3s' }} />
                 </div>
-                <div className="text-xs text-secondary">AI 正在分析行情与关键价位…</div>
-                <div className="text-[10px] text-muted">读取日 K / 技术指标 / 压力支撑 / 财务,生成四维分析</div>
+                <div className="text-xs text-secondary">{tx('AI 正在分析行情与关键价位…')}</div>
+                <div className="text-[10px] text-muted">{tx('读取日 K / 技术指标 / 压力支撑 / 财务,生成四维分析')}</div>
               </div>
             )}
 
@@ -175,17 +177,17 @@ export function StockAnalysisDialog({ task, mode, minimized }: Props) {
                 <div className="h-11 w-11 rounded-full bg-danger/10 flex items-center justify-center">
                   <AlertTriangle className="h-5 w-5 text-danger" />
                 </div>
-                <div className="text-sm font-medium text-foreground">分析失败</div>
+                <div className="text-sm font-medium text-foreground">{t('common.analysisFailed')}</div>
                 <div className="text-xs text-secondary text-center max-w-md px-4">{error}</div>
                 {error.includes('AI') && (
                   <button onClick={() => { window.location.href = `${import.meta.env.BASE_URL}settings?tab=ai` }}
                     className="mt-1 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-elevated border border-border text-xs text-secondary hover:text-foreground transition-colors">
-                    <Settings2 className="h-3.5 w-3.5" /> 去配置 AI
+                    <Settings2 className="h-3.5 w-3.5" /> {t('common.goToAiConfig')}
                   </button>
                 )}
                 <button onClick={handleStartNew}
                   className="mt-1 inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-sky-500/15 border border-sky-400/30 text-xs text-sky-300 hover:bg-sky-500/20 transition-colors">
-                  <RefreshCw className="h-3.5 w-3.5" /> 重试
+                  <RefreshCw className="h-3.5 w-3.5" /> {t('common.retry')}
                 </button>
               </div>
             )}
@@ -205,7 +207,7 @@ export function StockAnalysisDialog({ task, mode, minimized }: Props) {
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5 text-[10px] text-muted shrink-0">
                 <Wand2 className="h-3 w-3" />
-                <span className="hidden sm:inline">关注重点</span>
+                <span className="hidden sm:inline">{tx('关注重点')}</span>
               </div>
               <input
                 type="text"
@@ -213,7 +215,7 @@ export function StockAnalysisDialog({ task, mode, minimized }: Props) {
                 onChange={e => setFocus(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && (phase === 'done' || phase === 'error' || isHistory)) handleStartNew() }}
                 disabled={isWorking}
-                placeholder={isHistory ? '修改关注重点,回车重新生成' : (phase === 'done' ? '如:重点看能否突破压力位…回车重新分析' : '可留空,留空则全面分析')}
+                placeholder={isHistory ? tx('修改关注重点,回车重新生成') : (phase === 'done' ? tx('如:重点看能否突破压力位…回车重新分析') : tx('可留空,留空则全面分析'))}
                 className={cn(
                   'flex-1 h-8 px-3 rounded-lg bg-base ring-1 ring-border/30 text-xs text-foreground placeholder:text-muted/40',
                   'focus:outline-none focus:ring-2 focus:ring-sky-400/30 transition-shadow disabled:opacity-50',
@@ -223,42 +225,30 @@ export function StockAnalysisDialog({ task, mode, minimized }: Props) {
                 <button
                   onClick={handleStartNew}
                   className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-gradient-to-r from-sky-500/20 to-blue-500/15 border border-sky-400/30 text-xs font-medium text-sky-300 hover:from-sky-500/30 hover:to-blue-500/20 transition-all shrink-0"
-                  title="以此关注点重新生成新报告"
+                  title={tx('以此关注点重新生成新报告')}
                 >
-                  <RefreshCw className="h-3.5 w-3.5" />重新生成
+                  <RefreshCw className="h-3.5 w-3.5" />{tx('重新生成')}
                 </button>
               ) : (
                 <button
                   onClick={handleStartNew}
                   disabled={isWorking}
                   className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-gradient-to-r from-sky-500/20 to-blue-500/15 border border-sky-400/30 text-xs font-medium text-sky-300 hover:from-sky-500/30 hover:to-blue-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
-                  title={focus.trim() ? '按关注重点重新分析' : '重新分析'}
+                  title={focus.trim() ? tx('按关注重点重新分析') : tx('重新分析')}
                 >
                   {isWorking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : phase === 'done' ? <RefreshCw className="h-3.5 w-3.5" /> : <Send className="h-3.5 w-3.5" />}
-                  {phase === 'done' ? '重新分析' : '分析'}
+                  {phase === 'done' ? tx('重新分析') : tx('分析')}
                 </button>
               )}
             </div>
             <p className="mt-1.5 text-[10px] text-muted/50 leading-relaxed">
               {isHistory
-                ? '历史报告为静态记录;修改关注重点后将作为新任务重新生成。报告仅供参考,不构成投资建议。'
-                : '报告由项目已配置的 AI 模型基于本地行情与财务数据生成;消息面维度暂依据价量异动推断。报告仅供参考,不构成投资建议。'}
+                ? tx('历史报告为静态记录;修改关注重点后将作为新任务重新生成。报告仅供参考,不构成投资建议。')
+                : tx('报告由项目已配置的 AI 模型基于本地行情与财务数据生成;消息面维度暂依据价量异动推断。报告仅供参考,不构成投资建议。')}
             </p>
           </div>
         </motion.div>
       </motion.div>
     </AnimatePresence>
   )
-}
-
-function fmtRelative(iso: string): string {
-  try {
-    const t = new Date(iso).getTime()
-    const diff = Date.now() - t
-    if (diff < 60_000) return '刚刚'
-    if (diff < 3600_000) return `${Math.floor(diff / 60_000)} 分钟前`
-    if (diff < 86400_000) return `${Math.floor(diff / 3600_000)} 小时前`
-    if (diff < 7 * 86400_000) return `${Math.floor(diff / 86400_000)} 天前`
-    return new Date(iso).toLocaleDateString('zh-CN')
-  } catch { return '' }
 }

@@ -4,6 +4,8 @@
 // Prod:同源(FastAPI 托管前端 dist)
 
 import { toast } from '@/components/Toast'
+import { getLocale, t } from '@/lib/i18n'
+import { localizeApiError } from './api-errors'
 import type { NavLayout } from './navLayout'
 
 const BASE = ''
@@ -43,7 +45,7 @@ export interface WatchlistPrepareResult {
 export function friendlyStreamError(message: string | undefined | null): string {
   if (!message) return ''
   if (/failed to fetch|network error|load failed|networkerror/i.test(message)) {
-    return '网络连接中断: 通常是 AI 服务繁忙, 或代理/网关超时切断了长连接, 请重试'
+    return t('common.networkError')
   }
   return message
 }
@@ -77,7 +79,7 @@ async function request<T>(path: string, init?: RequestOptions): Promise<T> {
     })
   } catch (err) {
     if (ctl && err instanceof DOMException && err.name === 'AbortError') {
-      const msg = `请求超时（${timeoutSeconds}s）· ${path.split('?')[0]}`
+      const msg = t('common.requestTimeout', { s: timeoutSeconds, path: path.split('?')[0] })
       if (!quiet) toast(msg, 'error')
       throw new ApiError(msg, 0)
     }
@@ -99,7 +101,7 @@ async function request<T>(path: string, init?: RequestOptions): Promise<T> {
         detail = JSON.stringify(raw)
       }
     } catch { /* ignore */ }
-    const msg = detail || `${res.status} ${res.statusText}`
+    const msg = detail ? localizeApiError(detail) : `${res.status} ${res.statusText}`
     // 401 (未登录/会话过期) 不弹 toast — 由全局认证拦截器统一跳登录页, 避免刷屏
     if (res.status !== 401 && !quiet) toast(msg, 'error')
     const retryAfter = Number(res.headers.get('Retry-After'))
@@ -4529,12 +4531,12 @@ export const api = {
     const res = await fetch('/api/financials/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol, focus: focus ?? '' }),
+      body: JSON.stringify({ symbol, focus: focus ?? '', locale: getLocale() }),
     })
     if (!res.ok) {
       let detail = ''
       try { const j = JSON.parse(await res.text()); detail = j.detail ?? j.message ?? '' } catch { /* ignore */ }
-      const msg = detail || `${res.status} ${res.statusText}`
+      const msg = detail ? localizeApiError(detail) : `${res.status} ${res.statusText}`
       toast(msg, 'error')
       throw new Error(msg)
     }
@@ -4601,12 +4603,12 @@ export const api = {
     const res = await fetch('/api/stock-analysis/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol, focus: focus ?? '' }),
+      body: JSON.stringify({ symbol, focus: focus ?? '', locale: getLocale() }),
     })
     if (!res.ok) {
       let detail = ''
       try { const j = JSON.parse(await res.text()); detail = j.detail ?? j.message ?? '' } catch { /* ignore */ }
-      const msg = detail || `${res.status} ${res.statusText}`
+      const msg = detail ? localizeApiError(detail) : `${res.status} ${res.statusText}`
       toast(msg, 'error')
       throw new Error(msg)
     }
@@ -4676,12 +4678,12 @@ export const api = {
     const res = await fetch('/api/market-recap/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ as_of: asOf ?? null, focus: focus ?? '' }),
+      body: JSON.stringify({ as_of: asOf ?? null, focus: focus ?? '', locale: getLocale() }),
     })
     if (!res.ok) {
       let detail = ''
       try { const j = JSON.parse(await res.text()); detail = j.detail ?? j.message ?? '' } catch { /* ignore */ }
-      const msg = detail || `${res.status} ${res.statusText}`
+      const msg = detail ? localizeApiError(detail) : `${res.status} ${res.statusText}`
       toast(msg, 'error')
       throw new Error(msg)
     }
@@ -4723,7 +4725,7 @@ export const api = {
     if (!res.ok) {
       let detail = ''
       try { const j = JSON.parse(await res.text()); detail = j.detail ?? j.message ?? '' } catch { /* ignore */ }
-      const msg = detail || `${res.status} ${res.statusText}`
+      const msg = detail ? localizeApiError(detail) : `${res.status} ${res.statusText}`
       toast(msg, 'error')
       throw new Error(msg)
     }
@@ -5153,7 +5155,7 @@ export const api = {
     if (!res.ok) {
       let detail = ''
       try { const j = JSON.parse(await res.text()); detail = j.detail ?? j.message ?? '' } catch { /* ignore */ }
-      const msg = detail || `${res.status} ${res.statusText}`
+      const msg = detail ? localizeApiError(detail) : `${res.status} ${res.statusText}`
       toast(msg, 'error')
       throw new Error(msg)
     }

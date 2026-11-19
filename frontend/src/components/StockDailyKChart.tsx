@@ -2,9 +2,10 @@ import { lazy, Suspense, useCallback, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { type KlineRow } from '@/lib/api'
 import { klineDailyQueryOptions, klineDateRange } from '@/lib/kline'
+import { tx } from '@/lib/i18n'
 import { storage } from '@/lib/storage'
 import type { ChartMarker, ChartPriceLine, ChartRange, ChartRenderer, DailyMarkerStyle, OHLC, VolumeCompareConfig } from '@/lib/chart-types'
-import { OVERLAY_INDICATORS, SUB_CHART_META } from '@/lib/chart-indicators'
+import { OVERLAY_INDICATORS, SUB_CHART_META, subChartLabel } from '@/lib/chart-indicators'
 import { CHART_LAYOUT, dailyChartHeight } from '@/lib/chart-layout'
 
 const EChartsCandlestick = lazy(() => import('./EChartsCandlestick').then(m => ({ default: m.EChartsCandlestick })))
@@ -91,14 +92,14 @@ function buildLimitMarkers(rows: KlineRow[], includeLimitDown: boolean): ChartMa
   for (const r of rows) {
     const date = typeof r.date === 'string' ? r.date.slice(0, 10) : String(r.date)
     if (includeLimitDown && r.signal_limit_down) {
-      markers.push({ date, kind: 'sell', above: false, color: '#22D3EE', label: '跌', event: 'limit_down' })
+      markers.push({ date, kind: 'sell', above: false, color: '#22D3EE', label: tx('跌'), event: 'limit_down' })
     } else if (r.signal_broken_limit_up) {
-      markers.push({ date, kind: 'neutral', above: true, color: '#8B5CF6', label: '炸', event: 'broken_limit_up' })
+      markers.push({ date, kind: 'neutral', above: true, color: '#8B5CF6', label: tx('炸'), event: 'broken_limit_up' })
     } else if (r.signal_limit_up) {
       const boards: number = r.consecutive_limit_ups ?? 1
       markers.push({ date, kind: 'buy', above: true, color: '#FACC15', label: boards <= 1 ? '板' : String(boards), event: 'limit_up' })
     } else if (includeLimitDown && isRecoveredLimitDown(r)) {
-      markers.push({ date, kind: 'neutral', above: false, color: '#60A5FA', label: '翘', event: 'limit_down_recovery' })
+      markers.push({ date, kind: 'neutral', above: false, color: '#60A5FA', label: tx('翘'), event: 'limit_down_recovery' })
     }
   }
   return markers
@@ -210,12 +211,12 @@ export function StockDailyKChart({
     <div className={className} style={{ minHeight: chartHeight }}>
       {showIndicatorControls && rows.length > 0 && (
         <div className={renderer === 'lightweight' ? 'flex min-h-10 flex-wrap items-center gap-1 border-b border-border/50 bg-elevated/20 px-3 py-1.5 xl:h-10 xl:flex-nowrap xl:py-0' : 'flex items-center gap-1.5 px-1 pb-0.5'}>
-          {renderer === 'lightweight' && <span className="mr-2 shrink-0 text-xs font-semibold text-foreground">日 K</span>}
+          {renderer === 'lightweight' && <span className="mr-2 shrink-0 text-xs font-semibold text-foreground">{tx('日 K')}</span>}
           {SUB_CHART_META.map(ind => (
             <ChartPill
               key={ind.key}
               active={activeIndicators.includes(ind.key)}
-              label={ind.label}
+              label={subChartLabel(ind)}
               activeClass="bg-accent/20 text-accent"
               onClick={() => toggleIndicator(ind.key)}
             />
@@ -224,20 +225,20 @@ export function StockDailyKChart({
             <ChartPill
               key={ind.key}
               active={activeIndicators.includes(ind.key)}
-              label={ind.label}
+              label={subChartLabel(ind)}
               activeClass="bg-accent/20 text-accent"
               onClick={() => toggleIndicator(ind.key)}
             />
           ))}
           {activeIndicators.includes('vol') && (
             <div className="ml-0.5 flex h-5 items-center gap-1.5 border-l border-border/70 pl-2">
-              <span className="text-[10px] text-muted">量比</span>
+              <span className="text-[10px] text-muted">{tx('量比')}</span>
               <button
                 type="button"
                 role="switch"
                 aria-checked={volumeCompare.enabled}
-                aria-label="开启量能对比"
-                title={volumeCompare.enabled ? '关闭量能对比' : '开启量能对比'}
+                aria-label={tx('开启量能对比')}
+                title={volumeCompare.enabled ? tx('关闭量能对比') : tx('开启量能对比')}
                 onClick={() => updateVolumeCompare({ enabled: !volumeCompare.enabled })}
                 className={`relative h-3.5 w-6 shrink-0 rounded-full transition-colors ${
                   volumeCompare.enabled ? 'bg-accent' : 'bg-elevated'
@@ -248,14 +249,14 @@ export function StockDailyKChart({
                 }`} />
               </button>
               <select
-                aria-label="量能对比周期"
+                aria-label={tx('量能对比周期')}
                 value={volumeCompare.days}
                 disabled={!volumeCompare.enabled}
                 onChange={event => updateVolumeCompare({ days: Number(event.target.value) })}
                 className="h-5 rounded border border-border bg-base px-1 text-[10px] text-secondary outline-none disabled:opacity-40"
               >
                 {Array.from({ length: 20 }, (_, index) => index + 1).map(days => (
-                  <option key={days} value={days}>前{days}日均量</option>
+                  <option key={days} value={days}>{tx('前{v}日均量', { v: days })}</option>
                 ))}
               </select>
             </div>
@@ -266,20 +267,20 @@ export function StockDailyKChart({
               <div className="flex items-center gap-1">
                 <ChartPill
                   active={showMarkers}
-                  label="异动"
+                  label={tx('异动')}
                   activeClass="text-[#FACC15] bg-[#FACC15]/10"
                   onClick={() => setShowMarkers(v => !v)}
                 />
                 {renderer === 'lightweight' && <select
-                  aria-label="异动显示方式"
-                  title="文字：显示板/炸/跌/翘标记；颜色：涨停为黄，跌停为青蓝；炸板收阳为玫紫、收阴为蓝紫；翘板收阳为薄荷青、收阴为钢蓝。开收同价沿用对应收阴色，影线保留原涨跌色。"
+                  aria-label={tx('异动显示方式')}
+                  title={tx('文字：显示板/炸/跌/翘标记；颜色：涨停为黄，跌停为青蓝；炸板收阳为玫紫、收阴为蓝紫；翘板收阳为薄荷青、收阴为钢蓝。开收同价沿用对应收阴色，影线保留原涨跌色。')}
                   value={markerStyle}
                   disabled={!showMarkers}
                   onChange={event => updateMarkerStyle(event.target.value as DailyMarkerStyle)}
                   className="h-5 w-[74px] rounded border border-border bg-base px-1 text-[10px] text-secondary outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-40"
                 >
-                  <option value="label">文字</option>
-                  <option value="candle">颜色</option>
+                  <option value="label">{tx('文字')}</option>
+                  <option value="candle">{tx('颜色')}</option>
                 </select>}
               </div>
             )}
@@ -287,22 +288,22 @@ export function StockDailyKChart({
             {showMarkerToggle && addedDate && (
               <ChartPill
                 active={showAddedMark}
-                label="自选"
+                label={tx('自选')}
                 activeClass="text-[#3B82F6] bg-[#3B82F6]/10"
-                title={showAddedMark ? '隐藏K线上的加入自选日标注' : '显示K线上的加入自选日标注'}
+                title={showAddedMark ? tx('隐藏K线上的加入自选日标注') : tx('显示K线上的加入自选日标注')}
                 onClick={() => setShowAddedMark(v => !v)}
               />
             )}
           </div>
         </div>
       )}
-      {kline.isLoading && <div className="text-sm text-muted py-4">加载中…</div>}
-      {kline.isError && <div className="text-sm text-danger py-2">日K加载失败</div>}
+      {kline.isLoading && <div className="text-sm text-muted py-4">{tx('加载中…')}</div>}
+      {kline.isError && <div className="text-sm text-danger py-2">{tx('日K加载失败')}</div>}
       {!kline.isLoading && !kline.isError && (kline.data?.rows?.length ?? 0) > 0 && rows.length === 0 && (
-        <div className="text-sm text-danger py-2">数据格式异常，请刷新页面</div>
+        <div className="text-sm text-danger py-2">{tx('数据格式异常，请刷新页面')}</div>
       )}
       {rows.length > 0 && (
-        <Suspense fallback={<div className="flex items-center justify-center text-xs text-muted" style={{ height }}>正在加载图表…</div>}>
+        <Suspense fallback={<div className="flex items-center justify-center text-xs text-muted" style={{ height }}>{tx('正在加载图表…')}</div>}>
         <Chart
           data={rows}
           markers={allMarkers}

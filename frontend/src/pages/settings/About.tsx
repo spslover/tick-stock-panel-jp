@@ -9,8 +9,10 @@ import { useUpdateCheck } from '@/lib/updateCheck'
 import { Modal } from '@/components/Modal'
 import { OssLicenseDialog, LicenseComplianceNotice } from '@/components/OssLicenseDialog'
 import { PROJECT_LICENSE_NAME, PROJECT_REPO_URL } from '@/data/ossLicenses'
+import { useI18n } from '@/lib/i18n'
 
 export function SettingsAboutPanel() {
+  const { tx } = useI18n()
   const { data: versionData } = useVersion()
   const [licenseOpen, setLicenseOpen] = useState(false)
   const [qrZoom, setQrZoom] = useState<{ src: string; alt: string; caption: string } | null>(null)
@@ -42,7 +44,7 @@ export function SettingsAboutPanel() {
         <div className="flex items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
             <Scale className="h-4 w-4 text-accent" />
-            <h3 className="text-sm font-medium text-foreground">版权</h3>
+            <h3 className="text-sm font-medium text-foreground">{tx('版权')}</h3>
           </div>
           <span className="shrink-0 rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-[10px] font-medium text-accent">
             {PROJECT_LICENSE_NAME}
@@ -53,7 +55,7 @@ export function SettingsAboutPanel() {
         <div className="flex items-center justify-between gap-4 py-2">
           <div className="min-w-0">
             <div className="text-sm text-foreground">© 2026 tick-stock-panel contributors</div>
-            <div className="text-[11px] text-muted truncate">基于 MIT 协议开源 · 遵照协议分发时须保留版权与许可声明</div>
+            <div className="text-[11px] text-muted truncate">{tx('基于 MIT 协议开源 · 遵照协议分发时须保留版权与许可声明')}</div>
           </div>
           <a
             href={PROJECT_REPO_URL}
@@ -63,15 +65,15 @@ export function SettingsAboutPanel() {
                        bg-elevated text-secondary hover:text-foreground transition-colors"
           >
             <ExternalLink className="h-3.5 w-3.5" />
-            仓库
+            {tx('仓库')}
           </a>
         </div>
 
         {/* 开源许可 — 点击弹窗查看完整内容 */}
         <div className="flex items-center justify-between gap-4 py-2">
           <div className="min-w-0">
-            <div className="text-sm text-foreground">开源许可</div>
-            <div className="text-[11px] text-muted truncate">本项目协议全文与第三方组件许可清单</div>
+            <div className="text-sm text-foreground">{tx('开源许可')}</div>
+            <div className="text-[11px] text-muted truncate">{tx('本项目协议全文与第三方组件许可清单')}</div>
           </div>
           <button
             onClick={() => setLicenseOpen(true)}
@@ -79,20 +81,20 @@ export function SettingsAboutPanel() {
                        bg-elevated text-secondary hover:text-foreground transition-colors"
           >
             <ScrollText className="h-3.5 w-3.5" />
-            查看许可
+            {tx('查看许可')}
           </button>
         </div>
 
         <div className="mt-3 border-t border-border/60 pt-3 text-[11px] leading-relaxed text-secondary">
           <p>
-            图表组件：
+            {tx('图表组件：')}
             <a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
               TradingView Lightweight Charts™
             </a>
           </p>
           <p className="mt-1">Copyright (с) 2025 TradingView, Inc.</p>
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
-            <a href="/third-party/lightweight-charts/LICENSE" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">Apache-2.0 许可</a>
+            <a href="/third-party/lightweight-charts/LICENSE" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">{tx('Apache-2.0 许可')}</a>
             <a href="/third-party/lightweight-charts/NOTICE" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">NOTICE</a>
           </div>
         </div>
@@ -105,13 +107,13 @@ export function SettingsAboutPanel() {
       <section className="rounded-card border border-border bg-surface p-5">
         <div className="flex items-center gap-2 mb-4">
           <Rocket className="h-4 w-4 text-accent" />
-          <h3 className="text-sm font-medium text-foreground">更新</h3>
+          <h3 className="text-sm font-medium text-foreground">{tx('更新')}</h3>
         </div>
 
         <div className="flex items-center justify-between gap-4 py-2">
           <div className="min-w-0">
-            <div className="text-sm text-foreground">当前版本</div>
-            <div className="text-[11px] text-muted truncate">已安装的应用版本</div>
+            <div className="text-sm text-foreground">{tx('当前版本')}</div>
+            <div className="text-[11px] text-muted truncate">{tx('已安装的应用版本')}</div>
           </div>
           <span className="font-mono text-xs text-secondary shrink-0">
             {versionData?.version ?? '—'}
@@ -175,7 +177,7 @@ export function SettingsAboutPanel() {
               ) : (
                 <RefreshCw className="h-3.5 w-3.5" />
               )}
-              {updateState === 'checking' ? '检查中…' : updateState === 'latest' ? '已检查' : '检查更新'}
+              {updateState === 'checking' ? tx('检查中…') : updateState === 'latest' ? tx('已检查') : tx('检查更新')}
             </button>
           </div>
         </div>
@@ -186,50 +188,49 @@ export function SettingsAboutPanel() {
         <div className="flex items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
             <Heart className="h-4 w-4 text-accent" />
-            <h3 className="text-sm font-medium text-foreground">打赏</h3>
+            <h3 className="text-sm font-medium text-foreground">{tx('打赏')}</h3>
           </div>
           <span className="shrink-0 rounded-full border border-border bg-elevated px-2 py-0.5 text-[10px] text-muted">
-            完全自愿 · 不影响任何功能
+            {tx('完全自愿 · 不影响任何功能')}
           </span>
         </div>
 
         <div className="flex items-center justify-between gap-6">
           {/* 左: 文案与入口 */}
           <div className="min-w-0 flex-1">
-            <div className="text-sm text-foreground">支持这个项目</div>
+            <div className="text-sm text-foreground">{tx('支持这个项目')}</div>
             <div className="mt-0.5 text-[11px] leading-relaxed text-muted">
-              如果 TSP 对你的交易与研究有帮助, 欢迎请作者喝杯咖啡,
-              扫描右侧微信赞赏码即可支持项目持续维护。
+              {tx('如果 TSP 对你的交易与研究有帮助, 欢迎请作者喝杯咖啡, 扫描右侧微信赞赏码即可支持项目持续维护。')}
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
-                onClick={() => setQrZoom({ src: '/donate-wechat.jpg', alt: '微信赞赏码', caption: '微信扫一扫 · 赞赏支持' })}
+                onClick={() => setQrZoom({ src: '/donate-wechat.jpg', alt: tx('微信赞赏码'), caption: tx('微信扫一扫 · 赞赏支持') })}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn text-xs
                            bg-accent text-white hover:bg-accent/90 transition-colors"
               >
                 <Heart className="h-3.5 w-3.5" />
-                赞赏支持
+                {tx('赞赏支持')}
               </button>
             </div>
             <p className="mt-3 text-[10px] leading-relaxed text-muted">
-              项目基于 MIT 协议永久免费, 打赏不会解锁任何功能; 数据源等第三方服务费用与本站无关。
+              {tx('项目基于 MIT 协议永久免费, 打赏不会解锁任何功能; 数据源等第三方服务费用与本站无关。')}
             </p>
           </div>
 
           {/* 右: 微信赞赏码 (白底保证二维码可扫) */}
           <button
-            onClick={() => setQrZoom({ src: '/donate-wechat.jpg', alt: '微信赞赏码', caption: '微信扫一扫 · 赞赏支持' })}
-            title="点击放大"
+            onClick={() => setQrZoom({ src: '/donate-wechat.jpg', alt: tx('微信赞赏码'), caption: tx('微信扫一扫 · 赞赏支持') })}
+            title={tx('点击放大')}
             className="group shrink-0 rounded-lg border border-border bg-white p-2
                        hover:border-accent/40 transition-colors"
           >
             <img
               src="/donate-wechat.jpg"
-              alt="微信赞赏码"
+              alt={tx('微信赞赏码')}
               className="h-28 w-28 object-contain"
             />
             <div className="mt-1 text-center text-[10px] text-neutral-500 group-hover:text-neutral-700">
-              微信赞赏
+              {tx('微信赞赏')}
             </div>
           </button>
         </div>

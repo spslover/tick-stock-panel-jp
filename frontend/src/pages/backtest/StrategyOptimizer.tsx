@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { DailyResultStaleNotice } from '@/components/data/DailyDataHealthNotice'
 import { Play, Square, Trophy, Mountain, GitBranch, CheckCircle2 } from 'lucide-react'
 import { api, type StrategyDetail } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { fmtPct } from '@/lib/format'
 import { EmptyState } from '@/components/EmptyState'
@@ -59,6 +60,7 @@ function num(v: number | null | undefined, digits = 3): string {
 }
 
 export function StrategyOptimizer() {
+  const { tx } = useI18n()
   const task = useRobustTask()
   const { data: stratData } = useQuery({ queryKey: QK.strategyList(), queryFn: () => api.strategyList() })
   const strategies: StrategyDetail[] = stratData?.strategies ?? []
@@ -118,13 +120,13 @@ export function StrategyOptimizer() {
   /** 应用参数 → 策略配置 override 通道 (可逆, 策略页可还原)。 */
   const onApply = async (params: Record<string, any>, sourceNote: string) => {
     if (!sweep.selected || applying) return
-    if (!window.confirm(`将参数应用到策略「${sweep.selected.name}」?\n${sourceNote}\n(写入策略配置, 可在策略页查看/还原)`)) return
+    if (!window.confirm(tx('将参数应用到策略「{name}」?\n{source}\n(写入策略配置, 可在策略页查看/还原)', { name: sweep.selected.name, source: sourceNote }))) return
     setApplying(true)
     try {
       await applyStrategyParams(sweep.selected, params)
-      toast('已应用到策略配置 (策略页可还原)', 'success')
+      toast(tx('已应用到策略配置 (策略页可还原)'), 'success')
     } catch (e) {
-      toast(`应用失败 · ${String((e as Error)?.message || e)}`, 'error')
+      toast(tx('应用失败 · {msg}', { msg: String((e as Error)?.message || e) }), 'error')
     } finally {
       setApplying(false)
     }
@@ -141,50 +143,50 @@ export function StrategyOptimizer() {
       {/* ── 配置面板 ── */}
       <div className="space-y-3 rounded-card border border-border bg-surface p-4 overflow-y-auto min-h-0">
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-secondary">策略</label>
+          <label className="mb-1.5 block text-xs font-medium text-secondary">{tx('策略')}</label>
           <StrategySelect strategies={strategies} value={sweep.strategyId} onChange={sweep.selectStrategy} />
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-secondary">优化目标 (白名单)</label>
+          <label className="mb-1.5 block text-xs font-medium text-secondary">{tx('优化目标 (白名单)')}</label>
           <select value={objective} onChange={e => setObjective(e.target.value)} className={INPUT_CLS}>
             {PRIMARY_OBJECTIVES.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select>
-          <div className="mt-1 text-[10px] text-muted">胜率/持仓天数等退化目标已排除 (交易少时可被运气推高)</div>
+          <div className="mt-1 text-[10px] text-muted">{tx('胜率/持仓天数等退化目标已排除 (交易少时可被运气推高)')}</div>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-secondary">起始</label>
+            <label className="mb-1.5 block text-xs font-medium text-secondary">{tx('起始')}</label>
             <DatePicker value={start} onChange={setStart} />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-secondary">结束</label>
+            <label className="mb-1.5 block text-xs font-medium text-secondary">{tx('结束')}</label>
             <DatePicker value={end} onChange={setEnd} />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-secondary">验证段数 K</label>
+            <label className="mb-1.5 block text-xs font-medium text-secondary">{tx('验证段数 K')}</label>
             <select value={kSegments} onChange={e => setKSegments(Number(e.target.value))} className={INPUT_CLS}>
-              {[2, 3, 4, 5, 6].map(k => <option key={k} value={k}>{k} 段</option>)}
+              {[2, 3, 4, 5, 6].map(k => <option key={k} value={k}>{k} {tx('段')}</option>)}
             </select>
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-secondary">最小交易数 (合计)</label>
+            <label className="mb-1.5 block text-xs font-medium text-secondary">{tx('最小交易数 (合计)')}</label>
             <input type="number" min={0} value={minTrades} onChange={e => setMinTrades(Number(e.target.value))} className={INPUT_CLS} />
           </div>
         </div>
 
         {windows && windows.length > 0 && (
           <div className="rounded-input border border-border/60 bg-elevated/30 p-2">
-            <div className="mb-1 text-[11px] font-medium text-secondary">验证窗预览 ({windows.length} 段)</div>
+            <div className="mb-1 text-[11px] font-medium text-secondary">{tx('验证窗预览 (')}{windows.length} {tx('段)')}</div>
             <div className="space-y-0.5">
               {windows.map(w => (
                 <div key={w.start} className="flex justify-between text-[10px] text-muted">
                   <span>{w.start} ~ {w.end}</span>
-                  <span>{w.days} 天</span>
+                  <span>{w.days} {tx('天')}</span>
                 </div>
               ))}
             </div>
@@ -195,25 +197,23 @@ export function StrategyOptimizer() {
         )}
 
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-secondary">模式</label>
+          <label className="mb-1.5 block text-xs font-medium text-secondary">{tx('模式')}</label>
           <select value={mode} onChange={e => setMode(e.target.value as any)} className={INPUT_CLS}>
-            <option value="position">组合仓位</option>
-            <option value="full">全量独立</option>
+            <option value="position">{tx('组合仓位')}</option>
+            <option value="full">{tx('全量独立')}</option>
           </select>
         </div>
 
         <SweepParamList params={sweep.params} sweeps={sweep.sweeps} updateSweep={sweep.updateSweep} hiddenLabels={sweep.hiddenParamLabels} />
         <CombosHint show={!!sweep.strategyId} combos={sweep.combos} gridError={sweep.gridError} />
-        <div className="text-[11px] text-secondary">每组跑 K 段验证 + Top-20 全窗细化, 耗时约为旧版 1.7 倍</div>
+        <div className="text-[11px] text-secondary">{tx('每组跑 K 段验证 + Top-20 全窗细化, 耗时约为旧版 1.7 倍')}</div>
 
         {task?.isPending ? (
           <button onClick={stopRobust} className="inline-flex w-full items-center justify-center gap-1.5 rounded-btn bg-red-500/90 px-3 py-2 text-xs font-medium text-white hover:bg-red-500">
-            <Square className="h-3.5 w-3.5" /> 停止
-          </button>
+            <Square className="h-3.5 w-3.5" /> {tx('停止')}</button>
         ) : (
           <button onClick={onRun} disabled={!canRun} className="inline-flex w-full items-center justify-center gap-1.5 rounded-btn bg-accent px-3 py-2 text-xs font-medium text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed">
-            <Play className="h-3.5 w-3.5" /> 开始稳健优化
-          </button>
+            <Play className="h-3.5 w-3.5" /> {tx('开始稳健优化')}</button>
         )}
       </div>
 
@@ -227,11 +227,11 @@ export function StrategyOptimizer() {
           <div className="mb-4">
             <div className="mb-1 flex justify-between text-xs text-secondary">
               <span>
-                {progress.type === 'robust_optimizer_prepare' ? '准备共享矩阵'
-                  : progress.type === 'robust_optimizer_stage2' ? `阶段二全窗细化 ${progress.done}/${progress.total}`
-                  : `阶段一 ${progress.done}/${progress.total}`}
+                {progress.type === 'robust_optimizer_prepare' ? tx('准备共享矩阵')
+                  : progress.type === 'robust_optimizer_stage2' ? tx('阶段二全窗细化 {done}/{total}', { done: progress.done, total: progress.total })
+                  : tx('阶段一 {done}/{total}', { done: progress.done, total: progress.total })}
               </span>
-              <span>当前最优: {progress.best_score != null ? progress.best_score.toFixed(3) : '—'}</span>
+              <span>{tx('当前最优:')} {progress.best_score != null ? progress.best_score.toFixed(3) : '—'}</span>
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-elevated">
               <div className="h-full bg-accent transition-all" style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} />
@@ -240,7 +240,7 @@ export function StrategyOptimizer() {
         )}
 
         {!result && !task?.isPending && (
-          <EmptyState title="稳健优化" hint="每组参数在 K 个互不重叠验证段上独立评估, 按 R = 0.6×中位 + 0.4×最差 段稳健分排名; 只有在多段行情上都好的参数才能当冠军。" />
+          <EmptyState title={tx('稳健优化')} hint={tx('每组参数在 K 个互不重叠验证段上独立评估, 按 R = 0.6×中位 + 0.4×最差 段稳健分排名; 只有在多段行情上都好的参数才能当冠军。')} />
         )}
 
         {result && (
@@ -250,9 +250,9 @@ export function StrategyOptimizer() {
             {bestRow && result.best_params && (
               <div className="rounded-card border border-accent/30 bg-accent/5 p-3">
                 <div className="mb-2 flex flex-wrap items-center gap-1.5 text-xs font-semibold text-accent">
-                  <Trophy className="h-3.5 w-3.5" /> 稳健冠军 · {result.objective} 稳健分 {num(result.best_score)}
-                  {conv && <Badge icon={<GitBranch className="h-3 w-3" />} text={CONVERGENCE_LABEL[conv.label]?.text ?? conv.label} cls={CONVERGENCE_LABEL[conv.label]?.cls ?? ''} />}
-                  {plateau && <Badge icon={<Mountain className="h-3 w-3" />} text={PLATEAU_LABEL[plateau.label]?.text ?? plateau.label} cls={PLATEAU_LABEL[plateau.label]?.cls ?? ''} />}
+                  <Trophy className="h-3.5 w-3.5" /> {tx('稳健冠军 ·')} {result.objective} {tx('稳健分')} {num(result.best_score)}
+                  {conv && <Badge icon={<GitBranch className="h-3 w-3" />} text={tx(CONVERGENCE_LABEL[conv.label]?.text ?? conv.label)} cls={CONVERGENCE_LABEL[conv.label]?.cls ?? ''} />}
+                  {plateau && <Badge icon={<Mountain className="h-3 w-3" />} text={tx(PLATEAU_LABEL[plateau.label]?.text ?? plateau.label)} cls={PLATEAU_LABEL[plateau.label]?.cls ?? ''} />}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {Object.entries(result.best_params).map(([k, v]) => (
@@ -260,23 +260,23 @@ export function StrategyOptimizer() {
                   ))}
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-secondary sm:grid-cols-4">
-                  <span>中位 {num(bestRow.median)}</span>
-                  <span>最差段 {num(bestRow.worst)}</span>
-                  <span className={bestRow.spread != null && bestRow.spread > 5 ? 'text-amber-400' : ''}>段间离散 {num(bestRow.spread)}</span>
-                  <span>合计交易 {bestRow.trades_total ?? '—'}</span>
+                  <span>{tx('中位')} {num(bestRow.median)}</span>
+                  <span>{tx('最差段')} {num(bestRow.worst)}</span>
+                  <span className={bestRow.spread != null && bestRow.spread > 5 ? 'text-amber-400' : ''}>{tx('段间离散')} {num(bestRow.spread)}</span>
+                  <span>{tx('合计交易')} {bestRow.trades_total ?? '—'}</span>
                 </div>
                 {bestRow.is_full?.objective_raw != null && (
                   <div className={`mt-2 text-[11px] ${bestRow.degradation != null && bestRow.degradation > 0 ? 'text-amber-400' : 'text-secondary'}`}>
-                    全窗样本内 {num(bestRow.is_full.objective_raw)} → 稳健分 {num(result.best_score)}
-                    {bestRow.degradation != null && ` · 乐观偏差 ${num(bestRow.degradation)}${bestRow.degradation_pct != null ? ` (${fmtPct(bestRow.degradation_pct)})` : ''}`}
+                    {tx('全窗样本内')} {num(bestRow.is_full.objective_raw)} {tx('→ 稳健分')} {num(result.best_score)}
+                    {bestRow.degradation != null && tx(' · 乐观偏差 {v}{pct}', { v: num(bestRow.degradation), pct: bestRow.degradation_pct != null ? ` (${fmtPct(bestRow.degradation_pct)})` : '' })}
                   </div>
                 )}
                 <button
-                  onClick={() => onApply(result.best_params!, '来源: 稳健优化冠军 (含退化/高原判据)')}
+                  onClick={() => onApply(result.best_params!, tx('来源: 稳健优化冠军 (含退化/高原判据)'))}
                   disabled={applying}
                   className="mt-2.5 inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-[11px] font-medium text-white hover:opacity-90 disabled:opacity-40"
                 >
-                  <CheckCircle2 className="h-3.5 w-3.5" /> {applying ? '应用中…' : '应用参数到策略'}
+                  <CheckCircle2 className="h-3.5 w-3.5" /> {applying ? tx('应用中…') : tx('应用参数到策略')}
                 </button>
               </div>
             )}
@@ -284,7 +284,7 @@ export function StrategyOptimizer() {
             {/* ── 各段冠军 (收敛度明细) ── */}
             {conv && conv.champions.length > 0 && (
               <div className="rounded-card border border-border/60 p-3">
-                <div className="mb-1.5 text-xs font-medium text-secondary">各段冠军 (收敛度诊断)</div>
+                <div className="mb-1.5 text-xs font-medium text-secondary">{tx('各段冠军 (收敛度诊断)')}</div>
                 <div className="space-y-1">
                   {conv.champions.map(c => (
                     <div key={c.segment} className="flex items-center justify-between gap-2 text-[11px]">
@@ -301,14 +301,13 @@ export function StrategyOptimizer() {
             {plateau && plateau.neighbors.length > 0 && (
               <div className="rounded-card border border-border/60 p-3">
                 <div className="mb-1.5 text-xs font-medium text-secondary">
-                  冠军邻域 (得分衰减 ≤ {plateau.tolerance != null ? plateau.tolerance.toFixed(3) : '—'} 视为在高原上)
-                </div>
+                  {tx('冠军邻域 (得分衰减 ≤')} {plateau.tolerance != null ? plateau.tolerance.toFixed(3) : '—'} {tx('视为在高原上)')}</div>
                 <div className="space-y-1">
                   {plateau.neighbors.map((n, i) => (
                     <div key={i} className="flex items-center justify-between gap-2 text-[11px]">
                       <span className="min-w-0 flex-1 truncate text-foreground">{Object.entries(n.params).map(([k, v]) => `${k}=${String(v)}`).join(', ')}</span>
                       <span className={n.decay == null ? 'text-muted' : n.decay <= (plateau.tolerance ?? 0) ? 'text-emerald-400' : 'text-red-400'}>
-                        {n.decay != null ? `衰减 ${n.decay.toFixed(3)}` : '无效 (错误/除名)'}
+                        {n.decay != null ? tx('衰减 {v}', { v: n.decay.toFixed(3) }) : tx('无效 (错误/除名)')}
                       </span>
                     </div>
                   ))}
@@ -317,8 +316,8 @@ export function StrategyOptimizer() {
             )}
 
             <div className="text-xs text-secondary">
-              {result.n_completed}/{result.n_combinations} 组完成 · K={result.k_segments} 段 · 阶段二细化 {result.stage2.evaluated} 组 · 耗时 {(result.elapsed_ms / 1000).toFixed(1)}s
-              {result.cancelled && ' · 已取消 (部分结果)'}
+              {result.n_completed}/{result.n_combinations} {tx('组完成 · K=')}{result.k_segments} {tx('段 · 阶段二细化')} {result.stage2.evaluated} {tx('组 · 耗时')} {(result.elapsed_ms / 1000).toFixed(1)}s
+              {result.cancelled && ' ' + tx('· 已取消 (部分结果)')}
             </div>
 
             {/* ── 排名表 ── */}
@@ -327,17 +326,17 @@ export function StrategyOptimizer() {
                 <thead>
                   <tr className="border-b border-border text-secondary">
                     <th className="px-2 py-1.5 text-left">#</th>
-                    <th className="px-2 py-1.5 text-left">参数</th>
-                    <th className="px-2 py-1.5 text-right">稳健分</th>
-                    <th className="px-2 py-1.5 text-right">中位</th>
-                    <th className="px-2 py-1.5 text-right">最差</th>
-                    <th className="px-2 py-1.5 text-right">离散</th>
+                    <th className="px-2 py-1.5 text-left">{tx('参数')}</th>
+                    <th className="px-2 py-1.5 text-right">{tx('稳健分')}</th>
+                    <th className="px-2 py-1.5 text-right">{tx('中位')}</th>
+                    <th className="px-2 py-1.5 text-right">{tx('最差')}</th>
+                    <th className="px-2 py-1.5 text-right">{tx('离散')}</th>
                     {Array.from({ length: result.k_segments }, (_, i) => (
                       <th key={i} className="px-2 py-1.5 text-right">V{i + 1}</th>
                     ))}
-                    <th className="px-2 py-1.5 text-right">全窗IS</th>
-                    <th className="px-2 py-1.5 text-right">退化</th>
-                    <th className="px-2 py-1.5 text-right">交易数</th>
+                    <th className="px-2 py-1.5 text-right">{tx('全窗IS')}</th>
+                    <th className="px-2 py-1.5 text-right">{tx('退化')}</th>
+                    <th className="px-2 py-1.5 text-right">{tx('交易数')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -348,8 +347,7 @@ export function StrategyOptimizer() {
               </table>
               {result.results.length > 50 && (
                 <div className="mt-2 text-center text-[11px] text-secondary">
-                  仅显示前 50 组 · 共 {result.results.length} 组
-                </div>
+                  {tx('仅显示前 50 组 · 共')} {result.results.length} {tx('组')}</div>
               )}
             </div>
           </div>
@@ -360,13 +358,14 @@ export function StrategyOptimizer() {
 }
 
 function ResultRow({ row, k }: { row: RobustResultRow; k: number }) {
+  const { tx } = useI18n()
   if (row.error) {
     return (
       <tr className="border-b border-border/40">
         <td className="px-2 py-1.5 text-secondary">{row.rank}</td>
         <td className="px-2 py-1.5" colSpan={k + 7}>
           <span className="text-foreground">{Object.entries(row.params).map(([kk, v]) => `${kk}=${v}`).join(', ')}</span>
-          <span className="ml-2 text-red-400">失败: {row.error.slice(0, 50)}</span>
+          <span className="ml-2 text-red-400">{tx('失败:')} {row.error.slice(0, 50)}</span>
         </td>
       </tr>
     )
@@ -377,7 +376,7 @@ function ResultRow({ row, k }: { row: RobustResultRow; k: number }) {
       <td className="px-2 py-1.5 text-secondary">{row.rank}</td>
       <td className="px-2 py-1.5">
         <span className="text-foreground">{Object.entries(row.params).map(([kk, v]) => `${kk}=${v}`).join(', ')}</span>
-        {dq && <span className="ml-2 text-amber-400" title={row.disqualify_reason ?? ''}>除名: {row.disqualify_reason}</span>}
+        {dq && <span className="ml-2 text-amber-400" title={row.disqualify_reason ?? ''}>{tx('除名:')} {row.disqualify_reason}</span>}
       </td>
       <td className="px-2 py-1.5 text-right font-medium">{num(row.score)}</td>
       <td className="px-2 py-1.5 text-right">{num(row.median)}</td>

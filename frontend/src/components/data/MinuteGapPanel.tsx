@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CheckCircle2, Download, Loader2, RefreshCw, Search } from 'lucide-react'
 import { api, type MinuteGapRow } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { toast } from '@/components/Toast'
 import './MinuteGapPanel.css'
@@ -17,6 +18,7 @@ import './MinuteGapPanel.css'
 const PAGE = 10
 
 export function MinuteGapPanel({ hasCap = true, onJobStart }: { hasCap?: boolean; onJobStart?: (jobId: string) => void }) {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const [filter, setFilter] = useState('')
   const [page, setPage] = useState(0)
@@ -37,7 +39,7 @@ export function MinuteGapPanel({ hasCap = true, onJobStart }: { hasCap?: boolean
     mutationFn: (targets: typeof repairTargets) => api.repairMinuteGaps(targets),
     onSuccess: (result, targets) => {
       qc.invalidateQueries({ queryKey: QK.pipelineJobs })
-      toast(`已启动 ${targets.length} 条缺口的补拉，可在数据页查看进度`, 'success')
+      toast(tx('已启动 {n} 条缺口的补拉，可在数据页查看进度', { n: targets.length }), 'success')
       onJobStart?.(result.job_id)
     },
   })
@@ -49,14 +51,13 @@ export function MinuteGapPanel({ hasCap = true, onJobStart }: { hasCap?: boolean
     return (
       <div className="flex h-24 items-center justify-center gap-2 text-xs text-muted">
         <Loader2 className="h-3.5 w-3.5 animate-spin" />
-        正在扫描分钟分区…
-      </div>
+        {tx('正在扫描分钟分区…')}</div>
     )
   }
   if (gaps.isError) {
     return (
       <div className="rounded-lg border border-danger/30 bg-danger/5 p-3 text-xs text-danger">
-        体检失败：{String((gaps.error as Error)?.message ?? gaps.error)}
+        {tx('体检失败：')}{String((gaps.error as Error)?.message ?? gaps.error)}
       </div>
     )
   }
@@ -69,17 +70,16 @@ export function MinuteGapPanel({ hasCap = true, onJobStart }: { hasCap?: boolean
       <div className="flex flex-wrap items-center justify-between gap-3 text-[11px]">
         <div className="space-y-1.5">
           <span className="text-muted">
-            扫描 {gaps.data?.scanned_dates ?? 0} 个交易日 · {gaps.data?.scanned_symbols ?? 0} 只标的
+            {tx('扫描 {days} 个交易日 · {symbols} 只标的', { days: gaps.data?.scanned_dates ?? 0, symbols: gaps.data?.scanned_symbols ?? 0 })}
           </span>
           {all.length === 0 ? (
             <span className="flex items-center gap-1 text-bear">
               <CheckCircle2 className="h-3.5 w-3.5" />
-              未发现分钟数据缺口
-            </span>
+              {tx('未发现分钟数据缺口')}</span>
           ) : (
             <span className="flex items-center gap-1 text-warning">
               <AlertTriangle className="h-3.5 w-3.5" />
-              {all.length} 条缺口 · 合计缺 {totalMissing.toLocaleString()} 根
+              {tx('{n} 条缺口 · 合计缺 {m} 根', { n: all.length, m: totalMissing.toLocaleString() })}
             </span>
           )}
         </div>
@@ -92,7 +92,7 @@ export function MinuteGapPanel({ hasCap = true, onJobStart }: { hasCap?: boolean
               className="inline-flex shrink-0 items-center gap-1.5 rounded-btn bg-accent/90 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-accent disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
             >
               {repair.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-              {repair.isPending ? '正在启动…' : `一键补齐（${repairTargets.length} 条）`}
+              {repair.isPending ? tx('正在启动…') : tx('一键补齐（{n} 条）', { n: repairTargets.length })}
             </button>
           )}
           <button
@@ -102,26 +102,28 @@ export function MinuteGapPanel({ hasCap = true, onJobStart }: { hasCap?: boolean
             className="inline-flex shrink-0 items-center gap-1 rounded-btn border border-border px-2.5 py-1.5 text-[11px] text-secondary hover:text-accent disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             <RefreshCw className={`h-3 w-3 ${gaps.isFetching ? 'animate-spin' : ''}`} />
-            重新体检
-          </button>
+            {tx('重新体检')}</button>
         </div>
       </div>
 
       {(gaps.data?.inactive_symbol_days ?? 0) > 0 && (
         <p className="rounded-btn border border-border/60 bg-base/30 px-3 py-2 text-[11px] leading-relaxed text-muted">
-          另有 {gaps.data!.inactive_symbol_days} 组整日零成交记录（日线核对无成交，可能停牌），未计入缺口，无需补拉。
+          {tx('另有 {n} 组整日零成交记录（日线核对无成交，可能停牌），未计入缺口，无需补拉。', { n: gaps.data!.inactive_symbol_days ?? 0 })}
         </p>
       )}
 
       {repair.isError && (
         <div role="alert" className="rounded-btn border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
-          补拉启动失败：{String((repair.error as Error)?.message ?? repair.error)}
+          {tx('补拉启动失败：')}{String((repair.error as Error)?.message ?? repair.error)}
         </div>
       )}
       {all.length > 0 && (
         <p className="text-[11px] leading-relaxed text-muted">
-          一键补齐处理{filter.trim() ? '当前筛选的' : '已列出的全部'} {filtered.length} 条缺口，按每条记录的股票和交易日补拉，结束后复查。
-          {gaps.data?.truncated && <span className="text-warning"> 本次体检列表已截断，仅处理已列出的记录。</span>}
+          {tx('一键补齐处理{scope} {n} 条缺口，按每条记录的股票和交易日补拉，结束后复查。', {
+            scope: filter.trim() ? tx('当前筛选的') : tx('已列出的全部'),
+            n: filtered.length,
+          })}
+          {gaps.data?.truncated && <span className="text-warning"> {tx('本次体检列表已截断，仅处理已列出的记录。')}</span>}
         </p>
       )}
 
@@ -129,7 +131,7 @@ export function MinuteGapPanel({ hasCap = true, onJobStart }: { hasCap?: boolean
         <div className="flex flex-wrap gap-1.5">
           {summary.map(c => (
             <span key={c.date} className="rounded bg-warning/10 px-2 py-0.5 text-[10px] text-warning">
-              {c.date} · {c.gap_symbols} 只 · 缺 {c.missing_bars} 根
+              {tx('{date} · {syms} 只 · 缺 {bars} 根', { date: c.date, syms: c.gap_symbols, bars: c.missing_bars })}
             </span>
           ))}
         </div>
@@ -142,24 +144,23 @@ export function MinuteGapPanel({ hasCap = true, onJobStart }: { hasCap?: boolean
             <input
               value={filter}
               onChange={e => { setFilter(e.target.value); setPage(0) }}
-              placeholder="按代码 / 日期过滤"
-              aria-label="按代码或日期过滤缺口"
+              placeholder={tx('按代码 / 日期过滤')}
+              aria-label={tx('按代码或日期过滤缺口')}
               className="h-9 min-w-0 flex-1 bg-transparent text-xs text-foreground outline-none"
             />
           </div>
 
           {filtered.length === 0 ? (
             <div role="status" className="rounded-card border border-dashed border-border px-4 py-8 text-center text-xs text-muted">
-              没有匹配的缺口记录，请尝试其他代码或日期。
-            </div>
+              {tx('没有匹配的缺口记录，请尝试其他代码或日期。')}</div>
           ) : (
           <div className="minute-gap-list rounded-card border border-border/60">
             <div aria-hidden="true" className="minute-gap-columns rounded-t-card border-b border-border bg-base/50 px-3 py-2 text-[10px] font-medium text-muted">
-              <span>代码</span><span>日期</span>
-              <span className="text-right">实有 / 应有</span><span className="text-right">缺失</span>
-              <span>数据范围</span><span className="text-right">操作</span>
+              <span>{tx('代码')}</span><span>{tx('日期')}</span>
+              <span className="text-right">{tx('实有 / 应有')}</span><span className="text-right">{tx('缺失')}</span>
+              <span>{tx('数据范围')}</span><span className="text-right">{tx('操作')}</span>
             </div>
-            <ul aria-label="分钟数据缺口" className="divide-y divide-border/40">
+            <ul aria-label={tx('分钟数据缺口')} className="divide-y divide-border/40">
               {pageRows.map((g: MinuteGapRow) => (
                 <li
                   key={`${g.symbol}-${g.date}`}
@@ -171,15 +172,15 @@ export function MinuteGapPanel({ hasCap = true, onJobStart }: { hasCap?: boolean
                   </div>
                   <dl className="minute-gap-metrics">
                     <div className="minute-gap-metric">
-                      <dt className="minute-gap-label text-[10px] text-muted">实有 / 应有</dt>
+                      <dt className="minute-gap-label text-[10px] text-muted">{tx('实有 / 应有')}</dt>
                       <dd className="whitespace-nowrap font-mono text-warning">{g.actual_bars}/{g.expected_bars}</dd>
                     </div>
                     <div className="minute-gap-metric">
-                      <dt className="minute-gap-label text-[10px] text-muted">缺失</dt>
-                      <dd className="font-mono text-warning">{g.missing_bars} 根</dd>
+                      <dt className="minute-gap-label text-[10px] text-muted">{tx('缺失')}</dt>
+                      <dd className="font-mono text-warning">{g.missing_bars} {tx('根')}</dd>
                     </div>
                     <div className="minute-gap-metric minute-gap-range">
-                      <dt className="minute-gap-label text-[10px] text-muted">数据范围</dt>
+                      <dt className="minute-gap-label text-[10px] text-muted">{tx('数据范围')}</dt>
                       <dd className="whitespace-nowrap font-mono text-secondary">{g.first_time ?? '—'} ~ {g.last_time ?? '—'}</dd>
                     </div>
                   </dl>
@@ -190,8 +191,7 @@ export function MinuteGapPanel({ hasCap = true, onJobStart }: { hasCap?: boolean
                       onClick={() => repair.mutate([{ symbol: g.symbol, date: g.date }])}
                       className="whitespace-nowrap rounded-btn border border-border px-2 py-1.5 text-[10px] text-secondary hover:border-accent hover:text-accent disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
                     >
-                      尝试补齐
-                    </button>
+                      {tx('尝试补齐')}</button>
                   </div>
                 </li>
               ))}
@@ -201,7 +201,7 @@ export function MinuteGapPanel({ hasCap = true, onJobStart }: { hasCap?: boolean
 
           {filtered.length > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-3 text-[11px] text-muted">
-              <span>第 {currentPage * PAGE + 1}–{Math.min((currentPage + 1) * PAGE, filtered.length)} 条，共 {filtered.length} 条</span>
+              <span>{tx('第 {from}–{to} 条，共 {total} 条', { from: currentPage * PAGE + 1, to: Math.min((currentPage + 1) * PAGE, filtered.length), total: filtered.length })}</span>
               {pageCount > 1 && (
                 <div className="flex items-center gap-2">
                   <button
@@ -210,8 +210,7 @@ export function MinuteGapPanel({ hasCap = true, onJobStart }: { hasCap?: boolean
                     disabled={currentPage === 0}
                     className="rounded-btn border border-border px-2 py-1 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
                   >
-                    上一页
-                  </button>
+                    {tx('上一页')}</button>
                   <span>{currentPage + 1} / {pageCount}</span>
                   <button
                     type="button"
@@ -219,8 +218,7 @@ export function MinuteGapPanel({ hasCap = true, onJobStart }: { hasCap?: boolean
                     disabled={currentPage >= pageCount - 1}
                     className="rounded-btn border border-border px-2 py-1 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
                   >
-                    下一页
-                  </button>
+                    {tx('下一页')}</button>
                 </div>
               )}
             </div>
@@ -228,10 +226,9 @@ export function MinuteGapPanel({ hasCap = true, onJobStart }: { hasCap?: boolean
         </>
       )}
 
-      {!hasCap && <p className="text-[11px] text-muted">当前分钟数据源不可用，可查看本地缺口；配置可用数据源后可尝试补齐。</p>}
+      {!hasCap && <p className="text-[11px] text-muted">{tx('当前分钟数据源不可用，可查看本地缺口；配置可用数据源后可尝试补齐。')}</p>}
       <p className="border-t border-border/60 pt-3 text-[11px] leading-relaxed text-muted">
-        补拉按所选交易日向当前分钟源请求数据。若源已超出历史窗口或只返回部分时段，剩余缺口会保留在体检结果中。
-      </p>
+        {tx('补拉按所选交易日向当前分钟源请求数据。若源已超出历史窗口或只返回部分时段，剩余缺口会保留在体检结果中。')}</p>
     </div>
   )
 }

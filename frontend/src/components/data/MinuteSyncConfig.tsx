@@ -2,12 +2,14 @@ import { useState, useEffect, useId, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2, Trash2, Download, Calendar, SlidersHorizontal, Activity } from 'lucide-react'
 import { api } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { MissingCapChip } from '@/lib/capability-labels'
 import { MinuteGapPanel } from '@/components/data/MinuteGapPanel'
 
 // hasCap: 分钟K能力当前是否可用 (路由矩阵判定, 生效源含插件/自定义源)
 export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: boolean; onJobStart?: (jobId: string) => void; onClose?: () => void }) {
+  const { tx } = useI18n()
   const [tab, setTab] = useState<'sync' | 'health'>('sync')
   const tabId = useId()
   const syncTabRef = useRef<HTMLButtonElement>(null)
@@ -83,7 +85,7 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
     <div className="flex min-h-0 flex-1 flex-col">
       <div
         role="tablist"
-        aria-label="分钟数据管理"
+        aria-label={tx('分钟数据管理')}
         className="flex shrink-0 gap-5 border-b border-border px-4 sm:px-5"
         onKeyDown={e => {
           if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return
@@ -94,8 +96,8 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
         }}
       >
         {([
-          { key: 'sync', label: '同步与获取', icon: SlidersHorizontal, ref: syncTabRef },
-          { key: 'health', label: '数据体检', icon: Activity, ref: healthTabRef },
+          { key: 'sync', label: tx('同步与获取'), icon: SlidersHorizontal, ref: syncTabRef },
+          { key: 'health', label: tx('数据体检'), icon: Activity, ref: healthTabRef },
         ] as const).map(({ key, label, icon: Icon, ref }) => (
           <button
             key={key}
@@ -126,7 +128,7 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
         <div className="flex items-center gap-2.5">
           <button
             role="switch"
-            aria-label="自动同步"
+            aria-label={tx('自动同步')}
             aria-checked={enabled}
             onClick={handleToggle}
             disabled={!hasMinuteCap}
@@ -141,14 +143,14 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
             />
           </button>
           <span className="text-xs text-foreground font-medium">
-            自动同步{enabled ? '已开启' : '已关闭'}
+            {enabled ? tx('自动同步已开启') : tx('自动同步已关闭')}
           </span>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center">
             <button
               onClick={() => setDays(localDays - 1)}
-              aria-label="减少自动同步天数"
+              aria-label={tx('减少自动同步天数')}
               disabled={!hasMinuteCap || !enabled || localDays <= 1}
               className="h-6 w-6 flex items-center justify-center rounded-l-btn bg-elevated border border-border text-secondary hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
             >−</button>
@@ -157,12 +159,12 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
             </div>
             <button
               onClick={() => setDays(localDays + 1)}
-              aria-label="增加自动同步天数"
+              aria-label={tx('增加自动同步天数')}
               disabled={!hasMinuteCap || !enabled || localDays >= 30}
               className="h-6 w-6 flex items-center justify-center rounded-r-btn bg-elevated border border-border text-secondary hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
             >+</button>
           </div>
-          <span className="text-[10px] text-muted">天</span>
+          <span className="text-[10px] text-muted">{tx('天')}</span>
           {!hasMinuteCap && (
             <MissingCapChip capKey="kline.minute.batch" />
           )}
@@ -173,14 +175,14 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
           「往前获取」与「获取 1 年」共用此设置 (两者都经过 sync_and_persist_minute)。 */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs text-foreground font-medium">分段大小</span>
-          <span className="text-[10px] text-muted px-1 py-px rounded bg-warning/8 text-warning/80">内存优化</span>
+          <span className="text-xs text-foreground font-medium">{tx('分段大小')}</span>
+          <span className="text-[10px] text-muted px-1 py-px rounded bg-warning/8 text-warning/80">{tx('内存优化')}</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center">
             <button
               onClick={() => setSegment(localSegment - 5)}
-              aria-label="减小分段大小"
+              aria-label={tx('减小分段大小')}
               disabled={!hasMinuteCap || localSegment <= 5}
               className="h-6 w-6 flex items-center justify-center rounded-l-btn bg-elevated border border-border text-secondary hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
             >−</button>
@@ -189,25 +191,24 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
             </div>
             <button
               onClick={() => setSegment(localSegment + 5)}
-              aria-label="增大分段大小"
+              aria-label={tx('增大分段大小')}
               disabled={!hasMinuteCap || localSegment >= 30}
               className="h-6 w-6 flex items-center justify-center rounded-r-btn bg-elevated border border-border text-secondary hover:bg-border/50 disabled:opacity-30 transition-colors text-xs"
             >+</button>
           </div>
-          <span className="text-[10px] text-muted">交易日/段</span>
+          <span className="text-[10px] text-muted">{tx('交易日/段')}</span>
         </div>
       </div>
       <div className="text-[11px] text-muted leading-relaxed">
-        每段拉完即写盘，避免内存堆积。分段越小越省内存，获取耗时越长；默认 20 个交易日。设置自动保存。
-      </div>
+        {tx('每段拉完即写盘，避免内存堆积。分段越小越省内存，获取耗时越长；默认 20 个交易日。设置自动保存。')}</div>
       </div>
 
       {/* 区块 B: 手动获取 (一次性操作, 独立于上方自动同步开关) */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <Download className="h-3 w-3 text-secondary" />
-          <span className="text-[11px] text-secondary font-medium">手动获取</span>
-          <span className="text-[10px] text-muted">不受自动同步开关影响</span>
+          <span className="text-[11px] text-secondary font-medium">{tx('手动获取')}</span>
+          <span className="text-[10px] text-muted">{tx('不受自动同步开关影响')}</span>
         </div>
         <div className="grid grid-cols-2 gap-2">
         <button
@@ -216,9 +217,9 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
           className="inline-flex min-h-20 flex-col items-center justify-center gap-1 px-2 py-3 rounded-btn bg-accent/90 text-white text-xs font-medium hover:bg-accent disabled:opacity-40 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
         >
           {fetchingMode === '40d' ? (
-            <><Loader2 className="h-3.5 w-3.5 animate-spin" /><span>获取中…</span></>
+            <><Loader2 className="h-3.5 w-3.5 animate-spin" /><span>{tx('获取中…')}</span></>
           ) : (
-            <><Download className="h-3.5 w-3.5" /><span>单次获取 {localSegment} 天</span></>
+            <><Download className="h-3.5 w-3.5" /><span>{tx('单次获取')} {localSegment} {tx('天')}</span></>
           )}
         </button>
         <button
@@ -227,16 +228,15 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
           className="inline-flex min-h-20 flex-col items-center justify-center gap-1 px-2 py-3 rounded-btn border border-accent/30 bg-accent/5 text-accent text-xs font-medium hover:bg-accent/10 disabled:opacity-40 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
         >
           {fetchingMode === '1y' ? (
-            <><Loader2 className="h-3.5 w-3.5 animate-spin" /><span>分段获取中…</span></>
+            <><Loader2 className="h-3.5 w-3.5 animate-spin" /><span>{tx('分段获取中…')}</span></>
           ) : (
-            <><Calendar className="h-3.5 w-3.5" /><span>获取最近 1 年</span><span className="text-[9px] opacity-70">分段拉取</span></>
+            <><Calendar className="h-3.5 w-3.5" /><span>{tx('获取最近 1 年')}</span><span className="text-[9px] opacity-70">{tx('分段拉取')}</span></>
           )}
         </button>
         </div>
         <div className="text-[11px] text-muted leading-relaxed">
-          A股标的 · 前复权价格 · 从本地最早数据向前叠加 ·{' '}
-          均按上方「分段大小」分段拉取、每段即落盘
-        </div>
+          {tx('A股标的 · 前复权价格 · 从本地最早数据向前叠加 ·')}{' '}
+          {tx('均按上方「分段大小」分段拉取、每段即落盘')}</div>
       </div>
       </div>
       <div
@@ -254,13 +254,12 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
       <button
         onClick={() => setConfirmClear(true)}
         disabled={clearMutation.isPending}
-        title="清空分钟K数据"
+        title={tx('清空分钟K数据')}
         className="inline-flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-btn text-danger/80 text-[11px] font-medium hover:bg-danger/10 disabled:opacity-40 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger/60"
       >
         <Trash2 className="h-3 w-3" />
-        清空分钟K数据
-      </button>
-      {onClose && <button onClick={onClose} className="rounded-btn border border-border bg-elevated px-4 py-1.5 text-xs text-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">关闭</button>}
+        {tx('清空分钟K数据')}</button>
+      {onClose && <button onClick={onClose} className="rounded-btn border border-border bg-elevated px-4 py-1.5 text-xs text-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">{tx('关闭')}</button>}
       </div>
 
       {/* 清空确认弹窗 */}
@@ -268,16 +267,15 @@ export function MinuteSyncConfig({ hasCap, onJobStart, onClose }: { hasCap: bool
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !clearMutation.isPending && setConfirmClear(false)} />
           <div className="relative rounded-card border border-border bg-surface shadow-2xl mx-4 px-6 py-5 max-w-sm w-full space-y-4">
-            <div className="text-sm text-foreground text-center font-medium">确认清空分钟K数据？</div>
+            <div className="text-sm text-foreground text-center font-medium">{tx('确认清空分钟K数据？')}</div>
             <div className="text-[11px] text-muted text-center leading-relaxed">
-              此操作仅删除分钟K (kline_minute) 数据, <span className="text-foreground/80">不影响</span>日K、复权因子、指标等其他数据。清空后可重新获取。
-            </div>
+              {tx('此操作仅删除分钟K (kline_minute) 数据,')} <span className="text-foreground/80">{tx('不影响')}</span>{tx('日K、复权因子、指标等其他数据。清空后可重新获取。')}</div>
             <div className="flex items-center justify-center gap-3">
               <button onClick={() => setConfirmClear(false)} disabled={clearMutation.isPending}
-                className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs hover:bg-elevated/80 transition-colors duration-150">取消</button>
+                className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs hover:bg-elevated/80 transition-colors duration-150">{tx('取消')}</button>
               <button onClick={() => clearMutation.mutate()} disabled={clearMutation.isPending}
                 className="px-4 py-1.5 rounded-btn bg-danger/90 text-foreground text-xs font-medium hover:bg-danger disabled:opacity-40 transition-colors duration-150">
-                {clearMutation.isPending ? <span className="inline-flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" />清空中…</span> : '确认清空'}
+                {clearMutation.isPending ? <span className="inline-flex items-center gap-1.5"><Loader2 className="h-3 w-3 animate-spin" />{tx('清空中…')}</span> : tx('确认清空')}
               </button>
             </div>
           </div>

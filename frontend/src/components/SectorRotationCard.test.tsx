@@ -17,7 +17,7 @@ const chart = vi.hoisted(() => ({
   on: vi.fn(), off: vi.fn(), setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn(),
   isDisposed: () => false, getDom: () => null, group: '',
 }))
-vi.mock('echarts', () => ({
+vi.mock('@/lib/echarts', () => ({
   init: () => chart,
   getInstanceByDom: () => null,
   connect: vi.fn(),

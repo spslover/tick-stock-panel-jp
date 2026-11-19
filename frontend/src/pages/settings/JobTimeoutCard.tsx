@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Clock3 } from 'lucide-react'
 import { api, type Preferences } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/useSharedQueries'
 import { toast } from '@/components/Toast'
@@ -31,6 +32,7 @@ function formatTimeoutValue(seconds: number, unit: TimeoutUnit): string {
 }
 
 export function JobTimeoutCard() {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const prefs = usePreferences()
   const [timeoutDraft, setTimeoutDraft] = useState<{ regular: string; long: string } | null>(null)
@@ -65,9 +67,9 @@ export function JobTimeoutCard() {
       qc.setQueryData<Preferences>(QK.preferences, current => (
         current ? { ...current, ...saved } : current
       ))
-      toast(saved.minute_batch_compress ? '分时压缩已开启' : '分时压缩已关闭', 'success')
+      toast(saved.minute_batch_compress ? tx('分时压缩已开启') : tx('分时压缩已关闭'), 'success')
     },
-    onError: (e: Error) => toast(`保存失败: ${e.message}`, 'error'),
+    onError: (e: Error) => toast(tx('保存失败: {msg}', { msg: e.message }), 'error'),
   })
   const toggleDailyCompress = useMutation({
     mutationFn: (enabled: boolean) => api.updateDailyBatchCompress(enabled),
@@ -75,9 +77,9 @@ export function JobTimeoutCard() {
       qc.setQueryData<Preferences>(QK.preferences, current => (
         current ? { ...current, ...saved } : current
       ))
-      toast(saved.daily_batch_compress ? '日K压缩已开启' : '日K压缩已关闭', 'success')
+      toast(saved.daily_batch_compress ? tx('日K压缩已开启') : tx('日K压缩已关闭'), 'success')
     },
-    onError: (e: Error) => toast(`保存失败: ${e.message}`, 'error'),
+    onError: (e: Error) => toast(tx('保存失败: {msg}', { msg: e.message }), 'error'),
   })
   const toggleAllCompress = useMutation({
     mutationFn: async (enabled: boolean) => {
@@ -91,9 +93,9 @@ export function JobTimeoutCard() {
       qc.setQueryData<Preferences>(QK.preferences, current => (
         current ? { ...current, ...saved } : current
       ))
-      toast(saved.minute_batch_compress ? '传输压缩已全部开启' : '传输压缩已全部关闭', 'success')
+      toast(saved.minute_batch_compress ? tx('传输压缩已全部开启') : tx('传输压缩已全部关闭'), 'success')
     },
-    onError: (e: Error) => toast(`保存失败: ${e.message}`, 'error'),
+    onError: (e: Error) => toast(tx('保存失败: {msg}', { msg: e.message }), 'error'),
   })
 
   const saveJobTimeouts = useMutation({
@@ -103,9 +105,9 @@ export function JobTimeoutCard() {
         current ? { ...current, ...saved } : current
       ))
       setTimeoutDraft(null)
-      toast('任务超时配置已保存', 'success')
+      toast(tx('任务超时配置已保存'), 'success')
     },
-    onError: (e: Error) => toast(`保存失败: ${e.message}`, 'error'),
+    onError: (e: Error) => toast(tx('保存失败: {msg}', { msg: e.message }), 'error'),
   })
 
   return (
@@ -114,10 +116,9 @@ export function JobTimeoutCard() {
         <div className="flex items-start gap-2.5">
           <Clock3 className="h-4 w-4 text-secondary mt-0.5" />
           <div>
-            <h2 className="text-sm font-medium text-foreground">超时设置</h2>
+            <h2 className="text-sm font-medium text-foreground">{tx('超时设置')}</h2>
             <p className="text-[11px] text-muted mt-1 leading-relaxed">
-              后台任务超过对应时间<b>没有任何进度</b>才判定卡死并自动终止；只要任务仍在推进（如慢带宽下的冷启动全市场拉取），无论总时长多久都不会被中断。保存时自动换算为秒，修改后对新建任务生效。
-            </p>
+              {tx('后台任务超过对应时间')}<b>{tx('没有任何进度')}</b>{tx('才判定卡死并自动终止；只要任务仍在推进（如慢带宽下的冷启动全市场拉取），无论总时长多久都不会被中断。保存时自动换算为秒，修改后对新建任务生效。')}</p>
           </div>
         </div>
         <button
@@ -125,14 +126,14 @@ export function JobTimeoutCard() {
           disabled={!timeoutValuesValid || !timeoutValuesChanged || saveJobTimeouts.isPending}
           className="shrink-0 px-3 py-1.5 rounded-btn bg-accent text-white text-xs font-medium hover:bg-accent/90 disabled:opacity-40 transition-colors"
         >
-          {saveJobTimeouts.isPending ? '保存中...' : '保存'}
+          {saveJobTimeouts.isPending ? tx('保存中...') : tx('保存')}
         </button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="rounded-lg border border-border/60 bg-elevated/20 px-3.5 py-3">
-          <span className="block text-xs font-medium text-foreground mb-1">普通任务停滞超时</span>
-          <span className="block text-[10px] text-muted mb-2">日 K 管道、扩展、修正与重算任务</span>
+          <span className="block text-xs font-medium text-foreground mb-1">{tx('普通任务停滞超时')}</span>
+          <span className="block text-[10px] text-muted mb-2">{tx('日 K 管道、扩展、修正与重算任务')}</span>
           <div className="flex items-center gap-2">
             <input
               type="number"
@@ -154,17 +155,17 @@ export function JobTimeoutCard() {
               }}
               className="w-20 shrink-0 rounded-btn border border-border bg-base px-2 py-1.5 text-xs text-foreground outline-none focus:border-accent"
             >
-              <option value="second">秒</option>
-              <option value="minute">分钟</option>
-              <option value="hour">小时</option>
+              <option value="second">{tx('秒')}</option>
+              <option value="minute">{tx('分钟')}</option>
+              <option value="hour">{tx('小时')}</option>
             </select>
           </div>
-          <span className="block text-[10px] text-muted/60 mt-1.5">默认 20 分钟无进度，最小 1 分钟</span>
+          <span className="block text-[10px] text-muted/60 mt-1.5">{tx('默认 20 分钟无进度，最小 1 分钟')}</span>
         </label>
 
         <label className="rounded-lg border border-border/60 bg-elevated/20 px-3.5 py-3">
-          <span className="block text-xs font-medium text-foreground mb-1">长任务停滞超时</span>
-          <span className="block text-[10px] text-muted mb-2">分钟 K 全市场同步任务</span>
+          <span className="block text-xs font-medium text-foreground mb-1">{tx('长任务停滞超时')}</span>
+          <span className="block text-[10px] text-muted mb-2">{tx('分钟 K 全市场同步任务')}</span>
           <div className="flex items-center gap-2">
             <input
               type="number"
@@ -186,22 +187,21 @@ export function JobTimeoutCard() {
               }}
               className="w-20 shrink-0 rounded-btn border border-border bg-base px-2 py-1.5 text-xs text-foreground outline-none focus:border-accent"
             >
-              <option value="second">秒</option>
-              <option value="minute">分钟</option>
-              <option value="hour">小时</option>
+              <option value="second">{tx('秒')}</option>
+              <option value="minute">{tx('分钟')}</option>
+              <option value="hour">{tx('小时')}</option>
             </select>
           </div>
-          <span className="block text-[10px] text-muted/60 mt-1.5">默认 30 分钟无进度，最小 1 分钟</span>
+          <span className="block text-[10px] text-muted/60 mt-1.5">{tx('默认 30 分钟无进度，最小 1 分钟')}</span>
         </label>
       </div>
 
       <div className="mt-3 pt-3 border-t border-border space-y-3">
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <span className="block text-xs font-medium text-foreground">数据传输压缩</span>
+            <span className="block text-xs font-medium text-foreground">{tx('数据传输压缩')}</span>
             <span className="block text-[10px] text-muted mt-0.5 leading-relaxed">
-              大数据接口（分时、日K）启用 gzip 压缩，响应可缩至约 1/8，公网访问明显更快；本机或内网可关闭以节省服务端 CPU。任一子项开启时总开关为开，点击总开关一键全开/全关，子项可单独微调，立即生效。
-            </span>
+              {tx('大数据接口（分时、日K）启用 gzip 压缩，响应可缩至约 1/8，公网访问明显更快；本机或内网可关闭以节省服务端 CPU。任一子项开启时总开关为开，点击总开关一键全开/全关，子项可单独微调，立即生效。')}</span>
           </div>
           <button
             onClick={() => toggleAllCompress.mutate(!compressAnyOn)}
@@ -209,7 +209,7 @@ export function JobTimeoutCard() {
             className={`shrink-0 relative h-5 w-9 rounded-full transition-colors disabled:opacity-40 ${
               compressAnyOn ? 'bg-accent' : 'bg-elevated'
             }`}
-            title={compressAnyOn ? '全部关闭' : '全部开启'}
+            title={compressAnyOn ? tx('全部关闭') : tx('全部开启')}
           >
             <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
               compressAnyOn ? 'left-[1.125rem]' : 'left-0.5'
@@ -218,15 +218,15 @@ export function JobTimeoutCard() {
         </div>
         <div className="ml-1 space-y-2 border-l-2 border-border/60 pl-3">
           <CompressToggleRow
-            label="分时数据压缩"
-            desc="分时批量接口（自选/策略分时图，千只标的 MB 级响应）"
+            label={tx('分时数据压缩')}
+            desc={tx('分时批量接口（自选/策略分时图，千只标的 MB 级响应）')}
             enabled={minuteBatchCompress}
             pending={toggleCompress.isPending}
             onToggle={() => toggleCompress.mutate(!minuteBatchCompress)}
           />
           <CompressToggleRow
-            label="日K数据压缩"
-            desc="日K批量接口（自选/策略日K列，千只标的 MB 级响应）"
+            label={tx('日K数据压缩')}
+            desc={tx('日K批量接口（自选/策略日K列，千只标的 MB 级响应）')}
             enabled={dailyBatchCompress}
             pending={toggleDailyCompress.isPending}
             onToggle={() => toggleDailyCompress.mutate(!dailyBatchCompress)}
@@ -244,6 +244,7 @@ function CompressToggleRow({ label, desc, enabled, pending, onToggle }: {
   pending: boolean
   onToggle: () => void
 }) {
+  const { tx } = useI18n()
   return (
     <div className="flex items-center justify-between gap-4">
       <div className="min-w-0">
@@ -256,7 +257,7 @@ function CompressToggleRow({ label, desc, enabled, pending, onToggle }: {
         className={`shrink-0 relative h-4 w-7 rounded-full transition-colors disabled:opacity-40 ${
           enabled ? 'bg-accent' : 'bg-elevated'
         }`}
-        title={enabled ? '点击关闭' : '点击开启'}
+        title={enabled ? tx('点击关闭') : tx('点击开启')}
       >
         <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition-all ${
           enabled ? 'left-[0.875rem]' : 'left-0.5'

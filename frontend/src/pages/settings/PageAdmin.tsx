@@ -7,6 +7,7 @@
  */
 import { Link, useSearchParams } from 'react-router-dom'
 import { cn } from '@/lib/cn'
+import { useI18n } from '@/lib/i18n'
 import { SettingsMenuSettingsPanel } from './MenuSettings'
 import { SettingsExtPagesPanel } from './ExtPages'
 
@@ -18,6 +19,7 @@ const SECTIONS = [
 type SectionKey = (typeof SECTIONS)[number]['key']
 
 export function SettingsPageAdminPanel() {
+  const { tx } = useI18n()
   const [searchParams, setSearchParams] = useSearchParams()
   const sectionParam = searchParams.get('section') as SectionKey | null
   const section: SectionKey = SECTIONS.some(s => s.key === sectionParam) ? sectionParam! : 'menus'
@@ -43,10 +45,10 @@ export function SettingsPageAdminPanel() {
                 : 'border-border text-secondary hover:bg-elevated/60',
             )}
           >
-            {s.label}
+            {tx(s.label)}
           </button>
         ))}
-        <Link to="/settings?tab=import" className="ml-auto rounded-lg border border-border px-3 py-1.5 text-sm text-secondary hover:bg-elevated">导入或管理页面插件</Link>
+        <Link to="/settings?tab=import" className="ml-auto rounded-lg border border-border px-3 py-1.5 text-sm text-secondary hover:bg-elevated">{tx('导入或管理页面插件')}</Link>
       </div>
 
       {section === 'menus' && <SettingsMenuSettingsPanel />}

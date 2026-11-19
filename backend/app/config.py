@@ -1,13 +1,15 @@
 """全局配置 — 从环境变量 / .env 读取。"""
 from __future__ import annotations
 
+import functools
+import ipaddress
 import logging
 import os
 import re
 import sys
 from pathlib import Path
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # ── 运行环境检测 ──────────────────────────────────────────
@@ -156,6 +158,15 @@ _ENV_FILE = Path(
 )
 
 
+@functools.lru_cache(maxsize=16)
+def parse_trusted_proxy_cidrs(
+    raw: str,
+) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
+    """解析逗号分隔的可信反向代理 CIDR 列表 (无效项直接抛 ValueError)."""
+    items = [part.strip() for part in (raw or "").split(",") if part.strip()]
+    return tuple(ipaddress.ip_network(item, strict=False) for item in items)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=str(_ENV_FILE),
@@ -231,6 +242,26 @@ class Settings(BaseSettings):
     # Auth — 首次启动时预置访问密码(明文, 仅用于初始化, 详见 services/auth.bootstrap_from_env)
     # 公网服务器部署时免去 SSH 端口转发设密码的麻烦。写入 auth.json(哈希)后即不再读取。
     auth_password: str = ""
+    # Edge security / gateway / AI budget
+    open_api_cors_origins: str = ""
+    trusted_proxy_cidrs: str = "127.0.0.1/32,::1/128"
+    auth_cookie_secure: bool | None = None
+    ai_daily_token_budget: int = 500_000
+
+    @field_validator("auth_cookie_secure", mode="before")
+    @classmethod
+    def _parse_auth_cookie_secure(cls, value: object) -> bool | None:
+        if value is None or isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            norm = value.strip().lower()
+            if norm in ("", "auto"):
+                return None
+            if norm in ("true", "1", "yes", "on"):
+                return True
+            if norm in ("false", "0", "no", "off"):
+                return False
+        raise ValueError("auth_cookie_secure must be auto/true/false")
 
     # Data — 桌面版按平台约定；源码使用项目根 data/；Docker 使用 /app/data。
     # (均可被环境变量 DATA_DIR 覆盖, pydantic-settings 自动注入)
@@ -268,7 +299,25 @@ class Settings(BaseSettings):
             raise ValueError("strategy_run_all_workers must be >= 1")
         if self.strategy_run_all_first_return_s < 0:
             raise ValueError("strategy_run_all_first_return_s must be >= 0")
+        if self.ai_daily_token_budget < 0:
+            raise ValueError("ai_daily_token_budget must be >= 0")
+        parse_trusted_proxy_cidrs(self.trusted_proxy_cidrs)
         return self
+
+    def cors_origins(self) -> list[str]:
+        """解析 OPEN_API_CORS_ORIGINS 逗号白名单 (去空白与尾部斜杠, 空串返回 [])."""
+        out: list[str] = []
+        for part in (self.open_api_cors_origins or "").split(","):
+            origin = part.strip().rstrip("/")
+            if origin and origin not in out:
+                out.append(origin)
+        return out
+
+    def trusted_proxy_networks(
+        self,
+    ) -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
+        """返回解析后的可信反代 CIDR 元组。"""
+        return parse_trusted_proxy_cidrs(self.trusted_proxy_cidrs)
 
     @property
     def use_free_mode(self) -> bool:
