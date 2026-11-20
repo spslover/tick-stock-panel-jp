@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { WatchlistGroup } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { fmtAssetPrice, fmtPct, priceColorClass } from '@/lib/format'
 import {
   rowPct,
@@ -65,6 +66,7 @@ const GroupCard = React.memo(function GroupCard({
   onPreview: (symbol: string, name: string) => void
   onOpen: (key: string) => void
 }) {
+  const { tx } = useI18n()
   const visible = expanded ? data.rows : data.rows.slice(0, topN)
   const hasMore = data.rows.length > topN
   const color = data.color
@@ -84,7 +86,7 @@ const GroupCard = React.memo(function GroupCard({
         type="button"
         onClick={() => onOpen(data.key)}
         className={`group flex w-full items-center gap-1.5 border-b border-border/60 px-3 py-2 text-left transition-colors hover:bg-elevated/60 ${showColorBar && color ? color.background : ''}`}
-        title={`查看「${data.name}」分组列表`}
+        title={tx('查看「{v}」分组列表', { v: data.name })}
       >
         <span className={`h-2 w-2 shrink-0 rounded-full ${color ? color.dot : 'bg-muted/60'}`} />
         <span className={`truncate text-xs font-medium ${color ? color.text : 'text-foreground'}`}>
@@ -102,9 +104,9 @@ const GroupCard = React.memo(function GroupCard({
           <span className="font-mono text-[10px] tabular-nums text-muted">{data.rows.length}</span>
           {pctInfo && pctInfo.sampled > 0 && (
             <span className="text-[10px] tabular-nums">
-              <span className="text-bull">{pctInfo.up}涨</span>
+              <span className="text-bull">{pctInfo.up}{tx('涨')}</span>
               <span className="mx-0.5 text-muted/40">/</span>
-              <span className="text-bear">{pctInfo.down}跌</span>
+              <span className="text-bear">{pctInfo.down}{tx('跌')}</span>
             </span>
           )}
         </span>
@@ -113,7 +115,7 @@ const GroupCard = React.memo(function GroupCard({
 
       {/* 组内榜单: 按涨跌幅降序 */}
       {data.rows.length === 0 ? (
-        <div className="px-3 py-4 text-center text-[11px] text-muted">暂无标的</div>
+        <div className="px-3 py-4 text-center text-[11px] text-muted">{tx('暂无标的')}</div>
       ) : (
         <div className="flex flex-col">
           {visible.map((r: any, i: number) => {
@@ -160,7 +162,7 @@ const GroupCard = React.memo(function GroupCard({
           onClick={() => onToggle(data.key)}
           className="flex items-center justify-center gap-1 border-t border-border/60 px-3 py-1.5 text-[10px] text-muted transition-colors hover:bg-elevated/60 hover:text-foreground"
         >
-          {expanded ? '收起' : `显示全部 ${data.rows.length} 只`}
+          {expanded ? tx('收起') : tx('显示全部 {n} 只', { n: data.rows.length })}
           <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? '' : 'rotate-180'}`} />
         </button>
       )}
@@ -193,6 +195,7 @@ export function WatchlistGroupCards({
   config,
   onConfigChange,
 }: WatchlistGroupCardsProps) {
+  const { tx } = useI18n()
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set())
 
   const toggleExpanded = useCallback((key: string) => {
@@ -252,13 +255,13 @@ export function WatchlistGroupCards({
 
   if (cards.length === 0) return null
 
-  const metricLabel = GROUP_METRICS.find(m => m.id === config.metric)?.label ?? ''
+  const metricLabel = tx(GROUP_METRICS.find(m => m.id === config.metric)?.label ?? '')
 
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <div className="text-[10px] uppercase tracking-wider text-muted">分组卡片 · {metricLabel}</div>
-        <GroupStatsSettings config={config} onChange={onConfigChange} ariaLabel="分组卡片设置" showCardLimit />
+        <div className="text-[10px] uppercase tracking-wider text-muted">{tx('分组卡片 ·')} {metricLabel}</div>
+        <GroupStatsSettings config={config} onChange={onConfigChange} ariaLabel={tx('分组卡片设置')} showCardLimit />
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {ordered.map(card => (

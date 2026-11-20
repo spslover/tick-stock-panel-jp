@@ -1,5 +1,6 @@
 import { CheckCircle2, XCircle, Loader2, AlertCircle } from 'lucide-react'
 import { formatDuration } from '@/lib/format'
+import { tx } from '@/lib/i18n'
 
 export function SectionTitle({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
   return (
@@ -39,11 +40,11 @@ export function HistoryRow({ job, onClick }: { job: any; onClick: () => void }) 
         {job.result && (() => {
           const r = job.result as Record<string, any>
           const parts: string[] = []
-          if (r.daily_days != null) parts.push(`日K ${r.daily_days}日`)
+          if (r.daily_days != null) parts.push(tx('日K {n}日', { n: r.daily_days }))
           // 独立除权因子同步任务 (无日K字段): 摘要以除权因子开头便于区分
-          if (r.adj_factor_symbols != null && r.daily_days == null) parts.push(`除权因子 ${r.adj_factor_symbols}只`)
-          if (r.enriched_days != null) parts.push(`enriched ${r.enriched_days}行`)
-          if (r.minute_rows != null) parts.push(`分钟K ${r.minute_rows}行`)
+          if (r.adj_factor_symbols != null && r.daily_days == null) parts.push(tx('除权因子 {n}只', { n: r.adj_factor_symbols }))
+          if (r.enriched_days != null) parts.push(tx('enriched {n}行', { n: r.enriched_days }))
+          if (r.minute_rows != null) parts.push(tx('分钟K {n}行', { n: r.minute_rows }))
           if (r.earliest_after && r.earliest_before) {
             const a = String(r.earliest_after).slice(0, 10)
             const b = String(r.earliest_before).slice(0, 10)

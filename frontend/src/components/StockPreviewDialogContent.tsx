@@ -74,9 +74,9 @@ function loadIntradayDays(): number {
 }
 
 function boardTag(symbol: string): { label: string; color: string } | null {
-  if (/^(300|301)/.test(symbol)) return { label: '创', color: 'text-[#f97316] bg-[#f97316]/12 border-[#f97316]/25' }
-  if (/^688/.test(symbol))       return { label: '科', color: 'text-purple-400 bg-purple-400/12 border-purple-400/25' }
-  if (/^[48]/.test(symbol))      return { label: '北', color: 'text-cyan-400 bg-cyan-400/12 border-cyan-400/25' }
+  if (/^(300|301)/.test(symbol)) return { label: '创', color: 'text-[#f97316] bg-[#f97316]/12 border-[#f97316]/25' } // i18n-exempt: 板块标识不翻译
+  if (/^688/.test(symbol))       return { label: '科', color: 'text-purple-400 bg-purple-400/12 border-purple-400/25' } // i18n-exempt: 板块标识不翻译
+  if (/^[48]/.test(symbol))      return { label: '北', color: 'text-cyan-400 bg-cyan-400/12 border-cyan-400/25' } // i18n-exempt: 板块标识不翻译
   return null
 }
 
@@ -97,7 +97,7 @@ function fmtAbnormalCalcTime(asofSec: number): string {
 
 
 export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, navList: navListSource, onNavigate }: Props) {
-  const { tx } = useI18n()
+  const { tx, locale } = useI18n()
   const [view, setView] = useState<PreviewView>('daily')
   const panelId = useId()
   const extensionTabs = getFrontendSlotRegistrations('stock-preview.tabs')
@@ -198,7 +198,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
     onNavigate: n => onNavigate?.(n.symbol, n.name),
     // 点位监控弹窗/规则编辑器打开时方向键不切股 (与 ESC 的 !priceAlertDraft 守卫同层级)
     blocked: () => !!priceAlertDraft || showMonitorEditor,
-    wrapHints: { head: '已到榜首', tail: '已到末尾' },
+    wrapHints: { head: tx('已到榜首'), tail: tx('已到末尾') },
   })
 
   // 邻近预取目标: 当前股左右相邻两只 (首↔尾循环), 交由 StockPanel 提前拉取日K/财务/分时缓存
@@ -291,7 +291,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
             )}
             role="dialog"
             aria-modal="true"
-            aria-label={`${symbol} 个股详情`}
+            aria-label={tx('{s} 个股详情', { s: symbol })}
           >
             {/* 顶栏: 单行 = 个股身份 + 视图/区间控件 + 操作按钮。纯样式重排, 交互逻辑不变 */}
             <div className="shrink-0 border-b border-border/60 bg-elevated/30">
@@ -309,7 +309,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                 {name && <span className="truncate text-xs text-secondary">{name}</span>}
 
                 {/* 切股导航: 上一只 / n·N / 下一只 */}
-                <NavPager nav={nav} prevLabel="上一只" nextLabel="下一只" />
+                <NavPager nav={nav} prevLabel={tx('上一只')} nextLabel={tx('下一只')} />
               </div>
 
               {/* 视图/区间控件: 原第二行并入顶行, 紧邻操作按钮 (原「自选于」标注位置) */}
@@ -404,8 +404,8 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                     onClick={() => toggleWatchlist.mutate({ action: 'remove' })}
                     disabled={toggleWatchlist.isPending}
                     className="rounded-btn p-1.5 text-[#FACC15] transition-colors cursor-pointer hover:bg-elevated disabled:opacity-50"
-                    title="移出自选"
-                    aria-label={`将 ${symbol} 移出自选`}
+                    title={tx('移出自选')}
+                    aria-label={tx('将 {s} 移出自选', { s: symbol })}
                   >
                     <Star className="h-4 w-4" />
                   </button>
@@ -414,7 +414,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                     onSelect={groupId => toggleWatchlist.mutate({ action: 'add', groupId })}
                     disabled={toggleWatchlist.isPending}
                     triggerClassName="rounded-btn p-1.5 text-muted transition-colors cursor-pointer hover:bg-elevated hover:text-foreground disabled:opacity-50"
-                    ariaLabel={`将 ${symbol} 加入自选`}
+                    ariaLabel={tx('将 {s} 加入自选', { s: symbol })}
                   >
                     <Star className="h-4 w-4" />
                   </WatchlistAddMenu>
@@ -423,7 +423,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                 <button
                   onClick={() => setShowMonitorEditor(true)}
                   className="p-1.5 rounded-btn text-amber-400 hover:bg-amber-400/10 transition-colors cursor-pointer"
-                  title="加监控"
+                  title={tx('加监控')}
                 >
                   <RadioTower className="h-4 w-4" />
                 </button>
@@ -433,7 +433,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                   <button
                     onClick={handleRefresh}
                     className="p-1.5 rounded-btn text-secondary hover:text-foreground hover:bg-elevated transition-colors"
-                    title="刷新"
+                    title={tx('刷新')}
                   >
                     <RefreshCw className="h-4 w-4" />
                   </button>
@@ -443,7 +443,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                 <button
                   onClick={() => setMaximized(v => !v)}
                   className="p-1.5 rounded-btn text-secondary hover:text-foreground hover:bg-elevated transition-colors"
-                  title={maximized ? '缩小' : '放大'}
+                  title={maximized ? tx('缩小') : tx('放大')}
                 >
                   {maximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </button>
@@ -451,8 +451,8 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                 <button
                   onClick={onClose}
                   className="shrink-0 rounded-btn p-1.5 text-secondary transition-colors hover:bg-danger/15 hover:text-danger"
-                  aria-label="关闭个股详情"
-                  title="关闭"
+                  aria-label={tx('关闭个股详情')}
+                  title={tx('关闭')}
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -465,10 +465,10 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
               <div className="flex items-center gap-4 border-b border-amber-400/20 bg-amber-400/[0.06] px-5 py-2 shrink-0">
                 {/* 左: 触发标记 + 时间 */}
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[10px] font-semibold text-amber-400">⚡ 触发</span>
+                  <span className="text-[10px] font-semibold text-amber-400">{tx('⚡ 触发')}</span>
                   {triggerInfo.ts && (
                     <span className="text-[11px] text-secondary font-mono">
-                      {new Date(triggerInfo.ts).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      {new Date(triggerInfo.ts).toLocaleString(locale, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                     </span>
                   )}
                 </div>
@@ -508,9 +508,9 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                 <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2 shrink-0 ${meta.bar}`}>
                   <span className="flex shrink-0 items-center gap-1.5">
                     <Activity className={`h-3.5 w-3.5 ${meta.icon}`} />
-                    <span className={`text-[11px] font-bold ${meta.icon}`}>异动</span>
+                    <span className={`text-[11px] font-bold ${meta.icon}`}>{tx('异动')}</span>
                     <span className={`rounded px-1.5 py-0.5 text-[10px] ${meta.cls}`}>
-                      {meta.label}
+                      {tx(meta.label)}
                     </span>
                   </span>
                   {Object.entries(abRow.windows)
@@ -520,25 +520,25 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                       return (
                         <span
                           key={w}
-                          title={`近${parseInt(w, 10)}日累计偏离(含实时) / 交易所规则阈值 · 接近度=|偏离|/阈值`}
+                          title={tx('近{n}日累计偏离(含实时) / 交易所规则阈值 · 接近度=|偏离|/阈值', { n: parseInt(w, 10) })}
                           className={`shrink-0 rounded border px-1.5 py-0.5 font-mono text-[11px] ${
                             dominant
                               ? 'border-border bg-elevated font-semibold text-foreground'
                               : 'border-border/60 bg-base/40 text-secondary'
                           }`}
                         >
-                          {parseInt(w, 10)}日{' '}
+                          {parseInt(w, 10)}{tx('日')}{' '}
                           <span className={info.value >= 0 ? 'text-bull' : 'text-bear'}>{fmtPct(info.value)}</span>
                           <span className="text-muted"> / ±{(info.threshold * 100).toFixed(0)}%</span>
-                          <span className="text-muted"> · 接近{(info.closeness * 100).toFixed(0)}%</span>
+                          <span className="text-muted"> {tx('· 接近')}{(info.closeness * 100).toFixed(0)}%</span>
                         </span>
                       )
                     })}
                   <span
                     className="ml-auto shrink-0 font-mono text-[10px] text-muted"
-                    title="异动引擎上次计算时间"
+                    title={tx('异动引擎上次计算时间')}
                   >
-                    计算于 {fmtAbnormalCalcTime(abnormal.data?.asof ?? 0)}
+                    {tx('计算于')} {fmtAbnormalCalcTime(abnormal.data?.asof ?? 0)}
                   </span>
                 </div>
               )
@@ -586,7 +586,7 @@ export function StockPreviewDialogContent({ symbol, name, onClose, triggerInfo, 
                 </div>
               ) : selectedTab && TabContent && (
                 <ExtensionBoundary key={`${selectedTab.id}:${symbol}`} extensionId={selectedTab.extensionId}>
-                  <Suspense fallback={<div role="status" className="text-xs text-muted">加载中…</div>}>
+                  <Suspense fallback={<div role="status" className="text-xs text-muted">{tx('加载中…')}</div>}>
                     <TabContent symbol={symbol} name={name ?? null} />
                   </Suspense>
                 </ExtensionBoundary>

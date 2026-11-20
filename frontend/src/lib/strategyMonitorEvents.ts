@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18n'
 import type { StrategyNotifyEvent } from './api'
 
 export interface StrategyEventMeta {
@@ -62,13 +63,16 @@ export const STRATEGY_NOTIFY_EVENT_OPTIONS: {
 ]
 
 export function strategyEventMeta(type: string): StrategyEventMeta {
-  return META[type] ?? {
-    label: '事件',
-    action: '策略事件',
+  const meta = META[type]
+  if (meta) return { ...meta, label: tx(meta.label), action: tx(meta.action) }
+  return {
+    label: tx('事件'),
+    action: tx('策略事件'),
     className: 'text-secondary',
   }
 }
 
 export function strategyName(message: string): string {
+  // i18n-exempt: 与后端消息文本比对
   return message.match(/策略「([^」]+)」/)?.[1] ?? ''
 }

@@ -1,3 +1,4 @@
+import { useI18n } from '@/lib/i18n'
 /**
  * 回测预热期徽标 — 点击弹出说明气泡。
  *
@@ -19,6 +20,7 @@ import { Info } from 'lucide-react'
 interface Pos { top: number; left: number }
 
 export function WarmupBadge() {
+  const { tx } = useI18n()
   const [open, setOpen] = useState(false)
   const anchorRef = useRef<HTMLButtonElement>(null)
   const [pos, setPos] = useState<Pos>({ top: 0, left: 0 })
@@ -53,11 +55,10 @@ export function WarmupBadge() {
         type="button"
         onClick={() => setOpen(o => !o)}
         className="inline-flex items-center gap-0.5 rounded-full px-1.5 text-[10px] text-amber-500/70 transition-colors hover:bg-amber-400/10 hover:text-amber-500"
-        title="为什么开头可能没交易?"
+        title={tx('为什么开头可能没交易?')}
       >
         <Info className="h-3 w-3" strokeWidth={1.5} />
-        预热 ≥120 天
-      </button>
+        {tx('预热 ≥120 天')}</button>
 
       {createPortal(
         <AnimatePresence>
@@ -78,18 +79,13 @@ export function WarmupBadge() {
                 className="z-[70] rounded-btn border border-border bg-surface p-3 text-[11px] leading-relaxed text-secondary shadow-2xl"
                 onClick={e => e.stopPropagation()}
               >
-                <div className="mb-1.5 font-medium text-foreground">为什么开头几个月可能没有交易?</div>
+                <div className="mb-1.5 font-medium text-foreground">{tx('为什么开头几个月可能没有交易?')}</div>
                 <p className="text-muted">
-                  技术指标 (MA / MACD / RSI 等) 需要历史数据才能算出。系统会自动在回测起点之前多取约
-                  <span className="font-medium text-amber-300"> 120 天 (≈4 个月)</span> 数据做预热。
-                </p>
+                  {tx('技术指标 (MA / MACD / RSI 等) 需要历史数据才能算出。系统会自动在回测起点之前多取约')}<span className="font-medium text-amber-300"> {tx('120 天 (≈4 个月)')}</span> {tx('数据做预热。')}</p>
                 <p className="mt-1.5 text-muted">
-                  若本地数据恰好从回测起点才开始, 开头几个月指标算不出、信号不触发,
-                  <span className="text-secondary"> 属正常现象, 不是 bug</span>。等数据攒够后自然开始产生交易。
-                </p>
+                  {tx('若本地数据恰好从回测起点才开始, 开头几个月指标算不出、信号不触发,')}<span className="text-secondary"> {tx('属正常现象, 不是 bug')}</span>{tx('。等数据攒够后自然开始产生交易。')}</p>
                 <div className="mt-2 border-t border-border/60 pt-2 text-muted">
-                  <span className="text-secondary">解决:</span> 把历史数据补到回测起点之前至少半年, 或把起点往后挪。
-                </div>
+                  <span className="text-secondary">{tx('解决:')}</span> {tx('把历史数据补到回测起点之前至少半年, 或把起点往后挪。')}</div>
                 {/* 小箭头指向锚点 */}
                 <div
                   className="absolute -top-1 h-2 w-2 rotate-45 border-l border-t border-border bg-surface"

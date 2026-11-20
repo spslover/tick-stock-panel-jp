@@ -4,6 +4,7 @@ import { Clock, X } from 'lucide-react'
 import { StockPanel } from '@/components/StockPanel'
 import { NavPager, NavWrapToast } from '@/components/NavPager'
 import type { ChartMarker, ChartPriceLine, ChartRange } from '@/lib/chart-types'
+import { useI18n } from '@/lib/i18n'
 import type { StrategyBacktestTrade } from '@/lib/api'
 import { useListNav } from '@/lib/useListNav'
 import { tradeNavKey, type TradeNavItem } from '../tradeNav'
@@ -31,22 +32,22 @@ function addDays(date: string, days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-function fmtMoney(v: number | null | undefined): string {
-  if (v == null || Number.isNaN(Number(v))) return '—'
-  const n = Number(v)
-  const abs = Math.abs(n)
-  if (abs >= 100_000_000) return `${(n / 100_000_000).toFixed(2)}亿`
-  if (abs >= 10_000) return `${(n / 10_000).toFixed(2)}万`
-  return n.toFixed(0)
-}
-
-function fmtSignedMoney(v: number | null | undefined): string {
-  if (v == null || Number.isNaN(Number(v))) return '—'
-  const prefix = Number(v) > 0 ? '+' : ''
-  return `${prefix}${fmtMoney(v)}`
-}
-
 export function TradeKlineModal({ trade, assetType, navItems, currentKey, onNavigate, onClose }: Props) {
+  const { tx, locale } = useI18n()
+  // 万/亿 是中文数量级, 英文用 K/M, 日文用 万/億 —— 走词库翻译
+  const fmtMoney = (v: number | null | undefined): string => {
+    if (v == null || Number.isNaN(Number(v))) return '—'
+    const n = Number(v)
+    const abs = Math.abs(n)
+    if (abs >= 100_000_000) return tx('{v}亿', { v: (n / 100_000_000).toFixed(2) })
+    if (abs >= 10_000) return tx('{v}万', { v: (n / 10_000).toFixed(2) })
+    return n.toFixed(0)
+  }
+  const fmtSignedMoney = (v: number | null | undefined): string => {
+    if (v == null || Number.isNaN(Number(v))) return '—'
+    const prefix = Number(v) > 0 ? '+' : ''
+    return `${prefix}${fmtMoney(v)}`
+  }
   const [showIntraday, setShowIntraday] = useState(false)
   const [selection, setSelection] = useState<{ key: string; date: string } | null>(null)
   const [resolvedAsset, setResolvedAsset] = useState<{ symbol: string; type: string } | null>(null)
@@ -78,7 +79,7 @@ export function TradeKlineModal({ trade, assetType, navItems, currentKey, onNavi
     currentKey: currentKey ?? null,
     onNavigate: item => onNavigate?.(item),
     // 「笔」而非「只」: 链的粒度是交易, 同一标的可以出现多笔
-    wrapHints: { head: '已到首笔', tail: '已到末笔' },
+    wrapHints: { head: tx('已到首笔'), tail: tx('已到末笔') },
   })
 
   // ESC 关闭 (左右键切交易由 useListNav 接管)
@@ -111,40 +112,40 @@ export function TradeKlineModal({ trade, assetType, navItems, currentKey, onNavi
     return [{
       start: String(trade.entry_date).slice(0, 10),
       end: String(trade.exit_date).slice(0, 10),
-      label: '持仓区间',
+      label: tx('持仓区间'),
       color: 'rgba(59,130,246,0.07)',
     }]
-  }, [trade])
+  }, [trade, locale])
 
   const markers = useMemo<ChartMarker[]>(() => trade ? [
-    { date: entryDay, kind: 'buy', label: `买 ${fmtPrice(trade.entry_price, precision)}` },
-    { date: exitDay, kind: 'sell', label: `卖 ${fmtPrice(trade.exit_price, precision)}` },
-  ] : [], [trade, entryDay, exitDay, precision])
+    { date: entryDay, kind: 'buy', label: tx('买 {v}', { v: fmtPrice(trade.entry_price, precision) }) },
+    { date: exitDay, kind: 'sell', label: tx('卖 {v}', { v: fmtPrice(trade.exit_price, precision) }) },
+  ] : [], [trade, entryDay, exitDay, precision, locale])
 
   const priceLines = useMemo<ChartPriceLine[]>(() => {
     if (!trade) return []
     const start = String(trade.entry_date).slice(0, 10)
     const end = String(trade.exit_date).slice(0, 10)
     if (Number(trade.entry_price) === Number(trade.exit_price)) {
-      return [{ value: Number(trade.entry_price), label: `买卖价 ${fmtPrice(trade.entry_price, precision)}`, color: '#3B82F6', start, end }]
+      return [{ value: Number(trade.entry_price), label: tx('买卖价 {v}', { v: fmtPrice(trade.entry_price, precision) }), color: '#3B82F6', start, end }]
     }
     return [
       {
         value: Number(trade.entry_price),
-        label: `买入价 ${fmtPrice(trade.entry_price, precision)}`,
+        label: tx('买入价 {v}', { v: fmtPrice(trade.entry_price, precision) }),
         color: '#C74040',
         start,
         end,
       },
       {
         value: Number(trade.exit_price),
-        label: `卖出价 ${fmtPrice(trade.exit_price, precision)}`,
+        label: tx('卖出价 {v}', { v: fmtPrice(trade.exit_price, precision) }),
         color: '#2D9B65',
         start,
         end,
       },
     ]
-  }, [trade, precision])
+  }, [trade, precision, locale])
 
   return (
     <AnimatePresence>
@@ -161,7 +162,7 @@ export function TradeKlineModal({ trade, assetType, navItems, currentKey, onNavi
           <motion.div
             role="dialog"
             aria-modal="true"
-            aria-label={`${trade.symbol} ${trade.name || ''} 交易回放`}
+            aria-label={`${trade.symbol} ${trade.name || ''} ${tx('交易回放')}`}
             initial={{ opacity: 0, scale: 0.95, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.97, y: 8 }}
@@ -172,34 +173,32 @@ export function TradeKlineModal({ trade, assetType, navItems, currentKey, onNavi
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="font-mono text-sm font-semibold text-foreground">{trade.symbol}</span>
-                  <span className="truncate text-sm text-foreground">{trade.name || '交易回放'}</span>
-                  <span className="rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">交易回放</span>
+                  <span className="truncate text-sm text-foreground">{trade.name || tx('交易回放')}</span>
+                  <span className="rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">{tx('交易回放')}</span>
 
                   {/* 切交易: 上一笔 / n·N / 下一笔 */}
-                  <NavPager nav={nav} prevLabel="上一笔" nextLabel="下一笔" />
+                  <NavPager nav={nav} prevLabel={tx('上一笔')} nextLabel={tx('下一笔')} />
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted">
-                  <button type="button" aria-label="查看买入日" title="查看买入日分时"
+                  <button type="button" aria-label={tx('查看买入日')} title={tx('查看买入日分时')}
                     onClick={() => selectDate(entryDay)}
                     className="rounded px-1 py-0.5 text-bull transition-colors hover:bg-bull/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
-                    {String(trade.entry_date).replace('T', ' ').slice(0, 16)} 买入
-                  </button>
+                    {String(trade.entry_date).replace('T', ' ').slice(0, 16)} {tx('买入')}</button>
                   <span aria-hidden="true">→</span>
-                  <button type="button" aria-label="查看卖出日" title="查看卖出日分时"
+                  <button type="button" aria-label={tx('查看卖出日')} title={tx('查看卖出日分时')}
                     onClick={() => selectDate(exitDay)}
                     className="rounded px-1 py-0.5 text-bear transition-colors hover:bg-bear/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60">
-                    {String(trade.exit_date).replace('T', ' ').slice(0, 16)} 卖出
-                  </button>
-                  <span>· 持仓 {trade.duration ?? '—'} 天</span>
+                    {String(trade.exit_date).replace('T', ' ').slice(0, 16)} {tx('卖出')}</button>
+                  <span>{tx('· 持仓 {d} 天', { d: trade.duration ?? '—' })}</span>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
                 <div className="text-right">
-                  <div className="text-muted">买 / 卖</div>
+                  <div className="text-muted">{tx('买 / 卖')}</div>
                   <div className="num text-foreground">{fmtPrice(trade.entry_price, precision)} / {fmtPrice(trade.exit_price, precision)}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-muted">盈亏</div>
+                  <div className="text-muted">{tx('盈亏')}</div>
                   <div className={`num font-semibold ${priceColorClass(trade.pnl_amount ?? trade.pnl_pct)}`}>
                     {fmtSignedMoney(trade.pnl_amount)} / {fmtPct(trade.pnl_pct)}
                   </div>
@@ -215,11 +214,10 @@ export function TradeKlineModal({ trade, assetType, navItems, currentKey, onNavi
                   }`}
                 >
                   <Clock className="h-3 w-3" />
-                  分时
-                </button>
+                  {tx('分时')}</button>
                 <button
                   type="button"
-                  aria-label="关闭交易回放"
+                  aria-label={tx('关闭交易回放')}
                   onClick={onClose}
                   className="rounded-btn p-1 text-secondary transition-colors hover:bg-elevated hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
                 >

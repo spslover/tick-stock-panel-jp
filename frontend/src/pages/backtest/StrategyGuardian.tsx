@@ -129,7 +129,7 @@ function AdoptCard({ onChanged }: { onChanged: () => void }) {
           <StrategySelect strategies={strategies} value={strategyId} onChange={setStrategyId} />
         </div>
         <select value={objective} onChange={e => setObjective(e.target.value)} className={`${INPUT_CLS} w-32`}>
-          {PRIMARY_OBJECTIVES.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+          {PRIMARY_OBJECTIVES.map(o => <option key={o.id} value={o.id}>{tx(o.label)}</option>)}
         </select>
         <button
           onClick={() => adopt.mutate()}

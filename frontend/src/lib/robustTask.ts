@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18n'
 import { useSyncExternalStore } from 'react'
 import { fetchRunningTask, reportTaskFinished, reportTaskRunning } from './taskRegistry'
 
@@ -196,7 +197,7 @@ function connectSSE(url: string): void {
       current = { ...current, isPending: false, result, error: null }
       emit()
     } catch {
-      current = { ...current, isPending: false, error: '结果解析失败' }
+      current = { ...current, isPending: false, error: tx('结果解析失败') }
       emit()
     }
     es.close()
@@ -209,11 +210,11 @@ function connectSSE(url: string): void {
     if (current?.id !== id) return
     if (e.data) {
       try {
-        const msg = JSON.parse(e.data)?.message ?? '稳健优化出错'
+        const msg = JSON.parse(e.data)?.message ?? tx('稳健优化出错')
         current = { ...current, isPending: false, error: msg }
         emit()
       } catch {
-        current = { ...current, isPending: false, error: '稳健优化出错' }
+        current = { ...current, isPending: false, error: tx('稳健优化出错') }
         emit()
       }
       es.close()
@@ -228,7 +229,7 @@ function connectSSE(url: string): void {
         es.close()
         eventSource = null
         finishTaskRegistry()
-        current = { ...current, isPending: false, error: '连接中断, 重连多次失败' }
+        current = { ...current, isPending: false, error: tx('连接中断, 重连多次失败') }
         emit()
       }
     }
@@ -307,7 +308,7 @@ export function stopRobust(): void {
     }, 5000)
   }
   if (current?.isPending) {
-    current = { ...current, isPending: false, error: '已取消' }
+    current = { ...current, isPending: false, error: tx('已取消') }
     emit()
   }
 }

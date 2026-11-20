@@ -529,7 +529,7 @@ function DataSourceStep({ onNext, onBack }: { onNext: () => void; onBack: () => 
                         {row.datasets.length > 0 ? (
                           row.datasets.map(ds => (
                             <span key={ds} className="rounded-md bg-elevated/45 px-1.5 py-0.5 text-[10px] leading-none text-muted/85">
-                              {DATASET_LABELS[ds] ?? ds}
+                              {tx(DATASET_LABELS[ds] ?? ds)}
                             </span>
                           ))
                         ) : (

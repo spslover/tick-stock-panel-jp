@@ -1,3 +1,4 @@
+import { getLocale } from '@/lib/i18n'
 // 数字 / 价格 / 涨跌幅 格式化(§6.0.2 等宽数字)
 
 export function fmtPrice(v: number | null | undefined, digits = 2): string {
@@ -32,10 +33,7 @@ export function fmtPct(v: number | null | undefined, digits = 2): string {
 export function fmtVolume(v: number | null | undefined): string {
   if (v == null || Number.isNaN(v)) return '—'
   const sign = v < 0 ? '-' : ''
-  const a = Math.abs(v)
-  if (a >= 1e8) return `${sign}${(a / 1e8).toFixed(2)}亿`
-  if (a >= 1e4) return `${sign}${(a / 1e4).toFixed(2)}万`
-  return v.toFixed(0)
+  return sign + compactNumber(Math.abs(v), { digits: 2, smallDigits: 2 })
 }
 
 // A 股语义色:红涨绿跌 → 仅用于价格相关元素
@@ -46,10 +44,7 @@ export function priceColorClass(v: number | null | undefined): string {
 
 export function fmtBigNum(v: number | null | undefined): string {
   if (v == null || Number.isNaN(v)) return '—'
-  if (v >= 1_000_000_000_000) return `${(v / 1_000_000_000_000).toFixed(2)}万亿`
-  if (v >= 100_000_000) return `${(v / 100_000_000).toFixed(2)}亿`
-  if (v >= 10_000) return `${(v / 10_000).toFixed(0)}万`
-  return v.toFixed(0)
+  return compactNumber(v)
 }
 
 export function fmtDate(s: string | Date | null | undefined): string {
@@ -107,8 +102,7 @@ export function cnDateTimeFromUtc(utcIso: string | null | undefined): string {
 // ===== Data 页面工具函数 =====
 
 export function formatNumber(n: number): string {
-  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}亿`
-  if (n >= 10_000) return `${(n / 10_000).toFixed(1)}万`
+  if (n >= 100_000_000 || n >= 10_000) return compactNumber(n, { digits: 1, smallDigits: 1 })
   return n.toLocaleString()
 }
 
@@ -146,6 +140,43 @@ export function formatLogTime(iso: string): string {
 }
 
 /**
+ * 紧凑金额/数量 —— 倍率与后缀必须成对切换:
+ *   中文 万=1e4 / 亿=1e8 / 万亿=1e12, 英文 K=1e3 / M=1e6 / B=1e9 / T=1e12。
+ *   只换后缀会让英文差一个数量级(1.23 亿 会被显示成 "1.23B" = 12.3 亿)。
+ */
+export function compactNumber(v: number, opts?: { digits?: number; smallDigits?: number }): string {
+  const loc = getLocale()
+  const abs = Math.abs(v)
+  const d = opts?.digits ?? 2
+  const sd = opts?.smallDigits ?? 0
+  if (loc === 'en') {
+    if (abs >= 1e12) return `${(v / 1e12).toFixed(d)}T`
+    if (abs >= 1e9) return `${(v / 1e9).toFixed(d)}B`
+    if (abs >= 1e6) return `${(v / 1e6).toFixed(d)}M`
+    if (abs >= 1e3) return `${(v / 1e3).toFixed(sd)}K`
+    return v.toFixed(0)
+  }
+  // i18n-exempt: 数量级符号是中文/日文记数法约定, 不是可翻译文案
+  const yi = loc === 'ja' ? '億' : '亿' // i18n-exempt: 数量级符号是记数法约定
+  const big = loc === 'ja' ? '兆' : '万亿' // i18n-exempt: 同上
+  if (abs >= 1e12) return `${(v / 1e12).toFixed(d)}${big}`
+  if (abs >= 1e8) return `${(v / 1e8).toFixed(d)}${yi}`
+  if (abs >= 1e4) return `${(v / 1e4).toFixed(sd)}万` // i18n-exempt: 同上
+  return v.toFixed(0)
+}
+
+/** 指定数量级单位(万/亿)的倍率与后缀 —— 英文用同量级的 K/M, 与中文 万/亿 一一对应。 */
+export function unitScale(kind: 'wan' | 'yi'): { div: number; suffix: string } {
+  const loc = getLocale()
+  if (kind === 'wan') {
+    return loc === 'en' ? { div: 1e3, suffix: 'K' } : { div: 1e4, suffix: '万' } // i18n-exempt: 数量级符号是记数法约定
+  }
+  return loc === 'en'
+    ? { div: 1e6, suffix: 'M' }
+    : { div: 1e8, suffix: loc === 'ja' ? '億' : '亿' } // i18n-exempt: 同上
+}
+
+/**
  * 扩展数据列数字格式化 — 千分位逗号 + 单位换算 + 小数位。
  * 供自选/策略列表的扩展数据 number 单元格统一调用。
  *
@@ -166,15 +197,19 @@ export function formatExtNumber(
   let decimals = unitDecimals ?? 2
 
   if (unitConvert === 'wan') {
-    n = val / 1e4
-    suffix = '万'
+    const u = unitScale('wan')
+    n = val / u.div
+    suffix = u.suffix
   } else if (unitConvert === 'yi') {
-    n = val / 1e8
-    suffix = '亿'
+    const u = unitScale('yi')
+    n = val / u.div
+    suffix = u.suffix
   } else if (unitConvert === 'auto') {
     const abs = Math.abs(val)
-    if (abs >= 1e8) { n = val / 1e8; suffix = '亿' }
-    else if (abs >= 1e4) { n = val / 1e4; suffix = '万' }
+    const yi = unitScale('yi')
+    const wan = unitScale('wan')
+    if (abs >= yi.div) { n = val / yi.div; suffix = yi.suffix }
+    else if (abs >= wan.div) { n = val / wan.div; suffix = wan.suffix }
     else { decimals = unitDecimals ?? 0 }
   } else {
     // none: 整数不带小数, 小数保留原精度(最多 4 位去尾零)

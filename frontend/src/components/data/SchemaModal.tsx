@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { api, type EnrichedField } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
 
@@ -35,6 +36,7 @@ function categorize(name: string): string {
 }
 
 export function EnrichedSchemaModal({ table, onClose }: { table: string | null; onClose: () => void }) {
+  const { tx } = useI18n()
   const open = !!table
   const backdrop = useDialogBackdrop(onClose)
   const schema = useQuery({
@@ -53,7 +55,7 @@ export function EnrichedSchemaModal({ table, onClose }: { table: string | null; 
     groups[cat].push(f)
   }
 
-  const title = table ? (TABLE_TITLES[table] ?? table) : ''
+  const title = table ? tx(TABLE_TITLES[table] ?? table) : ''
 
   return (
     <AnimatePresence>
@@ -74,17 +76,17 @@ export function EnrichedSchemaModal({ table, onClose }: { table: string | null; 
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
           >
             <div className="flex items-center justify-between px-5 py-3 border-b border-border">
-              <h3 className="text-sm font-medium text-foreground">{title} 字段说明</h3>
-              <span className="text-[10px] text-muted font-mono">{fields.length} 个字段</span>
+              <h3 className="text-sm font-medium text-foreground">{title} {tx('字段说明')}</h3>
+              <span className="text-[10px] text-muted font-mono">{fields.length} {tx('个字段')}</span>
             </div>
             <div className="px-5 py-3 overflow-y-auto max-h-[calc(70vh-48px)]">
               {schema.isLoading ? (
-                <div className="text-xs text-muted animate-pulse py-4 text-center">加载中…</div>
+                <div className="text-xs text-muted animate-pulse py-4 text-center">{tx('加载中…')}</div>
               ) : (
                 <div className="space-y-3">
                   {Object.entries(groups).map(([cat, items]) => (
                     <div key={cat}>
-                      <div className="text-[10px] font-medium text-accent/70 uppercase tracking-wider mb-1.5">{cat}</div>
+                      <div className="text-[10px] font-medium text-accent/70 uppercase tracking-wider mb-1.5">{tx(cat)}</div>
                       <div className="space-y-1">
                         {items.map((f) => (
                           <div key={f.name} className="flex items-baseline gap-2 text-[11px]">

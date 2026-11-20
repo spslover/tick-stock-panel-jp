@@ -3,11 +3,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { X, Loader2, Upload, Database, Plus, AlertCircle, Lock } from 'lucide-react'
 import { api, type ExtDataConfig, type ExtDataField } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
 import { SectionHead, INPUT_CLS } from './dialogShared'
 
 export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onClose: () => void }) {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const backdrop = useDialogBackdrop(onClose)
   const [label, setLabel] = useState(config.label)
@@ -46,7 +48,7 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
   const applyDetectedFields = (detected: { name: string; dtype: string; label: string }[]) => {
     const rest = detected.filter(f => f.name !== 'symbol')
     setFields([
-      { name: 'symbol', dtype: 'string', label: '标的代码' },
+      { name: 'symbol', dtype: 'string', label: tx('标的代码') },
       ...rest,
     ])
   }
@@ -75,7 +77,7 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
     if (!symbolMapping) return
     setDetecting(true); setError('')
     const rest = fields.filter(f => f.name !== 'symbol')
-    setFields([{ name: 'symbol', dtype: 'string', label: '标的代码' }, ...rest])
+    setFields([{ name: 'symbol', dtype: 'string', label: tx('标的代码') }, ...rest])
     setSymbolMapping(null)
     setDetecting(false)
   }
@@ -96,7 +98,7 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
               <Database className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-[15px] leading-6 font-semibold text-foreground">编辑扩展数据</h3>
+              <h3 className="text-[15px] leading-6 font-semibold text-foreground">{tx('编辑扩展数据')}</h3>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="text-[11px] font-mono text-muted">{config.id}</span>
                 <span className={`inline-flex px-1.5 py-px rounded text-[10px] border ${
@@ -104,14 +106,14 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
                     ? 'bg-blue-500/10 border-blue-500/25 text-blue-400'
                     : 'bg-amber-500/10 border-amber-500/25 text-amber-500'
                 }`}>
-                  {config.mode === 'snapshot' ? '快照型' : '时序型'}
+                  {config.mode === 'snapshot' ? tx('快照型') : tx('时序型')}
                 </span>
               </div>
             </div>
           </div>
           <button
             onClick={onClose}
-            aria-label="关闭"
+            aria-label={tx('关闭')}
             className="p-1.5 rounded-lg text-secondary hover:text-foreground hover:bg-elevated focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors shrink-0"
           >
             <X className="h-4 w-4" />
@@ -121,10 +123,10 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
         <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-6">
           {/* 01 基本信息 */}
           <section>
-            <SectionHead num="01" title="基本信息" />
+            <SectionHead num="01" title={tx('基本信息')} />
             <div className="space-y-3">
               <div>
-                <div className="text-[11px] font-medium text-secondary mb-1.5">显示名称</div>
+                <div className="text-[11px] font-medium text-secondary mb-1.5">{tx('显示名称')}</div>
                 <input
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
@@ -133,11 +135,11 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
                 />
               </div>
               <div>
-                <div className="text-[11px] font-medium text-secondary mb-1.5">描述 <span className="text-muted font-normal">可选</span></div>
+                <div className="text-[11px] font-medium text-secondary mb-1.5">{tx('描述')} <span className="text-muted font-normal">{tx('可选')}</span></div>
                 <input
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="一句话说明数据用途，展示在表卡片上"
+                  placeholder={tx('一句话说明数据用途，展示在表卡片上')}
                   className={INPUT_CLS}
                 />
               </div>
@@ -146,7 +148,7 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
 
           {/* 02 字段定义 */}
           <section>
-            <SectionHead num="02" title="字段定义">
+            <SectionHead num="02" title={tx('字段定义')}>
               <div className="flex items-center gap-1.5">
                 <input
                   ref={detectFileRef}
@@ -161,15 +163,13 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] text-muted hover:text-accent hover:bg-accent/[0.06] disabled:opacity-40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                 >
                   {detecting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-                  从文件导入
-                </button>
+                  {tx('从文件导入')}</button>
                 <button
                   onClick={addField}
                   className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] text-muted hover:text-accent hover:bg-accent/[0.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                 >
                   <Plus className="h-3 w-3" />
-                  添加字段
-                </button>
+                  {tx('添加字段')}</button>
               </div>
             </SectionHead>
 
@@ -180,7 +180,7 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
                 exit={{ opacity: 0, height: 0 }}
                 className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-3 py-2.5 space-y-2"
               >
-                <div className="text-[10px] text-amber-500 font-medium">未找到 symbol 列，请选择哪一列作为标的代码</div>
+                <div className="text-[10px] text-amber-500 font-medium">{tx('未找到 symbol 列，请选择哪一列作为标的代码')}</div>
                 <div className="flex flex-wrap gap-1.5">
                   {symbolMapping.candidates.map(col => (
                     <button
@@ -195,8 +195,7 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
                     onClick={() => setSymbolMapping(null)}
                     className="px-2.5 py-1 rounded-md bg-elevated text-muted text-[10px] hover:text-secondary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
                   >
-                    取消
-                  </button>
+                    {tx('取消')}</button>
                 </div>
               </motion.div>
             )}
@@ -207,9 +206,9 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
                 return (
                   <div key={i} className="flex items-center gap-2 group">
                     <input
-                      value={f.label}
+                      value={isBuiltin ? tx(f.label) : f.label}
                       onChange={(e) => updateField(i, 'label', e.target.value)}
-                      placeholder="显示名"
+                      placeholder={tx('显示名')}
                       disabled={isBuiltin}
                       className={`w-24 h-8 px-2.5 rounded-lg border text-[11px] placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow ${
                         isBuiltin
@@ -221,7 +220,7 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
                       <input
                         value={f.name}
                         onChange={(e) => updateField(i, 'name', e.target.value)}
-                        placeholder="字段名（英文）"
+                        placeholder={tx('字段名（英文）')}
                         disabled={isBuiltin}
                         className={`w-full h-8 px-2.5 rounded-lg border text-[11px] font-mono placeholder:text-muted/40 focus:outline-none focus:ring-1 focus:ring-accent/25 focus:border-accent/50 transition-shadow ${
                           isBuiltin
@@ -241,15 +240,15 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
                         isBuiltin ? 'bg-elevated/50 text-muted cursor-not-allowed' : 'bg-base text-foreground'
                       }`}
                     >
-                      <option value="string">文本</option>
-                      <option value="int">整数</option>
-                      <option value="float">小数</option>
-                      <option value="bool">布尔</option>
+                      <option value="string">{tx('文本')}</option>
+                      <option value="int">{tx('整数')}</option>
+                      <option value="float">{tx('小数')}</option>
+                      <option value="bool">{tx('布尔')}</option>
                     </select>
                     {!isBuiltin && fields.length > 3 ? (
                       <button
                         onClick={() => removeField(i)}
-                        aria-label="删除字段"
+                        aria-label={tx('删除字段')}
                         className="p-1.5 rounded-md text-muted/40 hover:text-danger hover:bg-danger/10 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-danger/40 transition-all"
                       >
                         <X className="h-3 w-3" />
@@ -276,15 +275,14 @@ export function EditExtDialog({ config, onClose }: { config: ExtDataConfig; onCl
             onClick={onClose}
             className="px-4 py-2 rounded-lg bg-elevated text-secondary text-xs hover:bg-elevated/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-colors"
           >
-            取消
-          </button>
+            {tx('取消')}</button>
           <button
             onClick={() => update.mutate()}
             disabled={!valid || update.isPending}
             className="px-5 py-2 inline-flex items-center gap-1.5 rounded-lg bg-accent text-white text-xs font-medium hover:bg-accent/90 active:translate-y-px disabled:opacity-40 disabled:pointer-events-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/40 transition-all shadow-sm shadow-accent/20"
           >
             {update.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            {update.isPending ? '保存中…' : '保存'}
+            {update.isPending ? tx('保存中…') : tx('保存')}
           </button>
         </div>
       </motion.div>

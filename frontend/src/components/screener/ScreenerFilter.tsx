@@ -1,5 +1,6 @@
 import { X, RotateCcw, Filter } from 'lucide-react'
 import { BOARDS, getBoardType } from '@/lib/board'
+import { tx } from '@/lib/i18n'
 
 // ===== 筛选类型 =====
 
@@ -128,13 +129,13 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
     'marketCapMin' | 'marketCapMax' | 'floatCapMin' | 'floatCapMax' |
     'volRatioMin' | 'rsiMin' | 'rsiMax'>
   const fields: { label: string; min: NumKey; max: NumKey; unit: string; step?: string }[] = [
-    { label: '现价',      min: 'priceMin',      max: 'priceMax',      unit: '元', step: '0.1' },
-    { label: '涨跌幅',    min: 'changePctMin',   max: 'changePctMax',  unit: '%' },
-    { label: '5日涨幅',   min: 'momentum5dMin',  max: 'momentum5dMax', unit: '%' },
-    { label: '成交额',    min: 'amountMin',      max: 'amountMin',     unit: '亿', step: '0.5' },
-    { label: '总市值',    min: 'marketCapMin',   max: 'marketCapMax',  unit: '亿', step: '10' },
-    { label: '流通市值',  min: 'floatCapMin',    max: 'floatCapMax',   unit: '亿', step: '10' },
-    { label: '量比',      min: 'volRatioMin',    max: 'volRatioMin',   unit: '', step: '0.1' },
+    { label: tx('现价'),      min: 'priceMin',      max: 'priceMax',      unit: tx('元'), step: '0.1' },
+    { label: tx('涨跌幅'),    min: 'changePctMin',   max: 'changePctMax',  unit: '%' },
+    { label: tx('5日涨幅'),   min: 'momentum5dMin',  max: 'momentum5dMax', unit: '%' },
+    { label: tx('成交额'),    min: 'amountMin',      max: 'amountMin',     unit: tx('亿'), step: '0.5' },
+    { label: tx('总市值'),    min: 'marketCapMin',   max: 'marketCapMax',  unit: tx('亿'), step: '10' },
+    { label: tx('流通市值'),  min: 'floatCapMin',    max: 'floatCapMax',   unit: tx('亿'), step: '10' },
+    { label: tx('量比'),      min: 'volRatioMin',    max: 'volRatioMin',   unit: '', step: '0.1' },
     { label: 'RSI14',     min: 'rsiMin',         max: 'rsiMax',        unit: '', step: '1' },
   ]
 
@@ -144,7 +145,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Filter className="h-3.5 w-3.5 text-accent" />
-          <span className="text-xs font-medium text-accent">筛选条件</span>
+          <span className="text-xs font-medium text-accent">{tx('筛选条件')}</span>
           {filterActive(value) && (
             <span className="bg-accent/15 text-accent rounded-full px-1.5 h-4 inline-flex items-center text-[10px] font-bold leading-none">
               {countActiveFilters(value)}
@@ -155,17 +156,16 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
           {filterActive(value) && (
             <button
               onClick={onReset}
-              title="清空全部筛选"
+              title={tx('清空全部筛选')}
               className="inline-flex items-center gap-1 px-1.5 h-6 rounded text-[11px]
                 text-muted hover:text-danger hover:bg-danger/10 transition-colors"
             >
               <RotateCcw className="h-3 w-3" />
-              清空
-            </button>
+              {tx('清空')}</button>
           )}
           <button
             onClick={onClose}
-            title="收起筛选"
+            title={tx('收起筛选')}
             className="p-1 rounded text-secondary hover:text-foreground hover:bg-elevated transition-colors"
           >
             <X className="h-3.5 w-3.5" />
@@ -175,7 +175,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
 
       {/* 板块 + ST 快速筛选 (按钮组) */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[11px] text-secondary shrink-0 w-10">市场</span>
+        <span className="text-[11px] text-secondary shrink-0 w-10">{tx('市场')}</span>
         {BOARDS.map(board => {
           const active = value.boards.includes(board)
           return (
@@ -201,8 +201,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
               : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
           }`}
         >
-          排除ST
-        </button>
+          {tx('排除ST')}</button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-2.5">
@@ -213,7 +212,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
               <span className="text-[11px] text-secondary shrink-0 w-14 text-right">{f.label}</span>
               <input
                 type="number"
-                placeholder="最小"
+                placeholder={tx('最小')}
                 value={value[f.min]}
                 onChange={(e) => set(f.min, e.target.value)}
                 step={f.step}
@@ -224,7 +223,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
                   <span className="text-[10px] text-muted">~</span>
                   <input
                     type="number"
-                    placeholder="最大"
+                    placeholder={tx('最大')}
                     value={value[f.max]}
                     onChange={(e) => set(f.max, e.target.value)}
                     step={f.step}
@@ -237,7 +236,7 @@ export function FilterPanel({ value, onChange, onClose, onReset }: {
           )
         })}
       </div>
-      <div className="text-[10px] text-muted/70 pl-1">输入即生效 · 点击市场/ST 按钮切换</div>
+      <div className="text-[10px] text-muted/70 pl-1">{tx('输入即生效 · 点击市场/ST 按钮切换')}</div>
     </div>
   )
 }

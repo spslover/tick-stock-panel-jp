@@ -1,3 +1,4 @@
+import { useI18n } from '@/lib/i18n'
 import { useState, useEffect } from 'react'
 
 export function ScheduleEditor({ value, onSave, loading, hint }: {
@@ -6,6 +7,7 @@ export function ScheduleEditor({ value, onSave, loading, hint }: {
   loading: boolean
   hint?: string
 }) {
+  const { tx } = useI18n()
   const [h, setH] = useState(value.hour)
   const [m, setM] = useState(value.minute)
 
@@ -18,7 +20,7 @@ export function ScheduleEditor({ value, onSave, loading, hint }: {
 
   return (
     <div className="flex items-center gap-2 pt-1.5">
-      <span className="text-[10px] text-muted">每日</span>
+      <span className="text-[10px] text-muted">{tx('每日')}</span>
       <input
         type="number" min={0} max={23} value={h}
         onChange={e => setH(Math.max(0, Math.min(23, Number(e.target.value))))}
@@ -35,9 +37,9 @@ export function ScheduleEditor({ value, onSave, loading, hint }: {
         disabled={loading || (h === value.hour && m === value.minute)}
         className="px-2.5 py-1 rounded-btn bg-accent/15 text-accent text-[11px] font-medium hover:bg-accent/25 disabled:opacity-40 transition-colors"
       >
-        {loading ? '保存中…' : '保存'}
+        {loading ? tx('保存中…') : tx('保存')}
       </button>
-      <span className="text-[10px] text-muted">工作日自动执行{hint ? ` · ${hint}` : ''}</span>
+      <span className="text-[10px] text-muted">{tx('工作日自动执行')}{hint ? ` · ${hint}` : ''}</span>
     </div>
   )
 }

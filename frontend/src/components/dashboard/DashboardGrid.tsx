@@ -18,6 +18,7 @@
 import { useCallback, useMemo, type ReactNode } from 'react'
 import GridLayout, { useContainerWidth, setTransform, type Layout } from 'react-grid-layout'
 import { getPageScale } from '@/lib/pageZoom'
+import { tx } from '@/lib/i18n'
 
 /** RGL 2.x 的「容器被 transform: scale 缩放」定位策略 (包根未导出 createScaledStrategy,
  *  按 dist 内官方实现等价构造): 定位走 transform, 拖拽像素位移按 scale 换算回布局坐标。
@@ -93,8 +94,7 @@ export function DashboardGrid({ ctx, items, onItemsChange, editing }: DashboardG
       {/* 编辑态操作提示 (入口与控制组在页面头部「重载」右侧) */}
       {editing && (
         <div className="mb-1.5 text-[11px] text-muted">
-          拖动组件任意位置移动 · 悬停卡片四边/四角调宽高 · 自动吸附网格 · 改动自动保存
-        </div>
+          {tx('拖动组件任意位置移动 · 悬停卡片四边/四角调宽高 · 自动吸附网格 · 改动自动保存')}</div>
       )}
 
       {!mounted ? (
@@ -143,7 +143,7 @@ export function DashboardGrid({ ctx, items, onItemsChange, editing }: DashboardG
                       type="button"
                       onClick={() => removeItem(it.i)}
                       className="dash-widget-remove flex h-4 w-4 shrink-0 items-center justify-center rounded text-muted hover:bg-danger/15 hover:text-danger"
-                      title="移除组件"
+                      title={tx('移除组件')}
                     >
                       <X className="h-3 w-3" />
                     </button>

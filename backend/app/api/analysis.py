@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
@@ -101,8 +102,27 @@ def _base_dir(request: Request) -> Path:
     return _data_dir(request) / "analysis_menus"
 
 
+# 菜单标识白名单: 与 AnalysisMenu.id 的 pattern 一致 (ASCII 字母/数字/下划线)。
+# 写入 / 删除共用同一校验 —— 历史上只有写入侧校验, 删除侧缺失导致路径穿越
+# (Windows 下 %5C 反斜杠是路径分隔符, 可越出菜单目录删除任意 .json)。
+_MENU_ID_RE = re.compile(r"^[a-zA-Z0-9_]+$")
+
+
+def _validate_menu_id(menu_id: str) -> str:
+    """校验菜单标识: 仅允许字母、数字、下划线。"""
+    if not _MENU_ID_RE.match(menu_id):
+        raise HTTPException(400, "菜单标识只能包含字母、数字和下划线")
+    return menu_id
+
+
 def _path(request: Request, menu_id: str) -> Path:
-    return _base_dir(request) / f"{menu_id}.json"
+    """解析菜单文件路径; 目标必须直接位于菜单目录内 (防路径穿越)。"""
+    _validate_menu_id(menu_id)
+    base = _base_dir(request)
+    p = (base / f"{menu_id}.json").resolve()
+    if p.parent != base.resolve():
+        raise HTTPException(400, "非法路径")
+    return p
 
 
 def _load_saved(request: Request) -> list[AnalysisMenu]:
@@ -179,8 +199,7 @@ def reorder_menus(request: Request, body: ReorderMenusReq):
 
 @router.post("/{menu_id}")
 def upsert_menu(request: Request, menu_id: str, body: UpsertAnalysisMenu):
-    if not menu_id.replace("_", "").isalnum():
-        raise HTTPException(400, "菜单标识只能包含字母、数字和下划线")
+    _validate_menu_id(menu_id)
     existing = next((m for m in _load_saved(request) if m.id == menu_id), None)
     menu = AnalysisMenu(
         id=menu_id,

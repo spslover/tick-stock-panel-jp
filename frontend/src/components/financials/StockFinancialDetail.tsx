@@ -241,7 +241,7 @@ export function StockFinancialDetail({ symbol, name }: Props) {
           </div>
         ) : rows.length === 0 ? (
           <div className="py-10 text-center text-xs text-muted">
-            {tx('暂无')}{TABS.find(t => t.key === tab)?.label}{tx('数据 — 可点击顶部「全部同步」拉取')}</div>
+            {tx('暂无')}{tx(TABS.find(t => t.key === tab)?.label ?? '')}{tx('数据 — 可点击顶部「全部同步」拉取')}</div>
         ) : (
           <div className="space-y-5">
             {/* 多期时为每期渲染一组;单期时只有一组 */}

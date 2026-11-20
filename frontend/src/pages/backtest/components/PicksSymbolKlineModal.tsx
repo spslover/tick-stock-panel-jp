@@ -5,6 +5,7 @@ import { StockPanel } from '@/components/StockPanel'
 import { NavPager, NavWrapToast } from '@/components/NavPager'
 import type { ChartMarker } from '@/components/EChartsCandlestick'
 import type { StrategyBacktestResult, StrategyBacktestTrade } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { navItemKey, type NavItem } from '@/lib/listNav'
 import { useListNav } from '@/lib/useListNav'
 import { fmtPct, fmtPrice, priceColorClass } from '@/lib/format'
@@ -28,6 +29,7 @@ interface Props {
 
 /** 「策略分析」行的标的级K线弹窗 (单笔回放见 TradeKlineModal) */
 export function PicksSymbolKlineModal({ symbol, result, periodStart, periodEnd, navList, onNavigate, onClose }: Props) {
+  const { tx } = useI18n()
   const backdrop = useDialogBackdrop(onClose)
 
   // onClose 只有 ESC 用; onNavigate 由 useListNav 内部承接 (支持内联 lambda)
@@ -39,7 +41,7 @@ export function PicksSymbolKlineModal({ symbol, result, periodStart, periodEnd, 
     keyOf: navItemKey,
     currentKey: symbol,
     onNavigate: n => onNavigate?.(n.symbol, n.name),
-    wrapHints: { head: '已到榜首', tail: '已到末尾' },
+    wrapHints: { head: tx('已到榜首'), tail: tx('已到末尾') },
   })
 
   useEffect(() => {
@@ -127,32 +129,30 @@ export function PicksSymbolKlineModal({ symbol, result, periodStart, periodEnd, 
                         {tag}
                       </span>
                     )}
-                    <span className="rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">标的回放</span>
+                    <span className="rounded border border-accent/30 bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">{tx('标的回放')}</span>
 
                     {/* 切标的: 上一只 / n·N / 下一只 */}
-                    <NavPager nav={nav} prevLabel="上一只" nextLabel="下一只" />
+                    <NavPager nav={nav} prevLabel={tx('上一只')} nextLabel={tx('下一只')} />
                   </div>
                   <div className="mt-1 text-[11px] text-muted">
-                    回测 {periodStart} ~ {periodEnd} · {trades.length} 笔交易
-                  </div>
+                    {tx('回测')} {periodStart} ~ {periodEnd} · {trades.length} {tx('笔交易')}</div>
                   <div className="mt-1 text-[10px] text-muted/70">
-                    ▲ 买入(红) · ▼ 卖出(绿) · 箭头旁为成交价 · 同日多笔合并显示
-                  </div>
+                    {tx('▲ 买入(红) · ▼ 卖出(绿) · 箭头旁为成交价 · 同日多笔合并显示')}</div>
                 </div>
 
                 <div className="flex shrink-0 items-center gap-3 text-xs">
                   {stat && (
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <div className="text-muted">总收益</div>
+                        <div className="text-muted">{tx('总收益')}</div>
                         <div className={`num font-semibold ${priceColorClass(stat.total_return)}`}>{fmtPct(stat.total_return)}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-muted">胜率</div>
+                        <div className="text-muted">{tx('胜率')}</div>
                         <div className="num text-secondary">{fmtPct(stat.win_rate)}</div>
                       </div>
                       <div className="text-right">
-                        <div className="text-muted">最佳 / 最差</div>
+                        <div className="text-muted">{tx('最佳 / 最差')}</div>
                         <div className="num">
                           <span className={priceColorClass(stat.best)}>{fmtPct(stat.best)}</span>
                           <span className="text-muted"> / </span>
@@ -164,7 +164,7 @@ export function PicksSymbolKlineModal({ symbol, result, periodStart, periodEnd, 
                   <button
                     onClick={onClose}
                     className="rounded-btn p-1 text-secondary transition-colors hover:bg-elevated hover:text-foreground"
-                    aria-label="关闭标的回放"
+                    aria-label={tx('关闭标的回放')}
                   >
                     <X className="h-4 w-4" />
                   </button>

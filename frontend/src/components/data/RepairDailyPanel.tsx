@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { MissingCapChip } from '@/lib/capability-labels'
 import { DatePicker } from '@/components/DatePicker'
@@ -49,16 +50,14 @@ export function RepairDailyPanel({ hasCap, isRunning, latestDate, onStart }: {
     <div className="space-y-3">
       <div className="rounded-card bg-accent/8 border border-accent/20 p-3 space-y-1.5">
         <div className="text-xs text-foreground">
-          当数据出现缺口时(漏跑、停服),从这里重拉选定区间到今天的全部数据并重算。
-        </div>
+          {tx('当数据出现缺口时(漏跑、停服),从这里重拉选定区间到今天的全部数据并重算。')}</div>
         <div className="text-[10px] text-muted leading-relaxed">
-          完整复用盘后管道流程 (A股日K · 除权因子 · 指标重算 · 指数),新数据按 (个股, 日期) 覆盖旧值,不会重复,也无需先清除。
-        </div>
+          {tx('完整复用盘后管道流程 (A股日K · 除权因子 · 指标重算 · 指数),新数据按 (个股, 日期) 覆盖旧值,不会重复,也无需先清除。')}</div>
       </div>
 
       {/* 起始日期 — 用户主要操作,放上面 */}
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-secondary">起始日期</span>
+        <span className="text-xs text-secondary">{tx('起始日期')}</span>
         <DatePicker
           value={startDate}
           onChange={setStartDate}
@@ -70,19 +69,18 @@ export function RepairDailyPanel({ hasCap, isRunning, latestDate, onStart }: {
 
       {/* 本地最新数据 — 参考信息,放下面 */}
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-muted">本地最新数据</span>
+        <span className="text-xs text-muted">{tx('本地最新数据')}</span>
         <span className="font-mono text-xs text-secondary">
           {latestDate ?? '—'}
           {gapDays !== null && gapDays > 0 && (
-            <span className="ml-2 text-warning/90">已落后 {gapDays} 天</span>
+            <span className="ml-2 text-warning/90">{tx('已落后')} {gapDays} {tx('天')}</span>
           )}
         </span>
       </div>
 
       <div className="text-[10px] text-muted -mt-1">
-        将重拉 <span className="font-mono text-secondary">{startDate}</span>
-        {' → '}<span className="font-mono text-secondary">{today}</span>(今天) 的 A股日K · 除权 · 指数并重算指标
-      </div>
+        {tx('将重拉')} <span className="font-mono text-secondary">{startDate}</span>
+        {' → '}<span className="font-mono text-secondary">{today}</span>{tx('(今天) 的 A股日K · 除权 · 指数并重算指标')}</div>
 
       <button
         onClick={() => repair.mutate()}
@@ -92,10 +90,9 @@ export function RepairDailyPanel({ hasCap, isRunning, latestDate, onStart }: {
         {repair.isPending ? (
           <>
             <Loader2 className="h-3 w-3 animate-spin" />
-            请求中…
-          </>
+            {tx('请求中…')}</>
         ) : (
-          <>开始修正</>
+          <>{tx('开始修正')}</>
         )}
       </button>
 

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { tx } from '@/lib/i18n'
+import { useI18n } from '@/lib/i18n'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, Pencil, Plus, Save, Trash2, X } from 'lucide-react'
 import { api, type FactorColumn, type ScoringDirection } from '@/lib/api'
@@ -55,12 +55,13 @@ function ScoringRow({ name, label, weight, direction, editing, onWeightChange, o
   onDirectionChange: (value: ScoringDirection) => void
   onRemove: () => void
 }) {
+  const { tx } = useI18n()
   return (
     <div className="grid min-h-8 grid-cols-[minmax(4rem,6.5rem)_3.75rem_minmax(3.5rem,1fr)_2.25rem_1.75rem] items-center gap-1.5">
       <span className="truncate text-right text-[11px] text-secondary" title={`${label} · ${name}`}>{label}</span>
       {editing ? (
         <div className="grid h-6 grid-cols-2 overflow-hidden rounded border border-border bg-base">
-          {([['high', ArrowUp, '偏好高值'], ['low', ArrowDown, '偏好低值']] as const).map(([value, Icon, title]) => (
+          {([['high', ArrowUp, tx('偏好高值')], ['low', ArrowDown, tx('偏好低值')]] as const).map(([value, Icon, title]) => (
             <button
               key={value}
               type="button"
@@ -80,7 +81,7 @@ function ScoringRow({ name, label, weight, direction, editing, onWeightChange, o
       ) : (
         <span className={`flex items-center justify-center gap-1 text-[10px] ${direction === 'low' ? 'text-cyan-400' : 'text-emerald-400'}`}>
           {direction === 'low' ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />}
-          {direction === 'low' ? '低值' : '高值'}
+          {direction === 'low' ? tx('低值') : tx('高值')}
         </span>
       )}
       {editing ? (
@@ -92,7 +93,7 @@ function ScoringRow({ name, label, weight, direction, editing, onWeightChange, o
           value={weight}
           onChange={event => onWeightChange(Number(event.target.value))}
           className="h-1 min-w-0 cursor-pointer accent-amber-400"
-          aria-label={`${label}权重`}
+          aria-label={tx('{v} 权重', { v: label })}
         />
       ) : (
         <div className="h-1.5 min-w-0 overflow-hidden rounded-full bg-elevated">
@@ -105,8 +106,8 @@ function ScoringRow({ name, label, weight, direction, editing, onWeightChange, o
           type="button"
           onClick={onRemove}
           className="flex h-7 w-7 items-center justify-center rounded-btn text-muted transition-colors hover:bg-danger/10 hover:text-danger"
-          title={`移除${label}`}
-          aria-label={`移除评分因子${label}`}
+          title={tx('移除 {v}', { v: label })}
+          aria-label={tx('移除评分因子 {v}', { v: label })}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
@@ -116,6 +117,7 @@ function ScoringRow({ name, label, weight, direction, editing, onWeightChange, o
 }
 
 export function ScoringEditor({ value, directions, onChange, fallbackLabels = {} }: Props) {
+  const { tx } = useI18n()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<Record<string, number>>(() => weightsToPercentages(value))
   const [directionDraft, setDirectionDraft] = useState<Record<string, ScoringDirection>>(directions)
@@ -192,10 +194,10 @@ export function ScoringEditor({ value, directions, onChange, fallbackLabels = {}
             onChange={event => setFactorToAdd(event.target.value)}
             disabled={factors.isLoading || factors.isError}
             className="h-8 min-w-0 flex-1 rounded-input border border-border bg-base px-2 text-xs text-secondary focus:border-accent focus:outline-none disabled:opacity-50"
-            aria-label="选择要添加的评分因子"
+            aria-label={tx('选择要添加的评分因子')}
           >
             <option value="">
-              {factors.isLoading ? '加载因子目录…' : factors.isError ? '因子目录加载失败' : '选择评分因子'}
+              {factors.isLoading ? tx('加载因子目录…') : factors.isError ? tx('因子目录加载失败') : tx('选择评分因子')}
             </option>
             {Object.entries(factorGroups).map(([group, items]) => {
               const available = items.filter(item => !item.archived && !(item.id in draft))
@@ -211,8 +213,8 @@ export function ScoringEditor({ value, directions, onChange, fallbackLabels = {}
             onClick={addFactor}
             disabled={!factorToAdd}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-btn border border-accent/30 bg-accent/10 text-accent transition-colors hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-40"
-            title="添加评分因子"
-            aria-label="添加评分因子"
+            title={tx('添加评分因子')}
+            aria-label={tx('添加评分因子')}
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
@@ -237,13 +239,13 @@ export function ScoringEditor({ value, directions, onChange, fallbackLabels = {}
         </div>
       ) : (
         <div className="border-y border-border/40 py-5 text-center text-xs text-muted">
-          {editing ? '请选择评分因子' : '当前策略不使用因子评分'}
+          {editing ? tx('请选择评分因子') : tx('当前策略不使用因子评分')}
         </div>
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-2">
         <div className="text-[10px] text-muted">
-          权重 <span className={`font-mono text-xs font-medium ${editing && draftTotal !== 100 ? 'text-amber-400' : 'text-emerald-400'}`}>
+          {tx('权重')} <span className={`font-mono text-xs font-medium ${editing && draftTotal !== 100 ? 'text-amber-400' : 'text-emerald-400'}`}>
             {editing ? draftTotal : visibleKeys.length > 0 ? 100 : 0}%
           </span>
         </div>
@@ -253,8 +255,8 @@ export function ScoringEditor({ value, directions, onChange, fallbackLabels = {}
               type="button"
               onClick={cancelEditing}
               className="flex h-7 w-7 items-center justify-center rounded-btn text-muted transition-colors hover:bg-elevated hover:text-foreground"
-              title="取消编辑"
-              aria-label="取消编辑评分方案"
+              title={tx('取消编辑')}
+              aria-label={tx('取消编辑评分方案')}
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -265,7 +267,7 @@ export function ScoringEditor({ value, directions, onChange, fallbackLabels = {}
             className="inline-flex h-7 items-center gap-1.5 rounded-btn border border-amber-400/40 bg-amber-400/10 px-2.5 text-[11px] text-amber-400 transition-colors hover:bg-amber-400/15"
           >
             {editing ? <Save className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-            {editing ? '保存方案' : '编辑方案'}
+            {editing ? tx('保存方案') : tx('编辑方案')}
           </button>
         </div>
       </div>

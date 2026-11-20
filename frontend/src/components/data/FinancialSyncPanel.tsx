@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react'
 import { Loader2, Download, CheckCircle2, Hourglass, Clock, Table2 } from 'lucide-react'
 import { useFinancialStatus, useFinancialSync } from '@/lib/useFinancials'
+import { useI18n } from '@/lib/i18n'
 import { fmtBigNum } from '@/lib/format'
 import { toast } from '@/components/Toast'
 
@@ -25,6 +26,7 @@ const TABLE_LABELS: Record<string, string> = {
 const TABLE_ORDER = ['metrics', 'income', 'balance_sheet', 'cash_flow', 'shares'] as const
 
 export function FinancialSyncPanel() {
+  const { tx, locale } = useI18n()
   const { data: status, isLoading } = useFinancialStatus()
   const syncMut = useFinancialSync()
 
@@ -71,11 +73,11 @@ export function FinancialSyncPanel() {
       onSuccess: (r) => {
         if (!r.synced?.started) {
           if (r.synced?.reason === 'already running') {
-            toast('财务数据正在同步中,请稍候', 'success')
+            toast(tx('财务数据正在同步中,请稍候'), 'success')
           } else if (r.synced?.reason === 'no FINANCIAL capability') {
-            toast('财务数据能力未就绪,请检查 API Key 或刷新页面后重试', 'error')
+            toast(tx('财务数据能力未就绪,请检查 API Key 或刷新页面后重试'), 'error')
           } else {
-            toast(`同步未能开始${r.synced?.reason ? `:${r.synced.reason}` : ''}`, 'error')
+            toast(r.synced?.reason ? tx('同步未能开始：{v}', { v: r.synced.reason }) : tx('同步未能开始'), 'error')
           }
           setSyncStartedAt(null)
           setSyncSingleTable(null)
@@ -91,8 +93,7 @@ export function FinancialSyncPanel() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center gap-2 py-10 text-xs text-muted">
-        <Loader2 className="h-4 w-4 animate-spin" /> 读取财务数据状态…
-      </div>
+        <Loader2 className="h-4 w-4 animate-spin" /> {tx('读取财务数据状态…')}</div>
     )
   }
 
@@ -100,8 +101,8 @@ export function FinancialSyncPanel() {
     return (
       <div className="rounded-card border border-dashed border-border bg-base/30 px-4 py-6 text-center">
         <Table2 className="mx-auto h-6 w-6 text-muted" />
-        <div className="mt-2 text-xs text-secondary">当前数据源不提供财务数据</div>
-        <div className="mt-1 text-[11px] text-muted">在 设置 → 数据源 配置提供财务数据的数据源后可用</div>
+        <div className="mt-2 text-xs text-secondary">{tx('当前数据源不提供财务数据')}</div>
+        <div className="mt-1 text-[11px] text-muted">{tx('在 设置 → 数据源 配置提供财务数据的数据源后可用')}</div>
       </div>
     )
   }
@@ -109,9 +110,7 @@ export function FinancialSyncPanel() {
   return (
     <div className="space-y-3">
       <div className="text-[11px] leading-relaxed text-muted">
-        5 张表同属「财务数据」这一个能力 (同一数据源 / 同一门禁), 可整体同步或单独更新某一张。
-        财务不在盘后管道内, 需在此手动拉取。
-      </div>
+        {tx('5 张表同属「财务数据」这一个能力 (同一数据源 / 同一门禁), 可整体同步或单独更新某一张。 财务不在盘后管道内, 需在此手动拉取。')}</div>
 
       <div className="divide-y divide-border/50 rounded-card border border-border bg-base/20">
         {TABLE_ORDER.map(key => {
@@ -136,32 +135,30 @@ export function FinancialSyncPanel() {
                 )}
               </span>
 
-              <span className="w-20 shrink-0 text-xs text-foreground">{TABLE_LABELS[key]}</span>
+              <span className="w-20 shrink-0 text-xs text-foreground">{tx(TABLE_LABELS[key])}</span>
 
               <span className="min-w-0 flex-1 truncate text-[11px] text-muted">
                 {hasData ? (
                   <>
-                    <span className="font-mono tabular-nums text-secondary">{fmtBigNum(rows)}</span> 行
-                    <span className="mx-1 text-border">·</span>
-                    <span className="font-mono tabular-nums text-secondary">{fmtBigNum(info?.symbols ?? 0)}</span> 只标的
-                  </>
+                    <span className="font-mono tabular-nums text-secondary">{fmtBigNum(rows)}</span> {tx('行')}<span className="mx-1 text-border">·</span>
+                    <span className="font-mono tabular-nums text-secondary">{fmtBigNum(info?.symbols ?? 0)}</span> {tx('只标的')}</>
                 ) : (
-                  '尚无数据'
+                  tx('尚无数据')
                 )}
               </span>
 
               <span className="hidden shrink-0 items-center gap-1 text-[10px] text-muted/80 sm:flex">
                 <Clock className="h-2.5 w-2.5" />
                 {lsTime
-                  ? new Date(lsTime).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-                  : '未同步'}
+                  ? new Date(lsTime).toLocaleString(locale, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+                  : tx('未同步')}
               </span>
 
               <button
                 onClick={() => handleSync(key)}
                 disabled={syncing}
-                title={syncing ? '正在同步…' : `仅更新${TABLE_LABELS[key]}`}
-                aria-label={`仅更新${TABLE_LABELS[key]}`}
+                title={syncing ? tx('正在同步…') : tx('仅更新 {v}', { v: tx(TABLE_LABELS[key]) })}
+                aria-label={tx('仅更新 {v}', { v: tx(TABLE_LABELS[key]) })}
                 className="shrink-0 rounded-btn p-1 text-muted transition-colors hover:bg-elevated hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-30"
               >
                 {thisSyncing
@@ -179,8 +176,8 @@ export function FinancialSyncPanel() {
             <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
             <span className="truncate">
               {isFullSync
-                ? `已同步 ${syncedCount}/${TABLE_ORDER.length} 张表…`
-                : `同步${syncSingleTable ? TABLE_LABELS[syncSingleTable] ?? syncSingleTable : ''}…`}
+                ? tx('已同步 {n}/{m} 张表…', { n: syncedCount, m: TABLE_ORDER.length })
+                : tx('同步 {v}…', { v: syncSingleTable ? tx(TABLE_LABELS[syncSingleTable] ?? syncSingleTable) : '' })}
             </span>
           </span>
         )}
@@ -190,7 +187,7 @@ export function FinancialSyncPanel() {
           className="ml-auto inline-flex h-7 shrink-0 items-center gap-1.5 rounded-btn border border-accent/30 bg-gradient-to-r from-accent/25 to-accent/10 px-3 text-xs font-medium text-accent transition-all duration-150 hover:from-accent/35 hover:to-accent/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-          {syncing ? '同步中…' : '全部同步'}
+          {syncing ? tx('同步中…') : tx('全部同步')}
         </button>
       </div>
     </div>

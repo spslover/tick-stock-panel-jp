@@ -1,6 +1,7 @@
 import { AlertTriangle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { type DailyDataRevisions, type IntegrityAsset } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 import { useDailyIntegrity } from '@/lib/useSharedQueries'
 import { DAILY_DATA_QUERY_PREFIXES } from '@/lib/queryKeys'
 
@@ -25,8 +26,8 @@ export function DailyDataHealthNotice() {
   return (
     <div role="alert" className="mx-3 mt-2 flex flex-wrap items-center gap-2 rounded-btn border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-      <span>{assets.map(a => LABELS[a]).join('、')}日K存在未完成的修补或重算，受影响的计算暂不可用。</span>
-      <Link className="ml-auto shrink-0 underline underline-offset-2" to="/data">前往数据页处理</Link>
+      <span>{assets.map(a => tx(LABELS[a])).join('、')}{tx('日K存在未完成的修补或重算，受影响的计算暂不可用。')}</span>
+      <Link className="ml-auto shrink-0 underline underline-offset-2" to="/data">{tx('前往数据页处理')}</Link>
     </div>
   )
 }
@@ -40,7 +41,7 @@ export function DailyResultStaleNotice({ result, assetType = 'stock' }: { result
   return (
     <div role="status" className="flex items-start gap-2 rounded-btn border border-warning/30 bg-warning/10 px-3 py-2 text-xs leading-relaxed text-warning">
       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-      <span>日K数据版本已变化，下方结果仍基于旧数据，请完成修补后重新运行验证。</span>
+      <span>{tx('日K数据版本已变化，下方结果仍基于旧数据，请完成修补后重新运行验证。')}</span>
     </div>
   )
 }

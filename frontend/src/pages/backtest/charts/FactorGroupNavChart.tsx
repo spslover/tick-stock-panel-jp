@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useECharts } from './useECharts'
 import type { FactorBacktestResult } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 import { useChartTheme } from '@/lib/theme'
 
 const GROUP_COLORS = [
@@ -124,8 +125,7 @@ export function FactorGroupNavChart({ result }: Props) {
         {result.long_short_nav?.length > 0 && (
           <span className="flex items-center gap-1 text-[10px] text-secondary">
             <span className="w-2 h-0.5 rounded bg-yellow-400" style={{ borderTop: '2px dashed #fbbf24' }} />
-            多空
-          </span>
+            {tx('多空')}</span>
         )}
       </div>
       <div ref={chartRef} className="h-[280px]" />

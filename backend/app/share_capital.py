@@ -34,6 +34,10 @@ def apply_historical_float_shares(
 
     当日保留 rows.float_shares；历史日期使用公告日不晚于交易日的最新股本，
     找不到历史记录时继续使用 rows.float_shares。
+
+    公告日未知的行不参与历史匹配 (CONTRIBUTING §3.4): 公告日缺失时无法证明
+    该股本在目标交易日已公开, 不得按 period_end 提前生效 (报表期泄露), 该行
+    退出历史表并降级到最新维表股本。
     """
     required = {"symbol", "date", "float_shares"}
     if (
@@ -51,9 +55,11 @@ def apply_historical_float_shares(
             return pl.col(column).str.to_date(strict=False)
         return pl.col(column).cast(pl.Date, strict=False)
 
-    available_date = as_date_expr("period_end")
+    # 可用日 = 公告日; 缺失公告日(含整表无该列) → 不可用 → 退出历史表。
     if "announce_date" in shares.columns:
-        available_date = as_date_expr("announce_date").fill_null(available_date)
+        available_date = as_date_expr("announce_date")
+    else:
+        available_date = pl.lit(None, dtype=pl.Date)
 
     history = (
         shares

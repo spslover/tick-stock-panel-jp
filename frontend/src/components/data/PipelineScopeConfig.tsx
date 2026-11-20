@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 
 type PullKey = 'pipeline_pull_a_share' | 'pipeline_pull_etf' | 'pipeline_pull_index'
@@ -35,8 +36,7 @@ export function PipelineScopeConfig() {
   return (
     <div className="space-y-2.5">
       <p className="text-xs text-secondary leading-relaxed">
-        勾选盘后管道每次自动拉取的数据类型。仅影响后续同步,已存储的历史数据不受影响。
-      </p>
+        {tx('勾选盘后管道每次自动拉取的数据类型。仅影响后续同步,已存储的历史数据不受影响。')}</p>
       <div className="space-y-1.5">
         {ITEMS.map((item) => {
           const on = getValue(item.key, item.defaultOn)
@@ -61,7 +61,7 @@ export function PipelineScopeConfig() {
                 </button>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-medium text-foreground">{item.label}</span>
+                    <span className="text-xs font-medium text-foreground">{tx(item.label)}</span>
                   </div>
                   <div className="text-[10px] text-muted leading-snug mt-0.5">{item.desc}</div>
                 </div>
@@ -72,12 +72,10 @@ export function PipelineScopeConfig() {
       </div>
       {updateToggle.isPending && (
         <div className="flex items-center gap-1.5 text-[10px] text-muted">
-          <Loader2 className="h-3 w-3 animate-spin" />保存中…
-        </div>
+          <Loader2 className="h-3 w-3 animate-spin" />{tx('保存中…')}</div>
       )}
       <div className="text-[10px] text-muted leading-relaxed pt-1">
-        数据通道基于免费接口,所有档位均可拉取。
-      </div>
+        {tx('数据通道基于免费接口,所有档位均可拉取。')}</div>
     </div>
   )
 }

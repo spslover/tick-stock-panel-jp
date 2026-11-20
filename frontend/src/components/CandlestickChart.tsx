@@ -10,7 +10,7 @@ import {
   type HistogramData,
 } from 'lightweight-charts'
 import { useChartTheme } from '@/lib/theme'
-import { tx } from '@/lib/i18n'
+import { compactNumber } from '@/lib/format'
 
 export interface OHLC {
   date: string
@@ -22,10 +22,7 @@ export interface OHLC {
 }
 
 export function fmtBigNum(v: number): string {
-  if (v >= 1_000_000_000_000) return `${(v / 1_000_000_000_000).toFixed(2)}${tx('万亿')}`
-  if (v >= 100_000_000) return `${(v / 100_000_000).toFixed(2)}${tx('亿')}`
-  if (v >= 10_000) return `${(v / 10_000).toFixed(0)}${tx('万')}`
-  return v.toFixed(0)
+  return compactNumber(v)
 }
 
 // 序列颜色 (双主题通用); 画布文字/网格/边框主题相关色走 ChartTheme

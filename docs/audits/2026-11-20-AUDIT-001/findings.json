@@ -1,0 +1,2547 @@
+{
+  "audit_id": "AUDIT-2026-11-20-001",
+  "project": "tick-stock-panel-jp",
+  "version_audited": "v0.3.37",
+  "commit_audited": "8cd101035b1cd3cf995a3548de51a9b87c927514",
+  "generated_at": "2026-11-20",
+  "execution_mode": "audit_and_fix",
+  "target_env": "local",
+  "status_vocabulary": [
+    "IMPLEMENTED",
+    "VERIFIED",
+    "PARTIAL",
+    "NOT_EXECUTED",
+    "BLOCKED",
+    "EXTERNAL_REQUIRED",
+    "PENDING_HUMAN_SIGNOFF",
+    "NEEDS_COMPLIANCE_REVIEW"
+  ],
+  "findings": [
+    {
+      "id": "SEC-001",
+      "title": "分析菜单删除接口路径穿越导致任意 .json 文件删除",
+      "dimension": "security",
+      "status": "CONFIRMED",
+      "severity": "High",
+      "priority": "P0",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/api/analysis.py",
+        "backend/app/main.py (auth middleware)"
+      ],
+      "evidence": [
+        "backend/app/api/analysis.py:104-105 _path() 直接 `_base_dir(request) / f\"{menu_id}.json\"`, 无标识符校验与目录包含检查",
+        "backend/app/api/analysis.py:193-199 delete_menu() 对该路径直接 p.unlink()",
+        "写入侧 analysis.py:182-183 有 `menu_id.replace(\"_\",\"\").isalnum()` 校验, 删除侧缺失 —— 两侧契约不一致是根因",
+        "复现: `DELETE /api/analysis-menus/..%5Cuser_data%5Csecrets` 返回 {\"status\":\"deleted\"}, data/user_data/secrets.json 被真实删除 (本次审计已复现)",
+        "Starlette 默认字符串 convertor 正则 `[^/]+` 允许 `\\`; uvicorn 先 percent-decode, 因此 %5C 在 Windows 上是路径分隔符且存活路由匹配"
+      ],
+      "reproduction_steps": "1) 取得有效会话 cookie; 2) `DELETE /api/analysis-menus/..%5Cuser_data%5Csecrets`; 3) 检查 data/user_data/secrets.json 是否消失",
+      "symptom": "任意 .json 文件被删除, 接口返回 200 {\"status\":\"deleted\"}",
+      "root_cause": "删除路径缺少与写路径一致的标识符白名单校验, 且删除前没有做目标目录包含检查 (fail-closed 缺失)",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "可删除 secrets.json (TickFlow/AI 密钥、Webhook、SMTP 口令)、auth.json (密码哈希与全部会话, 删除后 is_configured()=False → 面板回到未初始化状态, 任意内网主机可重新设置密码接管面板)、api_tokens.json (全部 API Token)",
+      "technical_impact": "单用户自托管面板; 攻击面为已认证会话 + 内网可达性; 无需提权即可造成不可逆凭据丢失",
+      "blast_radius": "Windows 部署 (桌面版主平台) 完全可达; Linux 上 %5C 非路径分隔符, 前向斜杠在路由层即被拒, 故仅 Windows 可利用",
+      "exploitability_or_trigger": "已认证会话 + 内网可达 + Windows 路径语义",
+      "recommendation": "在 analysis.py 提取共享的 `_validate_menu_id` (正则 ^[a-zA-Z0-9_]+$, 与 AnalysisMenu.id pattern 一致) 并在 _path() 内同时做标识符校验与 `p.parent == base.resolve()` 包含检查; 写入侧改用同一 helper",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "0.5",
+        "assumptions": "沿用既有 pages_admin.py 的 resolve+parent 校验范式"
+      },
+      "verification_method": "backend/tests/test_analysis_menu_path_traversal.py: 修复前 4 失败(含 secrets.json 被删除), 修复后 7 通过; 另跑 test_analysis_menu_url_template.py 全绿",
+      "rollback_strategy": "回滚 analysis.py 提交即恢复原行为(原行为即为漏洞本身)",
+      "residual_risk": "仅 analysis.py 一处命中同类 `_path` 模式; 其余 API 路径未穷尽审计, 需在后续迭代做一次全量路径参数审计",
+      "remediation_status": "IMPLEMENTED"
+    },
+    {
+      "id": "SEC-002",
+      "title": "认证/会话/凭据/Token 生命周期缺少安全审计留痕",
+      "dimension": "security",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "Medium",
+      "affected_components": [
+        "backend/app/api/auth.py",
+        "backend/app/services/auth.py",
+        "backend/app/services/api_tokens.py",
+        "backend/app/secrets_store.py"
+      ],
+      "evidence": [
+        "backend/app/services/auth.py:199-217 verify_and_create_session() 成功登录无任何日志",
+        "backend/app/services/auth.py:220-224 revoke_session() 注销无日志",
+        "backend/app/services/api_tokens.py:160-184 create_token() 与 :187-200 revoke_token() 无日志",
+        "backend/app/secrets_store.py:65-73 save() / :76-90 clear() 凭据写入无日志",
+        "全仓 grep 'audit' 在 backend/app 仅命中 backtest/evidence.py, 无安全审计落点",
+        "backend/app/main.py:102 attach_rotating_log('backend.log', max_mb=10, backup_count=3) — 3 个轮转纯文本文件, 无关联 ID、无防篡改、无访问控制"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "",
+      "root_cause": "",
+      "root_cause_status": "PROPOSED",
+      "business_impact": "凭据变更、密钥导出、Token 签发无法归因或重建; 事件响应缺少证据链",
+      "technical_impact": "actor 在单用户场景只能取 IP/会话 ID; 与 OPS-9 的关联 ID / 指标导出能力重叠, 建议合并建设",
+      "blast_radius": "",
+      "exploitability_or_trigger": "",
+      "recommendation": "新增 append-only JSONL 审计落点 (data/user_data/audit.jsonl, 0600, 带轮转), 记录 {ts, actor, action, object, result, correlation_id}; 只记 key 名, 绝不记密钥/Token 值",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "2-3",
+        "assumptions": "关联 ID 需先落地 (见 OPS-9)"
+      },
+      "verification_method": "单元测试断言每个事件恰好一条记录且字段齐全; 静态检查审计写入函数不含敏感值序列化",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "日志本身仍缺防篡改与访问控制; 需配合 OPS-9 的关联 ID 一起做",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "SEC-003",
+      "title": "未设置访问密码时任意内网主机可抢先认领面板",
+      "dimension": "security",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P1",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/main.py",
+        "backend/app/api/auth.py",
+        "backend/app/services/api_gateway.py",
+        "backend/app/config.py"
+      ],
+      "evidence": [
+        "backend/app/main.py:1038-1049 未配置密码时, 内网客户端请求全部 /api/ 直接放行",
+        "backend/app/api/auth.py:134-141 POST /api/auth/setup 对任意'本地'IP 开放, 无认领令牌、无一次性码",
+        "backend/app/services/api_gateway.py:219-235 is_local_network 把整个 RFC1918 + ULA 视为本地",
+        "backend/app/config.py:206 host 默认 0.0.0.0 (全网卡)",
+        "docs/configuration.md:82-87 记录 HOST=0.0.0.0 为 Docker 默认"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "新装面板在 LAN 上裸奔, 任意设备可读数据、导出 secrets、删除策略并抢先设置密码",
+      "root_cause": "首次认领缺少一次性凭据; 未配置状态被当作'内网即可信'",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "结合 SEC-001, 未认证的内网主机可达成面板接管",
+      "technical_impact": "单点条件: 只要 HOST 不是 127.0.0.1 且未设密码",
+      "blast_radius": "所有新装且未设密码的实例, 直到用户主动设密",
+      "exploitability_or_trigger": "新装部署 + 内网可达 + 未设置密码",
+      "recommendation": "启动时打印一次性认领码(或强制 AUTH_PASSWORD), 未持码的 /api/auth/setup 请求拒绝; 未配置状态下把 API 降级为只读; 或把 host 默认改为 127.0.0.1, LAN 暴露改为显式开启",
+      "dependencies": [
+        "SEC-001"
+      ],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "1-2",
+        "assumptions": "不改变已设密码部署的现有行为"
+      },
+      "verification_method": "以 192.168.x 来源发起未设密码请求, 断言 /api/auth/setup 与变更类 /api/ 均非 2xx",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "内网本身仍是可信边界的一部分, 需配合网络分区管理",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "SEC-004",
+      "title": "会话 Cookie 在默认 HTTP 传输下不带 Secure 标志",
+      "dimension": "security",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/api/auth.py",
+        "backend/app/config.py"
+      ],
+      "evidence": [
+        "backend/app/api/auth.py:54-78 _should_set_secure_cookie 仅在显式开启 / https scheme / 可信代理 X-Forwarded-Proto=https 时为真",
+        "backend/app/api/auth.py:167-175 set_cookie(httponly=True, samesite='lax', secure=_should_set_secure_cookie(request))",
+        "backend/app/config.py:248 auth_cookie_secure 默认 None(自动)"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "",
+      "root_cause": "",
+      "root_cause_status": "PROPOSED",
+      "business_impact": "在文档描述的 HTTP/LAN 部署上, tf_session 以明文传输, 可被 LAN 嗅探者重放 —— 等价于完整会话劫持 (该 Cookie 具备全部 /api/ 能力)",
+      "technical_impact": "HttpOnly + SameSite=Lax 已削弱 XSS 窃取与经典 CSRF; 本项针对被动嗅探",
+      "blast_radius": "仅明文 HTTP 部署 (当前默认)",
+      "exploitability_or_trigger": "HTTP/LAN 部署 + 同网段可嗅探",
+      "recommendation": "当绑定地址非 loopback 时默认 AUTH_COOKIE_SECURE=true, 或提供 TLS 终止部署档; 至少在非 loopback 且无 TLS 时打印启动告警",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "0.5-1",
+        "assumptions": "桌面版 localhost 部署不受影响"
+      },
+      "verification_method": "断言非 loopback 请求的登录响应 Set-Cookie 含 Secure",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "需 TLS 才能从根本上消除被动嗅探",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "SEC-005",
+      "title": "CSRF 双提交令牌分支不可达 (tf_csrf 从未下发)",
+      "dimension": "security",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/main.py",
+        "backend/app/api/auth.py"
+      ],
+      "evidence": [
+        "backend/app/main.py:928-935 读取 cookie 'tf_csrf' 并要求 x-csrf-token 匹配",
+        "全仓 grep: backend/app 中 tf_csrf 仅此一处读取, frontend/src 中 0 处; set_cookie 仅 backend/app/api/auth.py:167/:185/:219 三处, 均为会话 Cookie"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "代码读起来像存在令牌层, 实际只有 Origin/Referer/Sec-Fetch-Site 同源校验在起作用",
+      "root_cause": "双提交机制只实现了校验侧, 未实现下发侧",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "当前实际风险低 (同源校验会拒绝跨站不安全请求), 但形成虚假安全感",
+      "technical_impact": "防御纵深缺失: 若未来放宽 Origin 校验, 将同时移除唯一屏障",
+      "blast_radius": "",
+      "exploitability_or_trigger": "",
+      "recommendation": "二选一: 登录时下发 tf_csrf 并要求 unsafe 方法带头; 或删除该死分支与 CORS 头白名单里的 X-CSRF-Token",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "0.5-1",
+        "assumptions": "前端需补一个 header 注入"
+      },
+      "verification_method": "登录响应设置 tf_csrf; 缺头的 unsafe 请求被拒",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "在 Origin 校验保留期间无实质风险",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "SEC-006",
+      "title": "会话令牌以可重放形态落盘并随备份导出",
+      "dimension": "security",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/services/auth.py",
+        "backend/app/services/config_backup.py",
+        "backend/app/api/config_backup.py"
+      ],
+      "evidence": [
+        "backend/app/services/auth.py:242-246 _persist_sessions_locked 把原始 token 映射写入 auth.json (mode 0600, Windows 下 chmod 为尽力而为)",
+        "backend/app/services/auth.py:35 SESSION_TTL = 30*24*3600 (30 天)",
+        "backend/app/api/config_backup.py:154-157 'auth' 备份类别包含同一文件"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "",
+      "root_cause": "",
+      "root_cause_status": "PROPOSED",
+      "business_impact": "任何能读到 auth.json 的人 (备份 ZIP、共享卷、同步盘、本地恶意软件) 都能重放 30 天内的全部会话, 无需知道密码",
+      "technical_impact": "密码侧实现是可靠的: PBKDF2-HMAC-SHA256 / 200000 轮 / 16 字节随机盐 / 常量时间比较 (services/auth.py:30,:82-98)",
+      "blast_radius": "",
+      "exploitability_or_trigger": "",
+      "recommendation": "落盘只存会话 token 的 SHA-256/HMAC 摘要, 校验时对presented cookie 做同样哈希后比对",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "1",
+        "assumptions": "不改变会话 TTL 与 Cookie 属性"
+      },
+      "verification_method": "断言 auth.json 不含原始 token; 重启后会话仍可校验 (services/auth.py:249-266)",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "备份导出凭据本身是用户主动的显式操作, 已在前端文案中提示",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "SEC-007",
+      "title": "上传的运行时页面包在应用同源下作为任意 JS 执行",
+      "dimension": "security",
+      "status": "LIKELY",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "Medium",
+      "affected_components": [
+        "backend/app/api/ext_pages.py",
+        "backend/app/main.py",
+        "frontend/src/extensions/runtime.tsx"
+      ],
+      "evidence": [
+        "backend/app/api/ext_pages.py:58-80 upload_page_pack 仅校验后缀 (.js/.mjs) 与 5MB 上限",
+        "backend/app/main.py:653-668 SPA CSP 的 script-src 含 'self' 与 blob:, 同源脚本可执行",
+        "frontend/src/extensions/runtime.tsx:174 以 import() 在宿主 origin 加载 bundle",
+        "frontend/src/main.tsx:83 installTspExtBridge 把完整 api 封装挂到 window.__TSP_EXT__"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "被启用的页面包可调用任意 /api/ (含 /api/config-backup/export?categories=secrets), 且其能力在上传会话结束后依然存在",
+      "root_cause": "",
+      "root_cause_status": "PROPOSED",
+      "business_impact": "",
+      "technical_impact": "前端动态 import 路径本次未逐行追踪, 因此状态为 LIKELY 而非 CONFIRMED",
+      "blast_radius": "本地单用户场景下影响的是用户自身数据; 若页面包来自外部扩展包则影响面更大",
+      "exploitability_or_trigger": "",
+      "recommendation": "把上传端点限制到签名/白名单插件注册表; 或将 bundle 标记为不可信并在带 sandbox 属性的独立源 iframe 中渲染, 同时从 'self' script-src 中排除",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "frontend+backend",
+        "person_days_range": "2-4",
+        "assumptions": "同源脚本无法真正沙箱化, 只能靠契约+显式确认"
+      },
+      "verification_method": "断言已上传 bundle 在页面上下文中无法读取 /api/settings 或调用 config-backup/export",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "与 FE-04 是同一信任模型的两个面: 运行时页面包没有能力边界",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "SEC-008",
+      "title": "依赖清单使用开放下界且无 CVE 扫描门禁",
+      "dimension": "security",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P2",
+      "confidence": "Medium",
+      "affected_components": [
+        "backend/pyproject.toml",
+        "frontend/package.json"
+      ],
+      "evidence": [
+        "backend/pyproject.toml:7-46 fastapi>=0.115 / uvicorn[standard]>=0.30 / python-multipart>=0.0.6 / pyyaml>=6.0 / httpx>=0.27 / openai>=1.66, 仅 polars 有上界",
+        "frontend/package.json:15-35 全部使用 caret 范围",
+        "backend/uv.lock 与 frontend/pnpm-lock.yaml 存在, 锁文件安装可复现",
+        "本次未运行任何 CVE 扫描器 (未安装, 不允许联网)"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "",
+      "root_cause": "",
+      "root_cause_status": "PROPOSED",
+      "business_impact": "绕开锁文件的安装 (pip install . / 依赖丢失锁文件) 可能解析到未经评审的新主版本 (Web 框架 / multipart 解析器 / YAML 解析器)",
+      "technical_impact": "本项不声称存在具体已知漏洞版本 —— 未查询任何公告库",
+      "blast_radius": "",
+      "exploitability_or_trigger": "",
+      "recommendation": "为 fastapi/uvicorn/python-multipart/pyyaml/httpx/openai 增加上界或约束文件; 在 CI 增加 pip-audit 与 pnpm audit (与 OPS-4 合并实施)",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend+frontend",
+        "person_days_range": "1",
+        "assumptions": "与 OPS-4 同批实施"
+      },
+      "verification_method": "uv lock --upgrade-package <pkg> 触发上界拦截; CI 在故意引入易受攻击版本时失败",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "无扫描器则无法给出 CVE 结论; 保持 NOT_EXECUTED 状态直到扫描实际执行",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "DATA-001",
+      "title": "自定义实时源用截面数值启发式判定涨跌幅单位",
+      "dimension": "data_consistency",
+      "status": "CONFIRMED",
+      "severity": "High",
+      "priority": "P0",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/data_providers/custom/provider.py",
+        "backend/app/services/quote_service.py",
+        "backend/app/indicators/pipeline.py"
+      ],
+      "evidence": [
+        "backend/app/data_providers/custom/provider.py:50 _PCT_FRACTION_MAX = 0.31 (小数制下 change_pct 的'物理上限')",
+        "backend/app/data_providers/custom/provider.py:80-86 未声明 pct_unit 时按 |值| 中位数(样本>=5)/最大值(样本<5)判定, 若 > 0.31 则整批 /100",
+        "backend/app/data_providers/custom/config.py:41 pct_unit 默认 None —— 该启发式是默认路径",
+        "同文件 :60-68 docstring 自称'单位只认显式声明, 不靠数值猜', 与实现自相矛盾",
+        "CONTRIBUTING §3.1: 'Heuristic conversions such as multiply by 100 if the value is less than 1 are forbidden, because they mask real data errors'",
+        "docs/custom-data-source.md:138 同样写明'不做数值猜测', 而 :153 又描述了截面中位数归一 —— 文档内部自相矛盾"
+      ],
+      "reproduction_steps": "1) 配置自定义 realtime 源且不声明 pct_unit; 2) 源返回百分制且批次平稳(|change_pct| 中位数 <= 0.31)或样本<5; 3) 观察 change_pct 未被换算, 0.05(=0.05%) 被当作小数制 5%",
+      "symptom": "整批涨跌幅出现 100 倍量级错误, 无任何告警",
+      "root_cause": "用数值推断单位, 违反项目自身 §3.1 契约; 平静行情/小样本下两种单位不可区分",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "污染 enriched.change_pct、监控阈值比较、涨跌停判定与盘中展示; 对交易判断是静默的错误结果",
+      "technical_impact": "仅影响用户自建的通用 HTTP 自定义源(内置 fuyao/tdxquant 插件不走该函数); 文档与代码口径不一致",
+      "blast_radius": "未声明 pct_unit 的自定义源用户, 在批次判定落入小数制区间时",
+      "exploitability_or_trigger": "未声明 pct_unit + (批次 |change_pct| 中位数<=0.31 或 样本<5)",
+      "recommendation": "移除数值推断: 未声明单位时 fail-closed —— change_pct 改由 (last_price-prev_close)/prev_close 重算(价格比值与源端单位无关, 恒为小数制), 缺价格时置 None; amplitude/turnover_rate 维持 None",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "1",
+        "assumptions": "下游可接受 change_pct 缺失并按价格重算"
+      },
+      "verification_method": "backend/tests/test_custom_pct_units.py: 21 项全绿 (含新增 '永不做 100 倍缩放' 回归用例); 文档 docs/custom-data-source.md 同步更新",
+      "rollback_strategy": "回滚 provider.py 与测试; 文档需同步回滚",
+      "residual_risk": "依赖旧启发式的自定义源将从'静默错值'变为'按价格重算或空值', 需在发版说明中提示显式声明 pct_unit",
+      "remediation_status": "IMPLEMENTED"
+    },
+    {
+      "id": "DATA-002",
+      "title": "历史股本在公告日缺失时回退 period_end, 构成报表期泄露",
+      "dimension": "data_consistency",
+      "status": "CONFIRMED",
+      "severity": "High",
+      "priority": "P1",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/share_capital.py",
+        "backend/app/indicators/pipeline.py",
+        "backend/app/tickflow/repository.py",
+        "backend/app/backtest/engine.py"
+      ],
+      "evidence": [
+        "backend/app/share_capital.py:54-56 available_date = as_date_expr('period_end'); 有 announce_date 列时再 fill_null(period_end) —— 公告日为空即按报表期生效",
+        "backend/app/indicators/pipeline.py:845 apply_historical_float_shares 后 :851 计算 volume*10000/float_shares 得到历史换手率",
+        "backend/app/services/financial_sync.py:186 announce_date 仅在源含该列时写入, 允许为空",
+        "backend/app/plugins/fuyao/provider.py:1010 _iso_of_ms(r.get('report_date_ms')) 源缺字段时返回空",
+        "CONTRIBUTING §3.4: 'A reporting period must never leak data that has not been announced yet'",
+        "修复前 backend/tests/test_financial_shares.py 断言 [0.5,0.5,1.0,2.0,0.5], 其中 2024-06-30 的 2.0 即来自 announce_date=None 的行按 period_end 生效"
+      ],
+      "reproduction_steps": "1) 构造 shares 行 period_end=2024-06-30, announce_date=None, float_shares=50M; 2) 计算 2024-06-30 的换手率; 3) 修复前得到 2.0(用 50M), 修复后为 1.0(沿用上一条已公告的 100M)",
+      "symptom": "历史换手率使用当日尚未公开的股本口径",
+      "root_cause": "以 period_end 作为公告日缺失时的替代值, 等于断言'财报在报告期末已公开'",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "历史 turnover_rate 失真 → 依赖换手率的因子/评分/回测结果系统性偏移, 属于未来函数类污染",
+      "technical_impact": "影响实盘 enriched 计算与回测矩阵两条路径 (pipeline.py:845 / backtest/engine.py:596 均传入同一 historical_shares)",
+      "blast_radius": "所有 announce_date 缺失的历史股本行对应的日期区间",
+      "exploitability_or_trigger": "财务源未提供 report_date_ms / announce_date 为空",
+      "recommendation": "available_date 只认 announce_date; 公告日未知(含整表无该列)的行退出历史表, 由 §3.4 允许的最新维表股本兜底",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "0.5",
+        "assumptions": "沿用既有 coalesce 兜底, 无需新增字段"
+      },
+      "verification_method": "backend/tests/test_financial_shares.py: 新增 2 个回归用例(缺公告日行/整表无公告日列), 全部通过; 既有用例期望值按修正后口径更新",
+      "rollback_strategy": "回滚 share_capital.py 即恢复旧口径(旧口径即泄露)",
+      "residual_risk": "已落盘的旧 enriched 分区不会被回溯修正, 需在发版说明中提示重算历史换手率",
+      "remediation_status": "IMPLEMENTED"
+    },
+    {
+      "id": "DATA-003",
+      "title": "实时 enriched 的涨跌幅走原始价口径, 历史路径走前复权口径",
+      "dimension": "data_consistency",
+      "status": "LIKELY",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "Medium",
+      "affected_components": [
+        "backend/app/services/quote_service.py",
+        "backend/app/indicators/pipeline.py",
+        "backend/app/tickflow/repository.py"
+      ],
+      "evidence": [
+        "backend/app/services/quote_service.py:1032-1035 change_pct = change_amount/prev_close (原始价相除), 注释自述'enriched 全项目约定小数'",
+        "backend/app/indicators/pipeline.py:2207-2211 'change_pct/change_amount/amplitude: 有则直接用, 无则计算' —— 实时值被直接采用",
+        "backend/app/indicators/pipeline.py:582 历史路径 change_pct = close/close.shift(1)-1, 其中 close 为前复权价 (:2176-2188)",
+        "backend/app/indicators/pipeline.py:2197-2205 把 quote_extra 的原始 prev_close 乘'当日'复权因子, 而历史路径隐含用'前一日'因子"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "除权日盘中/收盘写入的 change_pct 与同列历史定义不一致, 且实时 flush 会把该值落盘到当日 enriched 分区 (repository.py:2811-2852)",
+      "root_cause": "实时路径与历史路径对同一列使用了两种价格口径, 且复权因子取值基准不同",
+      "root_cause_status": "PROPOSED",
+      "business_impact": "以 change_pct 为阈值的监控/策略在除权日误触发或漏触发; 同一列在不同日期口径不同",
+      "technical_impact": "与 DATA-001 的修复方向一致: 由复权后的 close/prev_close 统一计算",
+      "blast_radius": "除权除息日的实时 enriched 行",
+      "exploitability_or_trigger": "当日复权因子与前一日不同",
+      "recommendation": "compute_enriched_today 内忽略 quote_extra 的 change_pct/change_amount, 统一由复权 close/prev_close 计算; prev_close 的复权因子改用前一日口径",
+      "dependencies": [
+        "DATA-001"
+      ],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "1-2",
+        "assumptions": "需确认上游 prev_close 是否为除权参考价"
+      },
+      "verification_method": "构造除权日 + quote_extra 提供 change_pct 的输入, 断言 enriched.change_pct 与历史路径 :582 在同一日数据上相等",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "需与上游供应商对齐 prev_close 字段定义后确认",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "DATA-004",
+      "title": "回测矩阵换手率兜底路径用最新股本回填全部历史",
+      "dimension": "data_consistency",
+      "status": "LIKELY",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "Medium",
+      "affected_components": [
+        "backend/app/backtest/matrix.py"
+      ],
+      "evidence": [
+        "backend/app/backtest/matrix.py:918-919 当 parquet 无 turnover_rate 时把 float_shares 加入 vector 字段 (最新值)",
+        "backend/app/backtest/matrix.py:1457-1460 shares = float_shares; np.broadcast_to(shares.reshape(1,-1), volume.shape) —— 1 维最新股本广播到所有历史行",
+        "backend/app/backtest/matrix.py:1466 np.multiply(volume[start:stop], 10000.0, out=out)"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "旧数据或无股本口径的数据源下, 矩阵用'今天'的流通股本重算全部历史的换手率",
+      "root_cause": "兜底分支把'缺字段'处理成'用最新值补齐', 而不是'缺历史股本则不可算'",
+      "root_cause_status": "PROPOSED",
+      "business_impact": "换手类因子/评分在历史上被系统性扭曲, 且回测与实盘 enriched 口径不一致",
+      "technical_impact": "仅影响 parquet 缺 turnover_rate 的兜底分支, 正常路径不受影响",
+      "blast_radius": "旧 enriched 分区或数据源不提供股本口径时的历史区间",
+      "exploitability_or_trigger": "enriched parquet 无 turnover_rate 列",
+      "recommendation": "兜底改为按日期 asof 匹配 repo.get_historical_shares(); 或缺历史股本时该字段保持 NaN 并显式告警",
+      "dependencies": [
+        "DATA-002"
+      ],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "1-2",
+        "assumptions": "与 pipeline.py:845 同源取数"
+      },
+      "verification_method": "构造历史上换过股本的标的 + 缺 turnover_rate 的 parquet, 断言矩阵换手率随日期变化或为 NaN, 而非恒等于最新股本口径",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "DATA-005",
+      "title": "分钟基准迁移未复用仓库的 Windows 重试替换且临时文件名固定",
+      "dimension": "data_consistency",
+      "status": "LIKELY",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "Medium",
+      "affected_components": [
+        "backend/app/services/minute_adjust.py",
+        "backend/app/tickflow/repository.py"
+      ],
+      "evidence": [
+        "backend/app/services/minute_adjust.py:260-266 tmp = part.with_suffix('.parquet.tmp'); fixed.write_parquet(tmp); tmp.replace(part) —— 固定临时名且无重试",
+        "backend/app/tickflow/repository.py:54-78 replace_with_retry(src,dst,attempts=10,delay_s=0.5) 为全仓统一实现, docstring 说明用于穿透 Windows 并发读取",
+        "backend/app/tickflow/repository.py:2587-2597 _atomic_write_parquet 已使用该实现"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "Windows 上目标分区正被 DuckDB/Parquet 读取时, Path.replace 抛 PermissionError → 迁移反复失败 → .raw_basis 基准标记永不生成 → 每次运行重跑全量迁移",
+      "root_cause": "新模块未复用既有统一原子写实现, 偏离仓库既有模式",
+      "root_cause_status": "PROPOSED",
+      "business_impact": "",
+      "technical_impact": "fail-closed 门槛(minute_adjust.py:274 仅在 failed==0 时写标记)是正确的, 问题在可用性与并发安全",
+      "blast_radius": "Windows 部署的分钟基准迁移",
+      "exploitability_or_trigger": "目标分区被并发读取",
+      "recommendation": "改用 app.tickflow.repository.replace_with_retry, 临时文件名加 uuid 唯一后缀 (同 enriched_generation._write_marker 模式)",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "0.5",
+        "assumptions": "复用现有工具函数, 无新增依赖"
+      },
+      "verification_method": "mock Path.replace 连续两次抛 PermissionError 后成功, 断言迁移完成且标记写入; 并发实例不产生同名临时文件",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "DATA-006",
+      "title": "日K 修补路径在持有全局写锁期间执行备份拷贝与文件替换",
+      "dimension": "data_consistency",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/tickflow/repository.py"
+      ],
+      "evidence": [
+        "backend/app/tickflow/repository.py:2333 with self._write_lock: 之后依次执行 :2339 shutil.copy2(path, backup_dir/path.name) 整日分区备份拷贝、:2342 _atomic_write_parquet(merged,out)、:2345 path.unlink()",
+        "backend/app/tickflow/repository.py:351 self._write_lock = threading.Lock() 是全仓唯一写锁"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "修补窗口内其他写路径(含实时行情 flush repository.py:2801/2841)被阻塞, 阻塞时长与分区大小线性相关",
+      "root_cause": "锁内混入与原子性无关的 IO(备份拷贝), 违反 §6.2",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "不造成数据损坏, 但表现为盘中实时 enriched 刷新延迟",
+      "technical_impact": "",
+      "blast_radius": "单进程, 修补任务执行期间",
+      "exploitability_or_trigger": "执行日K 精确修补",
+      "recommendation": "把备份拷贝与临时文件准备移到锁外, 锁内只做指纹复核 + 原子替换 + 删除旧分片 (参照 repository.py:2637-2664 的乐观读-合并模式)",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "1",
+        "assumptions": "必须保留 fingerprints 二次校验语义"
+      },
+      "verification_method": "并发测试: 持锁执行修补时断言 flush_live_enriched_asset 在预期时间内返回",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "ARC-1",
+      "title": "实时行情轮询线程在缓存未命中时执行全量 Parquet 扫描与指标重算",
+      "dimension": "architecture",
+      "status": "CONFIRMED",
+      "severity": "High",
+      "priority": "P1",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/services/quote_service.py",
+        "backend/app/strategy/monitor.py",
+        "backend/app/services/screener.py",
+        "backend/app/main.py"
+      ],
+      "evidence": [
+        "backend/app/services/quote_service.py:852 self._evaluate_monitors(*snapshot) 由 _fetch_quotes 在 _poll_loop (quote_service.py:757) 的守护线程内调用",
+        "backend/app/strategy/monitor.py:1305 hist_df = history_loader(today, lookback) 与 :697 history = history_loader(cn_today(), history_bars)",
+        "backend/app/main.py:467 monitor_engine.set_history_loader(_screener_svc._load_enriched_history) —— 实时路径复用了按需筛选器的历史加载器",
+        "backend/app/services/screener.py:281-283, :311, :333 缓存未命中时 scan_enriched_parquet('**/*.parquet') + compute_indicators 慢路径(注释标 ~5s)",
+        "backend/app/services/screener.py:287 该 repo 缓存仅在 asset_type == 'stock' 时命中, ETF 恒走慢路径"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "命中慢路径时, 整条实时链路(SSE、侧栏指数条、监控轮)被阻塞数秒",
+      "root_cause": "实时热路径与按需计算路径共用同一个历史加载器, 慢路径没有从热路径剥离",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "盘中告警延迟、行情新鲜度下降; 依赖历史窗口的监控规则(filter_history/overlay/matrix_native)全部受影响",
+      "technical_impact": "违反 CONTRIBUTING §5.2 (行情回调线程不得执行慢磁盘扫描) 与 §6.3",
+      "blast_radius": "有历史依赖监控规则的用户, 在 ETF 或缓存未命中路径上",
+      "exploitability_or_trigger": "监控规则需要历史窗口 + (ETF 资产类型 或 enriched 历史缓存未命中)",
+      "recommendation": "让 monitor.evaluate() 不做历史 IO: 由后台预热器填充 screener 既有 _history_cache/_HISTORY_CACHE_TTL, 实时线程只读已物化的数据帧",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "2-4",
+        "assumptions": "复用既有 TTL 缓存, 不新增持久化"
+      },
+      "verification_method": "定向测试: 历史加载器被 stub 成抛异常时, evaluate() 仍能用预热帧完成评估; 并对 evaluate() 断言无 Parquet 读取",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "后台预热器需要自己的调度与陈旧策略",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "ARC-2",
+      "title": "api/ext_data.py 成为持有存储布局的神模块, API 层与服务层各写一份路径约定",
+      "dimension": "architecture",
+      "status": "CONFIRMED",
+      "severity": "High",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/api/ext_data.py",
+        "backend/app/services/ext_data.py",
+        "backend/app/api/watchlist.py"
+      ],
+      "evidence": [
+        "backend/app/api/ext_data.py:211-220 _ext_data_dir → data_dir/ext_data/{id}; :223 _parquet_glob → {dir}/timeseries/**/*.parquet",
+        "backend/app/services/ext_data.py:879-882 _config_dir → data_dir/ext_data/{config_id} —— 第二份实现",
+        "backend/app/api/ext_data.py:293,304,329,344,356,468,885,933,1540 API 层直接 pl.read_parquet / pl.scan_parquet",
+        "backend/app/api/ext_data.py:1722-1726 API 层直接 duckdb.connect(':memory:'), :1814 read_parquet 拼接",
+        "backend/app/api/ext_data.py:869-895 _prev_daily_close 遍历 data_dir/kline_daily/date=* 分区; :896-1011 _dimension_intraday_compute 约 115 行 Polars 业务计算",
+        "backend/app/api/watchlist.py:727 from app.api.ext_data import _read_ext_dataframe —— 服务层反向依赖 API 层(倒置依赖)"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "存储布局变更需同时改 API 层、服务层与 DuckDB 视图构建; 路径变更时静默返回空看板而非报错",
+      "root_cause": "读/聚合路径留在 router 模块, 持久化路径下沉到 service 模块, 两者复制了同一份路径约定",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "读写口径分叉风险; 一处改动导致扩展数据页静默空数据",
+      "technical_impact": "违反 CONTRIBUTING §2.3 (api/ 保持薄层) 与 §2.2 (禁止绕过仓库层直读)",
+      "blast_radius": "扩展数据页、维度/分时视图、自选与筛选的 ext 列 join",
+      "exploitability_or_trigger": "扩展数据目录结构或分区方案变更",
+      "recommendation": "把 _read_ext_dataframe/_prev_daily_close/_dimension_intraday_compute/路径 helper 迁入 services/ext_data.py, 导出唯一权威的 _config_dir/_parquet_glob; api/watchlist.py 改为从 service 导入; router 保留薄封装",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "3-6",
+        "assumptions": "_read_ext_dataframe 签名不变, 无 schema 变更"
+      },
+      "verification_method": "ext_data 与 watchlist 相关 pytest 全绿; 新增断言: API 模块不再直接 import polars/duckdb 做读取",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "ARC-3",
+      "title": "api/overview.py 残留约 300 行与 service 层重复的死代码",
+      "dimension": "architecture",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/api/overview.py",
+        "backend/app/services/market_overview_builder.py"
+      ],
+      "evidence": [
+        "backend/app/api/overview.py:351-361 _build_overview 委托 services.market_overview_builder.build_market_overview (唯一存活路径)",
+        "API 模块内仍保留 12 个私有 helper (_dimension_field/_ext_files/_read_ext_rows/_dimension_values/_symbol_keys/_dimension_rank/_score/_quote_status/_index_quotes/_top_rows/_pct_band_rows/_board), AST 扫描显示 8 个模块级函数零引用",
+        "backend/app/api/overview.py:67-97 _read_ext_rows 与 backend/app/services/market_overview_builder.py:188-231 _read_ext_rows 近乎重复, 且 service 版带 mtime 签名缓存 (_EXT_ROWS_CACHE) 而 API 版没有",
+        "backend/app/api/overview.py:72 df = pl.read_parquet(files, hive_partitioning=True) —— API 层仍知道怎么读扩展 Parquet"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "两份扩展数据读取实现并存; 死路径一旦被重新接线就会丢掉 mtime 缓存并按请求全量扫 Parquet",
+      "root_cause": "抽取到 market_overview_builder 后未清理原实现",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "当前无直接业务影响, 但下一位修改者可能调用 API 侧 helper, 在看板路径上重新引入未缓存的全量 Parquet 读",
+      "technical_impact": "违反 §1.3 (最小范围/不留残留) 与 §1.1 (不建平行实现)",
+      "blast_radius": "仅 backend/app/api/overview.py",
+      "exploitability_or_trigger": "后续改动误用死 helper",
+      "recommendation": "删除 api/overview.py 中除 invalidate_overview_cache 与 _build_overview 外的死 helper; 需要保留者从 market_overview_builder 导出",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "0.5-1",
+        "assumptions": "仓内无其他模块 import 这些私有名"
+      },
+      "verification_method": "overview/market-recap/concept-rotation 相关 pytest 全绿; ruff 无新增告警",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "ARC-4",
+      "title": "两套并行的 provider 注册表, 契约与生命周期不一致",
+      "dimension": "architecture",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/data_providers/registry.py",
+        "backend/app/data_providers/custom/loader.py",
+        "backend/app/services/depth_service.py",
+        "backend/app/services/kline_sync.py"
+      ],
+      "evidence": [
+        "backend/app/data_providers/registry.py:6-14 _PROVIDERS = {'tickflow': TickFlowProvider}; get_provider() 对其他名字抛 ValueError('Unsupported data provider')",
+        "backend/app/data_providers/__init__.py:6-8 把它作为公开 API 导出",
+        "真实路由路径是 backend/app/data_providers/custom/loader.py:322 custom_sources.get_provider(...) 返回 ManagedProvider (生命周期受管)",
+        "backend/app/services/depth_service.py:309-319 手工在 registry.get_provider('tickflow') 与 custom_sources.get_provider(name) 之间分支",
+        "kline_sync.py:310/390/701/882/1286/1442、financial_sync.py:83、index_sync.py:235、instrument_sync.py:63、quote_service.py:876 均走 custom_sources.get_provider"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "按公开 API 写的新功能只支持 TickFlow, 遇到任何非 TickFlow 源直接崩溃; 两种 get_provider 的错误类型不同",
+      "root_cause": "TickFlow provider 早于插件系统, 插件加载器另建了一套取用入口, 注册表没有吸收插件",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "一般功能与插件化目标背离 —— 正是 CONTRIBUTING §4/§12 明确要杜绝的失败模式",
+      "technical_impact": "平行实现同一概念; 违反 §1.1 与 §4 (应使用既有 get_provider() 能力)",
+      "blast_radius": "所有未来集成; 当前已迫使 depth_service 手工分支",
+      "exploitability_or_trigger": "新功能按公开 API 取 provider",
+      "recommendation": "让 registry.get_provider(name) 在非内置名时委派插件加载器, 统一返回 ManagedProvider; 随后把 depth_service 的手工分支收敛为一次调用",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "1.5-3",
+        "assumptions": "需核对 provider.close() 语义与生命周期"
+      },
+      "verification_method": "非 TickFlow 名的 provider 契约测试; depth_service 与 kline_sync 相关 pytest 全绿",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "ARC-5",
+      "title": "四个通用服务硬编码 'fuyao' 插件名而非按能力路由",
+      "dimension": "architecture",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/services/trading_day.py",
+        "backend/app/services/dragon_tiger.py",
+        "backend/app/services/auction_benchmark.py",
+        "backend/app/services/data_integrity.py",
+        "backend/app/data_providers/capabilities.py"
+      ],
+      "evidence": [
+        "backend/app/services/trading_day.py:92 custom_sources.get_provider('fuyao')",
+        "backend/app/services/dragon_tiger.py:75 / backend/app/services/auction_benchmark.py:86 同",
+        "backend/app/services/data_integrity.py:410 custom_sources.get_provider('fuyao').trading_days()",
+        "每处均先用 custom_sources.is_custom_provider('fuyao') 判断并显式降级 (trading_day.py:86-97 返回 None; data_integrity.py:413-414 回退到陈旧/近似日历) —— 降级是显式的, 符合 §4",
+        "backend/app/data_providers/capabilities.py 的能力矩阵未声明 trading_calendar / dragon_tiger 数据集"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "交易日历、龙虎榜、竞价基准三项能力仅在 fuyao 插件存在时可用; 能力矩阵不是这些能力的路由权威",
+      "root_cause": "能力矩阵声明了 daily/adj_factor/minute/full_minute/realtime/depth5/financial, 但没有交易日历与龙虎榜条目, 于是这些功能被绑到了具体插件",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "其他 provider 用户直接失去交易日历精度与两项功能",
+      "technical_impact": "§4 要求能力路由以 provider 能力为准",
+      "blast_radius": "未安装 fuyao 的部署",
+      "exploitability_or_trigger": "使用非 fuyao 数据源",
+      "recommendation": "在 capabilities.py 声明所需数据集(如 trading_calendar / dragon_tiger), 并按 provider_has_dataset() + preferences 路由 (含矩阵测试)",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "2-4",
+        "assumptions": "含能力注册表条目、preferences getter、矩阵注入与矩阵测试"
+      },
+      "verification_method": "能力矩阵测试; 卸载 fuyao 的运行中断言功能以显式状态降级而非空白",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "QUAL-1",
+      "title": "自定义前端页面各自实现 HTTP 客户端, 绕过统一封装",
+      "dimension": "code_quality",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "frontend/src/custom/global-analysis/client.ts",
+        "frontend/src/custom/paper/executionClient.ts",
+        "frontend/src/custom/assistant/client.ts",
+        "frontend/src/lib/api.ts"
+      ],
+      "evidence": [
+        "frontend/src/custom/global-analysis/client.ts:113-128 自建 fetchJson, 无 AbortController、无超时、无 localizeApiError",
+        "frontend/src/custom/paper/executionClient.ts:45-67 自建 request (30s AbortController) —— api.ts:63 request() 的第二套实现",
+        "frontend/src/custom/assistant/client.ts:69,85,100 三处裸 fetch",
+        "frontend/src/lib/api.ts:57-60 注释说明默认 30s 超时的必要性: '后端依赖 polars, 偶发挂起时无超时会占满浏览器同源连接池, 拖垮整页所有请求'"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "global-analysis 页的请求无超时, 后端挂起时页面永久 loading 并占用同源连接池",
+      "root_cause": "custom/ 形成了自己的客户端约定, lib/api.ts 没有暴露可复用的导出",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "三个自定义页面的降级 UX; 存在拖垮整页请求的风险",
+      "technical_impact": "违反 CONTRIBUTING §7 (禁止组件直接散落请求地址) 与 docs/secondary-development.md §3.4",
+      "blast_radius": "global-analysis、paper-execution、assistant 三个页面",
+      "exploitability_or_trigger": "后端请求挂起",
+      "recommendation": "从 lib/api.ts 导出 request (或新增 lib/http.ts 共享封装), 三个自定义客户端改用它; NDJSON 流式读取保留本地实现",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "frontend",
+        "person_days_range": "1-2",
+        "assumptions": "不改变 api.ts 现有公开接口"
+      },
+      "verification_method": "pnpm build; 单元测试断言挂起请求以超时错误结束而非永久 pending",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "QUAL-2",
+      "title": "TanStack Query 查询键未集中, 且同一键字面量在两处重复",
+      "dimension": "code_quality",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "frontend/src/lib/queryKeys.ts",
+        "frontend/src/pages/backtest/StrategyWalkForward.tsx",
+        "frontend/src/pages/backtest/StrategyOptimizer.tsx",
+        "frontend/src/pages/settings/System.tsx",
+        "frontend/src/pages/settings/DataSourceEditor.tsx",
+        "frontend/src/pages/settings/Monitoring.tsx",
+        "frontend/src/pages/Screener.tsx",
+        "frontend/src/components/dashboard/widgets.tsx"
+      ],
+      "evidence": [
+        "frontend/src/pages/backtest/StrategyWalkForward.tsx:98 queryKey: ['wf-preview', start, end, trainDays, testDays, stepDays]",
+        "frontend/src/pages/backtest/StrategyOptimizer.tsx:89 queryKey: ['robust-preview', start, end, kSegments]",
+        "frontend/src/pages/settings/System.tsx:620,628 queryKey/invalidate ['upgrade-guard','status']",
+        "frontend/src/pages/settings/DataSourceEditor.tsx:226 ['data-source-detail', existingName]",
+        "frontend/src/pages/settings/Monitoring.tsx:68 与 frontend/src/pages/Screener.tsx:654 各自使用 ['minute-refresh-status'] —— 同一字面量在两个文件",
+        "frontend/src/components/dashboard/widgets.tsx:394 queryKey: ['alerts',''] 与 queryKeys.ts 的 QK.alerts() 重复"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "键在注册表之外 → 不可见于 SSE 失效前缀集合 (DAILY_DATA_QUERY_PREFIXES / MINUTE_DATA_QUERY_PREFIXES / EXT_DATA_QUERY_PREFIXES), 数据刷新后静默不刷新; 重复字面量是活雷",
+      "root_cause": "注册表是约定而非强制, 没有 lint 规则禁止内联 queryKey",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "数据刷新后面板陈旧; 缓存不一致难定位",
+      "technical_impact": "违反 CONTRIBUTING §7 与 §2.3",
+      "blast_radius": "回测预览、设置页、三个自定义页、看板组件",
+      "exploitability_or_trigger": "SSE 驱动的数据刷新",
+      "recommendation": "把缺失的工厂补进 queryKeys.ts 并替换内联键; 增加 lint/测试, 在 queryKeys.ts 与 lib/ 之外出现 `queryKey: [` 时失败 (需为 custom/ 扩展代码设显式豁免)",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "frontend",
+        "person_days_range": "1-2",
+        "assumptions": "custom/ 页面保留自有键模块"
+      },
+      "verification_method": "pnpm build; 新 lint 规则生效; grep 确认无残留内联键",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "QUAL-3",
+      "title": "异常路径 fail-open, 返回看似合理实则错误的金融数值",
+      "dimension": "code_quality",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P1",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/services/abnormal_moves.py",
+        "backend/app/api/paper.py",
+        "backend/app/api/lots.py",
+        "backend/app/api/kline.py"
+      ],
+      "evidence": [
+        "backend/app/services/abnormal_moves.py:161-164 except Exception: return 0.0 —— 该值成为板块基准; :196-199 与 :216-218 rt_delta = (rt_pct or 0.0) - bench_by_key.get(key, 0.0) → 指数行情拉取失败会整体平移所有候选的偏离值并改变'异动'排名, 且不报错",
+        "backend/app/api/paper.py:63-68 与 backend/app/api/lots.py:30-37 except Exception: return 'stock' —— lots.py 注释自述'回退为 stock 会让 etf 批次的止盈止损规则落入错误的监控轮'",
+        "backend/app/api/kline.py:450-452 except Exception: daily = None → 涨跌停基准价上下文缺失 (_get_price_limit_info :358)静默改变"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "上游瞬时失败降级为可信外观的金融输出, 而不是明确的'不可计算'状态",
+      "root_cause": "用 `except Exception: return <默认值>` 代替能力/状态建模",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "盘中异动排名错乱、ETF 监控规则落入错误轮次、涨跌停基准缺失 —— 均以数据形态暴露而非错误",
+      "technical_impact": "违反 CONTRIBUTING §12 (错误路径 fail-closed, 不静默返回错误金融结果) 与 §5.1 (明确的不可计算状态)",
+      "blast_radius": "异动总览、模拟盘、批次监控、日K 涨跌停上下文",
+      "exploitability_or_trigger": "指数行情/资产类型/日K 任一上游读取抛异常",
+      "recommendation": "abnormal_moves 区分'无指数数据'(None)与'指数平盘'(0.0), None 时跳过基准覆盖并在响应中给出显式降级标记; paper/lots 无法解析资产类型时以 4xx 拒绝而不是假定 stock",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "1-2",
+        "assumptions": "更严格的资产类型解析会拒绝部分原本以错误类型成功的写入, 需在发版说明中写明"
+      },
+      "verification_method": "单元测试断言异常路径返回显式降级/未知状态, 而非 0.0 或 'stock'",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "QUAL-4",
+      "title": "模块级全局可变状态在无锁情况下被并发读写",
+      "dimension": "code_quality",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "Medium",
+      "affected_components": [
+        "backend/app/services/preferences.py",
+        "backend/app/services/quote_service.py"
+      ],
+      "evidence": [
+        "backend/app/services/preferences.py:22-23 _cache / _cache_sig 为模块级可变状态; :59-79 load() 读签名、重读文件并分别赋值两个全局, 无锁; :79 _SAVE_LOCK 仅被 save()/mutation() 使用",
+        "backend/app/services/preferences.py:34-37 _invalidate_cache() 在持有 _SAVE_LOCK 时写 _cache/_cache_sig (与无锁的 load() 并存)",
+        "backend/app/services/quote_service.py:241-242 _LAST_FETCH_WRITE_INTERVAL_MS / _last_fetch_written_at_ms 由轮询线程无锁修改 (:253 global 赋值)",
+        "对照: backend/app/services/data_status_cache.py:19 与 backend/app/services/depth_service.py:64 使用实例锁, 说明仓内已有正确范式"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "读者可能观察到 _cache 与 _cache_sig 不对应同一文件版本 (多一次重读); 两个轮询线程可同时越过 30s 节流写两次",
+      "root_cause": "模块级缓存被逐步追加, 没有单一属主对象与统一同步",
+      "root_cause_status": "PROPOSED",
+      "business_impact": "最坏情况是一次冗余读或一次重复写, 不产生错误数据 (写路径使用 atomic_write_text)",
+      "technical_impact": "违反 §6.2 (使用锁、不可变快照或原子替换), 实际竞态窗口小",
+      "blast_radius": "preferences 读路径 (按 preferences.py:20-21 注释, 每轮行情 8-12 次调用)",
+      "exploitability_or_trigger": "读线程与写线程并发",
+      "recommendation": "把 _cache/_cache_sig 收进一个由单一锁保护的 _Cache 对象(照搬 data_status_cache.py); _last_fetch_written_at_ms 改用服务自身锁或实例属性",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "0.5-1",
+        "assumptions": "锁范围只覆盖签名检查, 避免在高频路径引入争用"
+      },
+      "verification_method": "并发测试: 读写并发下断言缓存不会对更新后的签名返回旧值",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "QUAL-5",
+      "title": "上帝模块: 偏好注册表、API 客户端与回测页面组件",
+      "dimension": "code_quality",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/services/preferences.py",
+        "frontend/src/lib/api.ts",
+        "frontend/src/pages/backtest/StrategyBacktest.tsx"
+      ],
+      "evidence": [
+        "backend/app/services/preferences.py 139 个模块级函数 (57KB), 约 70 组 getter/setter 扁平命名空间, 被 20+ 模块逐个 import",
+        "frontend/src/lib/api.ts 5133 行, 单一扁平 api 对象; docs/secondary-development.md §5.2 已把它列为高冲突热点文件",
+        "frontend/src/pages/backtest/StrategyBacktest.tsx 3206 行 / 79 个 useState/useMemo/useEffect, 页面内自算交易排序与退出信号兼容: :1463 trades.sort(...), :1494 sort(a.date.localeCompare(b.date)), :1587 effectiveExitSignals.filter(...)"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "三个文件承担了不成比例的变更冲突与复审成本; 回测页把 §5.3 规定的排序方向规则实现到了视图层",
+      "root_cause": "按功能生长, 没有触发拆分的条件; 页面同时承担编排与领域规则",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "回测分析结果的排序方向与引擎口径易分叉(§5.3 正是这类规则的所在)",
+      "technical_impact": "违反 §2.3 (复杂领域逻辑下沉到 hooks/组件/服务) 与 §1.3",
+      "blast_radius": "preferences、API 契约、回测 UI 的任何改动",
+      "exploitability_or_trigger": "任一文件的持续修改",
+      "recommendation": "preferences 按域拆成 services/preferences/{market,data_source,monitor,ai,ui}.py 并保留兼容再导出; api.ts 按域拆分但保留 api 门面; 回测页的交易排序与退出信号规则抽到 lib/backtestTrades.ts 并补单测",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend+frontend",
+        "person_days_range": "5-9",
+        "assumptions": "api.ts 拆分需保留门面间接层以降低与上游同步的冲突面"
+      },
+      "verification_method": "pnpm build; 抽取后的排序规则单测与回测引擎口径一致; preferences 相关 pytest 全绿",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "QUAL-6",
+      "title": "回测引擎四处裸 except Exception: pass 吞掉回调失败",
+      "dimension": "code_quality",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/backtest/engine.py"
+      ],
+      "evidence": [
+        "backend/app/backtest/engine.py:1279-1280, :1725-1726, :2278-2279, :3099-3100 四处相同的 except Exception: pass, 均在回调注册之后",
+        "对照 backend/app/backtest/engine.py:333 except BaseException as e: 有明确处理('失败不缓存: 摘除 inflight 让后续线程重试'), 说明该模式并非统一约定"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "回调失败既无日志也无计数, 回测结果可能静默缺少某个组成部分",
+      "root_cause": "为尽力而为的清理逻辑加异常处理时没有附带诊断",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "回测结果差异难以解释",
+      "technical_impact": "失败路径静默改变结果, 违反 §11.9 的失败路径要求",
+      "blast_radius": "回测引擎回调接线(4 处)",
+      "exploitability_or_trigger": "任一回调抛异常",
+      "recommendation": "把 pass 换成带回调标识的 logger.warning, 保持尽力而为语义",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "0.5",
+        "assumptions": "热循环下需采样或按回调去重以免日志刷屏"
+      },
+      "verification_method": "单元测试断言回调抛异常时产生日志记录",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "QUAL-7",
+      "title": "API 层在 import 时修改进程级全局状态 (pypinyin 词典)",
+      "dimension": "code_quality",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/api/kline.py"
+      ],
+      "evidence": [
+        "backend/app/api/kline.py:194-219 _init_pinyin_dict() 调用 pypinyin.load_phrases_dict({...}) 修改进程级全局词典, 并在模块作用域 :219 直接调用"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "import 该路由即改变整个进程的 pypinyin 行为; 测试中重新加载模块会重复施加",
+      "root_cause": "跨切面配置以 import 副作用方式生效, 而不是应用启动时初始化",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "影响极小(词典只是放宽可接受的读音)",
+      "technical_impact": "违反 §6.2 的无 import 副作用原则; main.py 才是进程级配置的天然位置",
+      "blast_radius": "import app.api.kline 的所有进程",
+      "exploitability_or_trigger": "模块导入",
+      "recommendation": "把调用移入既有启动路径(与拼音检索能力启用同处), _init_pinyin_dict 保留导出供显式调用",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "0.5",
+        "assumptions": "启动完成前不会用到拼音检索"
+      },
+      "verification_method": "新增断言: import app.api.kline 不改变 pypinyin 词典; 既有 instruments 检索测试仍绿",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "QUAL-8",
+      "title": "监控评估入口的时钟注入不一致, 降低可测试性",
+      "dimension": "code_quality",
+      "status": "LIKELY",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "Medium",
+      "affected_components": [
+        "backend/app/strategy/monitor.py"
+      ],
+      "evidence": [
+        "backend/app/strategy/monitor.py:738 def evaluate_date_rules(self, now: float | None = None) 接受可注入时间戳",
+        "backend/app/strategy/monitor.py:604 def evaluate(self, df, asset_type='stock', reset_strategy_results=True) 无时钟参数, :627 内部 now = time.time()"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "日期窗口规则可确定性测试, 实时规则评估不可; 临近交易时段边界的阈值测试依赖真实时钟",
+      "root_cause": "两个评估入口各自独立写成",
+      "root_cause_status": "PROPOSED",
+      "business_impact": "低; 但监控测试易抖动, 时段边界缺陷易漏过复审",
+      "technical_impact": "业务逻辑与墙钟耦合(审计任务书中的'不可测试设计'关切)",
+      "blast_radius": "监控规则测试",
+      "exploitability_or_trigger": "时段边界附近的规则评估",
+      "recommendation": "给 evaluate() 增加可选参数 now: float | None = None (默认 time.time()), 与 evaluate_date_rules 对齐, 由 quote_service._evaluate_monitors 传入",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "0.5",
+        "assumptions": "保持默认值, 既有调用点不受影响"
+      },
+      "verification_method": "单元测试在固定时间戳上评估规则",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "PERF-1",
+      "title": "行情轮询线程每轮全量扫描模拟盘订单历史并持锁读盘",
+      "dimension": "performance",
+      "status": "CONFIRMED",
+      "severity": "High",
+      "priority": "P1",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/services/quote_service.py",
+        "backend/app/strategy/paper.py",
+        "backend/app/strategy/paper_auto.py"
+      ],
+      "evidence": [
+        "backend/app/services/quote_service.py:1624-1630 _evaluate_monitors (轮询线程内) 遍历 paper_trading.list_account_ids 并调用 evaluate_intraday",
+        "backend/app/strategy/paper.py:469-476 load_orders() 对 orders/ 目录 glob('order_*.json') 并逐个读解析",
+        "backend/app/strategy/paper.py:1071-1075 with PAPER_LOCK: 持有锁期间执行上述扫描",
+        "backend/app/strategy/paper.py:199-202 每个订单一个 JSON 文件, 模块内唯一的 unlink 是 :122 的临时文件清理 —— 订单文件从不清理",
+        "backend/app/services/quote_service.py:284 默认轮询间隔 6 秒"
+      ],
+      "reproduction_steps": "1) 创建一个有较多历史订单的模拟账户; 2) 盘中观察每轮轮询耗时; 3) 每轮耗时随账户累计订单数线性增长",
+      "symptom": "轮询周期耗时随账户'终身'订单数增长, 而非随待处理订单量增长",
+      "root_cause": "以文件扫描代替待处理订单索引, 且扫描在全局锁内",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "行情刷新被推迟 → 全面板实时新鲜度与告警时延下降",
+      "technical_impact": "违反 §5.2 (行情回调线程不得做慢磁盘扫描) 与 §6.2 (不得持锁做磁盘全量扫描); PAPER_LOCK 同时被 place_order/cancel_order/overview 使用, 慢扫描还会阻塞下单",
+      "blast_radius": "单进程单用户面板, 影响该实例; 按 10 单/日 × 250 交易日估算约 2500 个文件每轮 —— 估算值, 未实测",
+      "exploitability_or_trigger": "存在模拟账户且订单历史累积",
+      "recommendation": "维护每账户的待处理市价单内存索引(下单/撤单/成交时更新), evaluate_intraday 改为查索引; 次选: 把模拟盘钩子移出轮询线程, 由独立工作线程消费快照",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "1-2",
+        "assumptions": "订单状态只经 paper.py / paper_auto.py 变更"
+      },
+      "verification_method": "单测断言热路径不再调用 load_orders (monkeypatch 抛异常); 造 5000 个历史订单文件测 _evaluate_monitors 前后耗时",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "若存在绕过 paper.py 直接改 orders/*.json 的路径, 索引会陈旧 —— 用目录 mtime 变化时重扫兜底",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "PERF-2",
+      "title": "市场总览对约 5500 行做约 25 遍 Python 逐行聚合",
+      "dimension": "performance",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/services/market_overview_builder.py",
+        "backend/app/api/overview.py"
+      ],
+      "evidence": [
+        "backend/app/services/market_overview_builder.py:437-447 df = svc._load_enriched_for_date(as_of) 后 rows = df.to_dicts()",
+        "同文件 :456 up = sum(1 for r in rows if ...); :473 limit_up = sum(1 for r in rows if ...); :496-501 above_ma_count 对 rows 遍历三次且每次对 close 与 MA 列调用 _finite(); :510-525 boards_map 与 :526-541 tiers_map 逐行循环; 另有 vol_ratios/turnovers/amounts/pct_values",
+        "backend/app/services/market_overview_builder.py:270-345 _dimension_rank 再遍历全部行构建 quote_map, 概念与行业各一次",
+        "backend/app/api/overview.py:22 5 秒 TTL 缓存, 但 SSE 在每次行情 tick 触发 overview-market 失效"
+      ],
+      "reproduction_steps": "1) 调用 /api/overview/market; 2) 观察 SSE 驱动的失效使重建频率远高于 5 秒 TTL 所暗示",
+      "symptom": "看板宽度面板可能落后一个行情 tick",
+      "root_cause": "把 Polars DataFrame 物化为 Python dict 列表后做多遍逐行聚合",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "看板市场宽度面板的实时性下降",
+      "technical_impact": "违反 §6.3 (Polars 计算优先表达式与批处理, 避免逐行 Python 循环); 规模为估算值, 未实测",
+      "blast_radius": "看板页; 不影响 A 股实时主链路",
+      "exploitability_or_trigger": "每次 overview-market 失效重建",
+      "recommendation": "把各聚合改为 DataFrame 上的 Polars 表达式, 只保留小切片(top_gainers/tiers/boards)做 dict; _dimension_rank 改为接收 DataFrame",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "1-2",
+        "assumptions": "输出结构保持不变"
+      },
+      "verification_method": "把当前 /api/overview/market JSON 固化为 golden fixture, 重写后断言输出等价; 同数据下计时 20 次前后对比",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "PERF-3",
+      "title": "全球市场总览一次并发 16 个外部请求, 每次新建客户端且无并发上限",
+      "dimension": "performance",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/services/global_market_data.py"
+      ],
+      "evidence": [
+        "backend/app/services/global_market_data.py:646-651 asyncio.gather(*[_fetch_quote_summary_item(...) for e in all_entries], return_exceptions=True); all_entries = benchmarks(4)+sectors(6)+stocks[:6](6) = 16",
+        "backend/app/services/global_market_data.py:192-195 每个调用各自 httpx.AsyncClient(timeout=..., follow_redirects=True)",
+        "backend/app/services/global_market_data.py:640-643 TTL 缓存只在入口检查一次, 两个并发调用者各自发出完整的 16 请求",
+        "backend/app/services/global_market_data.py:509-510 异常被吞掉并返回 None, 面板静默显示部分数据"
+      ],
+      "reproduction_steps": "1) 连续或并发请求全球市场总览; 2) 观察出站连接数; 3) 上游返回 429 时界面仍显示部分数据且无错误提示",
+      "symptom": "16-32 次出站请求可能触发上游限流, 且失败被静默吞掉",
+      "root_cause": "无并发上限、无 single-flight、无退避, 且每次新建客户端(每次全新 TLS 握手)",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "可选的全球分析功能展示不完整数据而无提示",
+      "technical_impact": "无 bulkhead/熔断/退避; 且绕开了 app/services/safe_http.py 的加固客户端",
+      "blast_radius": "仅全球分析特性, 不影响 A 股实时链路",
+      "exploitability_or_trigger": "请求全球市场总览",
+      "recommendation": "共享一个模块级 httpx.AsyncClient 并设 Limits; 用 asyncio.Semaphore(4) 限流; 加 single-flight 让并发调用共享一次抓取; 上游连续失败时开短熔断窗口并返回上次成功结果",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "1-2",
+        "assumptions": "改用 safe_http 后需复核 TLS/重定向语义"
+      },
+      "verification_method": "用计数 stub provider 断言并发上限被遵守且两次并发请求只产生一次扇出",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "PERF-4",
+      "title": "五处后台任务用 asyncio.create_task 但未保留强引用",
+      "dimension": "performance",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/api/pipeline.py",
+        "backend/app/api/kline.py",
+        "backend/app/services/data_integrity.py"
+      ],
+      "evidence": [
+        "backend/app/api/pipeline.py:106 asyncio.create_task(task())",
+        "同一写法见 backend/app/api/kline.py:1562, :1777, :1869, :1964 与 backend/app/services/data_integrity.py:721",
+        "对照 backend/app/services/ext_data.py:47 的正确写法: task = asyncio.create_task(...); _EXT_IO_TASKS.add(task)",
+        "asyncio.create_task 文档自述: 'Save a reference to the result of this function, to avoid a task disappearing mid-execution'"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "任务在执行中被 GC 回收 → 作业记录停在 running 无终态; pipeline_jobs.py:213-250 的孤儿回收只在下次进程启动时执行, 进程内的作业要等 :42 DEFAULT_JOB_TIMEOUT_S(1200s) 的停滞回收器才被误标为'卡死'",
+      "root_cause": "asyncio 只持有弱引用",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "作业状态准确性受损(不产生数据错误)",
+      "technical_impact": "罕见; 影响作业状态展示与停滞判定",
+      "blast_radius": "流水线/分钟同步/完整性修复提交路径",
+      "exploitability_or_trigger": "事件循环 GC 压力下任务被回收",
+      "recommendation": "统一采用 ext_data.py 的模式: 模块级集合保存 in-flight 任务并用 add_done_callback 丢弃",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "0.5",
+        "assumptions": "五处同构改动"
+      },
+      "verification_method": "提交作业后强制两次 gc.collect(), 断言作业到达终态",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "HA-1",
+      "title": "市场数据存储没有任何备份与恢复路径",
+      "dimension": "availability",
+      "status": "CONFIRMED",
+      "severity": "High",
+      "priority": "P1",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/services/config_backup.py",
+        "backend/app/tickflow/repository.py",
+        "backend/app/jobs/daily_pipeline.py"
+      ],
+      "evidence": [
+        "backend/app/services/config_backup.py:239-286 _collect_backup_files 只收集策略 .py、user_data/*.json、data_sources/*.yaml、analysis_menus、sound packs、ext-data config.json、ext-page 定义、paper/accounts/**",
+        "完全不包含 kline_daily/ kline_daily_enriched/ kline_minute/ kline_index_* kline_etf_* adj_factor/ financials/ depth5/",
+        "backend/app/tickflow/repository.py:162 duckdb.connect(database=':memory:') —— DuckDB 不提供任何持久化, Parquet 树是唯一系统记录"
+      ],
+      "reproduction_steps": "1) 备份 data/ 目录; 2) 删除 data/; 3) 恢复 —— 只能恢复'用什么算', 恢复不了'算的是什么'",
+      "symptom": "磁盘故障/误删/勒索隔离后, 本地积累的全部历史行情、enriched 指标、因子与财务数据不可恢复",
+      "root_cause": "配置备份与数据备份是两个概念, 后者完全缺失",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "数年历史数据一次性丢失; 重下受 TickFlow 套餐与密钥有效期约束, 可能根本下不回来",
+      "technical_impact": "单点故障; 无部分降级路径",
+      "blast_radius": "该安装的全部市场数据(灾难级)",
+      "exploitability_or_trigger": "磁盘故障/文件损坏/误删 data/",
+      "recommendation": "新增可开关的定时数据快照作业(管道后每日), 按 replace_with_retry (repository.py:54-78) 的原子替换纪律把 Parquet 树 + instruments/ 写到 data_backups/YYYYMMDD/, 带保留策略与恢复入口; 跨盘/可移动介质才有真正的磁盘故障防护",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend+SRE",
+        "person_days_range": "2-4",
+        "assumptions": "主机有 ≥2 倍 data/ 的空闲空间"
+      },
+      "verification_method": "在 data/ 副本上执行快照→删除→恢复, 断言 repo.refresh_cache() 的 enriched 行数一致且单分区 sha256 相同; 对比 /api/screener/cached 总量",
+      "rollback_strategy": "快照作业可由偏好关闭; 恢复是显式用户动作, 不覆盖前需确认",
+      "residual_risk": "同盘快照挡不住磁盘故障 —— 异地复制仍为未决项",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "HA-2",
+      "title": "看门狗自愈在桌面版是硬杀进程, 绕过优雅停机且无自动恢复",
+      "dimension": "availability",
+      "status": "CONFIRMED",
+      "severity": "High",
+      "priority": "P1",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/watchdog.py",
+        "backend/app/main.py",
+        "backend/app/desktop.py"
+      ],
+      "evidence": [
+        "backend/app/watchdog.py:115-118 HealthWatchdog(..., exit_cb=lambda code: os._exit(code))",
+        "backend/app/watchdog.py:97-107 连续失败后调用 self._exit_cb(70) 立即返回",
+        "os._exit 跳过 main.py:502-545 的全部 finally (watchdog stop / matrix 预热关闭 / mining 与 guardian manager shutdown / scheduler.shutdown / quote_service.stop / shutdown_delivery_executors)",
+        "backend/app/desktop.py:441-444 后端是 GUI 进程内的一个线程 (threading.Thread(target=_run_uvicorn, daemon=True))",
+        "backend/app/config.py:223-226 watchdog_interval_s=30.0, probe_timeout_s=15.0, failure_threshold=2"
+      ],
+      "reproduction_steps": "1) 让采集闸或仓库写锁卡死; 2) 连续 2 次 30 秒探测失败; 3) 桌面版整个应用被杀, 无重启; Docker 版靠 restart: unless-stopped 拉起",
+      "symptom": "桌面版用户应用直接退出, 必须手动重开; 在途的 enriched 发布、矩阵缓存清单与作业 running 记录被留在中间态",
+      "root_cause": "自愈策略假定存在 supervisor, 但三种部署形态里只有 Docker 成立",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "桌面版(主平台)命中卡死即失去应用且无自动恢复",
+      "technical_impact": "durability/可追溯性损失; pipeline_jobs._reap_orphans 只在下次启动回收作业记录, 部分写入的 enriched 发布留给另一条自愈路径",
+      "blast_radius": "桌面用户整应用退出; Docker 用户约 60-90 秒中断(2×30s 探测 + 重启)",
+      "exploitability_or_trigger": "采集闸或写锁连续 2 轮探测卡死",
+      "recommendation": "让退出路径区分部署形态: 桌面版改为由 desktop.py 拥有 uvicorn 线程的重启循环, 或用有界优雅停机替代 os._exit; 至少补齐行为差异文档",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "1-2",
+        "assumptions": "桌面分支可置于开关后"
+      },
+      "verification_method": "故障注入测试(stub default_probe 连续失败) 断言 Docker 模式退出码 70、桌面模式自动重启后进程存活 —— 本次未执行故障注入",
+      "rollback_strategy": "回滚看门狗接线; 容器行为不变",
+      "residual_risk": "有序停机本身可能阻塞在被卡死的锁上, 必须设时间上限",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "HA-3",
+      "title": "同一数据目录的第二个实例仍会启动调度器, 跨进程并发写分区",
+      "dimension": "availability",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "Medium",
+      "affected_components": [
+        "backend/app/main.py",
+        "backend/app/jobs/daily_pipeline.py",
+        "backend/app/tickflow/repository.py"
+      ],
+      "evidence": [
+        "backend/app/main.py:548-566 lifespan 竞争 MiningProcessLock, 失败时只置 lock_acquired=False 并记录'降级模式启动', 随后 _application_lifespan 完整执行, 包括 :267 daily_pipeline.start_scheduler(repo, capset)",
+        "mining_lock_acquired 的消费者只有 backend/app/main.py:170 与 backend/app/services/mining_lock_admin.py:70-74 —— 只管挖掘",
+        "backend/app/jobs/daily_pipeline.py:1335 AsyncIOScheduler(timezone='Asia/Shanghai') 使用默认内存作业存储, 注册 daily_pipeline/pre_market_instruments/depth_finalize/reprobe_capabilities",
+        "backend/app/tickflow/repository.py:351 _write_lock 是 threading.Lock —— 进程内锁, 跨进程不仲裁",
+        "backend/app/tickflow/repository.py:54-78 replace_with_retry 只重试并发'读者'导致的 Windows PermissionError, 不处理并发'写者'"
+      ],
+      "reproduction_steps": "1) 两个后端指向同一 DATA_DIR (如 dev.ps1 + 手工 uvicorn, 或容器 + 本地桌面版); 2) 第二个实例进入降级模式但仍启动调度器; 3) 两边都向同一 date=YYYY-MM-DD/part.parquet 写入",
+      "symptom": "两个实例都跑 15:35 管道 cron 与实时行情写入; os.replace 的 last-writer-wins 静默丢弃另一方分区内容",
+      "root_cause": "降级模式只覆盖了挖掘能力, 没有覆盖写盘与调度类副作用",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "受影响交易日的分区数据静默丢失, 只能重拉该日",
+      "technical_impact": "进程内锁无法跨进程仲裁; 无跨进程互斥",
+      "blast_radius": "误配双实例的部署, 造成当日数据丢失",
+      "exploitability_or_trigger": "同一 DATA_DIR 上运行两个后端进程",
+      "recommendation": "用数据目录级排他锁(复用 MiningProcessLock 模式或新增 data_dir.lock)门控 start_scheduler; 持锁时以降级模式启动且不启动调度器/行情轮询/分钟刷新/深度轮询, 仅保留 API; 在 /health 暴露降级状态",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "1-2",
+        "assumptions": "锁需具备与挖掘锁同级的陈旧判定"
+      },
+      "verification_method": "对同一 scratch DATA_DIR 启动两个实例, 断言第二个未注册 daily_pipeline 作业且只有一个写入分区; 断言降级实例仍可服务 /api/capabilities",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "HA-4",
+      "title": "健康检查是硬编码 liveness, 没有 readiness 探针也没有降级信号",
+      "dimension": "availability",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/api/routes.py",
+        "backend/app/main.py",
+        "backend/app/desktop.py"
+      ],
+      "evidence": [
+        "backend/app/api/routes.py:69-77 @router.get('/health') 返回 {'status':'ok', 'version':..., 'mode':..., 'memory':...} —— status 是常量",
+        "未读取 app.state.indicators_ready (main.py:203 设置, 由 repo._on_refresh_done :206 翻转)、app.state.scheduler (main.py:267-271)、quote_service.status()、app.state.mining_lock_acquired (main.py:564)",
+        "全仓无 /ready 或 readiness 端点",
+        "backend/app/desktop.py:339, :445-448 桌面启动器自己轮询 /health, 把 200 当作'后端就绪'"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "数据层冷启动、调度器启动失败 (main.py:268-272 只记录 'scheduler not started' 后继续) 或挖掘锁丢失时, 面板依然报告 ok",
+      "root_cause": "把 liveness 与 readiness 混为一体",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "管道静默停摆时, 运维面板显示健康, 发现延迟",
+      "technical_impact": "所有部署都依赖该契约面",
+      "blast_radius": "全部部署形态",
+      "exploitability_or_trigger": "任一必需子系统未就绪",
+      "recommendation": "新增 GET /ready 返回真实状态 {indicators_ready, scheduler_running, quote_running, mining_lock_acquired, degraded}, 必需子系统缺失时返回非 200; /health 保持纯 liveness; desktop.py:339 改轮询 /ready",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "0.5-1",
+        "assumptions": "只对真正必需的子系统设门禁, 避免编排器对降级实例重启循环"
+      },
+      "verification_method": "故意禁用调度器启动, 断言 /ready 非 200 且 scheduler_running=false; /health 仍 200",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "HA-5",
+      "title": "日志无关联标识, 告警只覆盖'卡死'一种症状",
+      "dimension": "availability",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/main.py",
+        "backend/app/services/ndjson_heartbeat.py",
+        "backend/app/services/workload.py",
+        "backend/app/watchdog.py"
+      ],
+      "evidence": [
+        "全仓 grep request_id|correlation|X-Request-Id|trace_id 在 backend/app 只命中 backtest 的 compute_rank_correlation —— 无请求级标识",
+        "backend/app/main.py:958-971 workload_middleware 只记录 5 个分组的请求计数, 无关联 ID",
+        "唯一的症状型告警是 backend/app/watchdog.py:100-107 的卡死探测",
+        "另三种典型停顿无告警: 管道失败/超时 (pipeline_jobs.py:42 DEFAULT_JOB_TIMEOUT_S=1200)、进程存活但行情变陈旧、磁盘写满 (data/ 每个交易日增长, config.py 与管道均无上限)"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "运维只能靠人工打开面板发现管道停了",
+      "root_cause": "可观测性只做了计数, 没有做可关联与可告警的症状面",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "事件定位慢且易错: 需在 quote_service/paper/alert_store/API 日志之间按时间戳和标的目测拼接",
+      "technical_impact": "backend/app/services/ndjson_heartbeat.py 已展示 NDJSON 写入范式, 可复用",
+      "blast_radius": "全部部署",
+      "exploitability_or_trigger": "任何需要事后追溯的故障",
+      "recommendation": "(1) 在既有中间件里铸造请求 ID, 通过 contextvars filter 注入日志; (2) 按 ndjson_heartbeat 范式周期性输出心跳, 含 quote_age_ms / last_pipeline_ok_at / data_dir_free_bytes / workload 计数, 并对症状设阈值告警而非对进程存活告警",
+      "dependencies": [
+        "OPS-9",
+        "SEC-002"
+      ],
+      "estimated_effort": {
+        "role": "backend+SRE",
+        "person_days_range": "2-3",
+        "assumptions": "仓内无日志采集管道, 日志格式变更无外部消费者"
+      },
+      "verification_method": "curl -H 'X-Request-Id: abc' /api/screener/cached 后断言该请求相关日志含 abc; 心跳文件按间隔增长且含四个字段",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "NDJSON 心跳文件需要轮转策略",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "OPS-1",
+      "title": "前端测试套件从未进入 CI 门禁",
+      "dimension": "ops_release",
+      "status": "CONFIRMED",
+      "severity": "High",
+      "priority": "P1",
+      "confidence": "High",
+      "affected_components": [
+        ".github/workflows/ci.yml",
+        "frontend/package.json",
+        "README.md"
+      ],
+      "evidence": [
+        ".github/workflows/ci.yml:44-63 前端 job 只跑 pnpm install --frozen-lockfile 与 pnpm build (= tsc -b && vite build, package.json:8)",
+        "package.json:11 \"test\": \"vitest run\" 未被任何 workflow 引用 (全仓 grep vitest|pnpm test 在 workflows 中 0 命中)",
+        "frontend/src 下实测 123 个 *.test.ts(x) 文件",
+        "README.md:19 徽章宣称 'Test: Backend + Frontend' 与 '3000+ 测试全绿 · CI 守护'",
+        "本次审计实测: vitest run → 123 files / 843 tests 全部通过, 耗时 204.63s"
+      ],
+      "reproduction_steps": "1) 在前端组件里引入一个必然失败的断言; 2) 观察 CI 仍然绿灯 (因为 vitest 从未运行)",
+      "symptom": "React 组件、查询键、i18n 覆盖与 SSE 客户端的回归可以静默合入",
+      "root_cause": "CI 只覆盖了'能否构建', 没有覆盖'行为是否正确'",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "任何前端行为回归都无门禁; README 徽章与实际覆盖不符",
+      "technical_impact": "123 个测试文件对合并门禁而言是死代码",
+      "blast_radius": "全部前端改动",
+      "exploitability_or_trigger": "任意前端回归",
+      "recommendation": "在 ci.yml 前端 job 增加 `pnpm test` 步骤 (阻断式)。本次审计已实测该套件全绿, 可直接设为阻断门禁",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "CI",
+        "person_days_range": "0.5",
+        "assumptions": "套件当前全绿 (已实测)"
+      },
+      "verification_method": "本次已实测 `vitest run` → 123 passed / 843 passed; CI 改动后需在 GitHub 侧确认步骤出现",
+      "rollback_strategy": "移除该步骤即恢复",
+      "residual_risk": "前端 suite 在 CI 的实际运行时间(约 205s)与并发额度未在 GitHub 上验证",
+      "remediation_status": "IMPLEMENTED"
+    },
+    {
+      "id": "OPS-2",
+      "title": "e2e_prod 可观测性测试断言了应用中并不存在的端点, CI 后端门禁为红",
+      "dimension": "ops_release",
+      "status": "CONFIRMED",
+      "severity": "High",
+      "priority": "P0",
+      "confidence": "High",
+      "affected_components": [
+        "backend/tests/e2e_prod/test_tier1_health_auth_gateway.py",
+        "backend/app/"
+      ],
+      "evidence": [
+        "该文件断言 GET /health/live (:60)、GET /health/ready (:70)、Prometheus 格式 GET /metrics (:78-85)、X-Request-ID 生成与回显 (:87-97)、data/logs/audit.jsonl (:110)",
+        "backend/app 中无 /health/live 与 /health/ready (仅 api/routes.py:69 的 /health); /metrics 仅存在于 api/financials.py:74 的 /api/financials/metrics, 非 Prometheus 暴露; 无任何中间件生成 X-Request-ID; audit.jsonl 在 backend/app 中 0 命中",
+        "本次审计实测: pytest tests/e2e_prod/test_tier1_health_auth_gateway.py → 8 failed, 7 passed (56.51s)",
+        "该目录有 __init__.py, 无 conftest 排除, 因此被 `pytest tests -q` 收集 (ci.yml:38)"
+      ],
+      "reproduction_steps": "1) cd backend; 2) uv run pytest tests/e2e_prod/test_tier1_health_auth_gateway.py -q → 8 failed",
+      "symptom": "仓库自带的 CI 命令在本地即失败; 8 个失败断言的是一个尚不存在的生产可观测性契约",
+      "root_cause": "测试先行写下了目标态契约, 但实现从未落地, 且无人让 CI 保持红",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "外部监控无法依赖 readiness/liveness/Prometheus/请求关联/审计日志; 更关键的是 CI 长期为红使门禁失去意义",
+      "technical_impact": "其中 test_open_api_gateway_enforces_all_6_scopes 与 test_api_token_local_only_gate_and_public_unconfigured_block 也失败, 需单独定位",
+      "blast_radius": "CI 后端门禁; 该文件同时是仓内最完整的可观测性契约陈述",
+      "exploitability_or_trigger": "任何一次 `pytest tests -q`",
+      "recommendation": "二选一并在仓内落文档: (A) 实现这四个端点并保留测试 (3-5 人日); (B) 删除这四条断言并在 issues 中登记缺口 (0.5 人日)。本审计未擅自删除, 因为这四条约定了作者想要的运维契约",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend",
+        "person_days_range": "0.5 或 3-5",
+        "assumptions": "需先由维护者选定 A 还是 B; 该选择决定 CI 门禁当前是红还是绿"
+      },
+      "verification_method": "uv run pytest tests/e2e_prod/test_tier1_health_auth_gateway.py -q 全绿 (选定 B 时需同时移除断言)",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "OPS-3",
+      "title": "容器镜像在 main 推送时直接发布到 GHCR, 不依赖 CI 且无回滚路径",
+      "dimension": "ops_release",
+      "status": "CONFIRMED",
+      "severity": "High",
+      "priority": "P1",
+      "confidence": "High",
+      "affected_components": [
+        ".github/workflows/docker.yml",
+        "docs/deployment.md"
+      ],
+      "evidence": [
+        ".github/workflows/docker.yml:17-19 on: push: branches: [main], 单一 job build-and-push, 无 needs: (grep needs: 0 命中)",
+        ".github/workflows/docker.yml:66 push: true, docker/metadata-action@v5 同时打 type=raw,value=latest 与 type=sha",
+        "docs/deployment.md:15-22 指示用户 docker pull ghcr.io/shy3130/tick-stock-panel:latest"
+      ],
+      "reproduction_steps": "1) 在 main 上合入一个使 CI 失败的提交; 2) 观察 GHCR 的 :latest 是否仍被覆盖",
+      "symptom": "CI 红灯时 :latest 仍可能被坏镜像覆盖; 文档中的升级路径正是拉 :latest",
+      "root_cause": "发布与门禁解耦, 且升级文档未固定到经过测试的标签",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "按文档升级的用户可能拉到坏镜像",
+      "technical_impact": "无回滚命令文档 (sha 标签存在但未提及)",
+      "blast_radius": "所有按 :latest 升级的部署",
+      "exploitability_or_trigger": "main 上任一使 CI 失败的提交",
+      "recommendation": "用 workflow_run 门禁(仅 CI 成功后发布) 或跨 workflow 的 needs; 在部署文档写明回滚到 :sha- 标签并把升级路径固定到已测试标签",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "CI",
+        "person_days_range": "1-2",
+        "assumptions": "workflow_run 会引入额外延迟与触发面"
+      },
+      "verification_method": "在分支上制造故意失败的提交, 断言不产生新的 GHCR 标签",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "OPS-4",
+      "title": "没有任何漏洞扫描 / SAST / 容器扫描 / SBOM / 依赖更新自动化",
+      "dimension": "ops_release",
+      "status": "CONFIRMED",
+      "severity": "High",
+      "priority": "P1",
+      "confidence": "High",
+      "affected_components": [
+        ".github/workflows/",
+        "backend/pyproject.toml",
+        "frontend/package.json"
+      ],
+      "evidence": [
+        "grep audit|trivy|codeql|snyk|grype|sbom|cyclonedx 在 .github/workflows 下 0 命中",
+        "无 .github/dependabot.yml, 无 renovate.json",
+        "三个锁文件存在: backend/uv.lock, frontend/pnpm-lock.yaml, mcp-server/uv.lock",
+        "本次未运行任何扫描器 (未安装且不允许联网) —— 结论仅为'仓内未配置扫描'"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "FastAPI/Polars/pyarrow/TickFlow SDK 或 React/ECharts 依赖树中的已知 CVE 永远不会被发现",
+      "root_cause": "供应链安全控制整体缺位",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "发布与 Docker 路径都消费这两棵依赖树",
+      "technical_impact": "扫描器噪声与 448 文件 Python 树的误报处理成本需在方案中考虑",
+      "blast_radius": "全部制品",
+      "exploitability_or_trigger": "依赖树引入已知漏洞版本",
+      "recommendation": "加 Dependabot (github-actions / pip(uv) / npm 生态); CI 增加 pip-audit + pnpm audit --audit-level=high; Docker 构建产出 CycloneDX SBOM; 镜像加 Trivy 扫描",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "CI+security",
+        "person_days_range": "2-3",
+        "assumptions": "先以非阻断方式引入, 清理误报后再转阻断"
+      },
+      "verification_method": "在分支上引入一个已知易受攻击版本, 断言扫描作业失败",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "OPS-5",
+      "title": "发布产物到 latest.json 的链路不可验证, 可静默发布残缺清单",
+      "dimension": "ops_release",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        ".github/workflows/release.yml"
+      ],
+      "evidence": [
+        "backend/app/../.github/workflows/release.yml:281-286 gh release download ... --clobber || true —— 下载失败被吞掉",
+        ".github/workflows/release.yml:300-303 if not local.exists(): continue 注释写明'本次未构建该平台 (分批发布), 清单只列实际存在的'",
+        "manifest 中的 sha256 由与上传相同的本地文件计算, 可检出下载损坏但检不出被替换的上传",
+        "发布标签由 softprops/action-gh-release@v2 依据 workflow_dispatch 输入创建, 无 commit SHA 证明, 无 actions/attest-build-provenance"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "macOS 资产下载失败而 Windows 成功时, latest.json 仍被发布且静默缺少 macOS 通道",
+      "root_cause": "下载错误被吞 + 缺少'清单必须覆盖本次构建的全部通道'断言",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "应用内更新检查从此不再提供 macOS 升级",
+      "technical_impact": "sha256 自证不能证明上传物未被替换",
+      "blast_radius": "发布通道",
+      "exploitability_or_trigger": "某个平台资产缺失或下载失败",
+      "recommendation": "去掉 || true, 下载失败即失败; 生成清单后断言通道集合与本次 matrix 一致并打印数量; 增加 provenance 证明",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "CI",
+        "person_days_range": "1-2",
+        "assumptions": "完整性检查需按本次 matrix 范围限定, 否则会破坏文档中的分批发布流程"
+      },
+      "verification_method": "故意缺失一个资产重跑发布, 断言作业失败而非发布残缺清单",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "OPS-6",
+      "title": "第三方 Action 与容器基础镜像使用可变标签而非 SHA/digest 固定",
+      "dimension": "ops_release",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        ".github/workflows/",
+        "Dockerfile"
+      ],
+      "evidence": [
+        "Action 全部按标签固定: actions/checkout@v4, astral-sh/setup-uv@v3, pnpm/action-setup@v4, actions/setup-node@v4, actions/upload-artifact@v4, softprops/action-gh-release@v2, docker/setup-qemu-action@v3, docker/setup-buildx-action@v3, docker/login-action@v3, docker/metadata-action@v5, docker/build-push-action@v6",
+        "Dockerfile:15 FROM node:20-alpine, :33 FROM node:20-bookworm-slim, :49 FROM python:3.11-slim —— 无 digest 固定",
+        "Dockerfile:23 npm install -g pnpm@9 而 package.json:48 指定 pnpm@9.10.0",
+        "Dockerfile:76-83 pip install --no-cache-dir uv 无版本约束"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "上游标签移动(或 Action 仓库被投毒)会改变 CI 构建与发布的内容, 包括 GHCR 镜像与签名安装包路径",
+      "root_cause": "供应链未做不可变固定",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "影响全部制品的可复现性",
+      "technical_impact": "与 OPS-4 互为因果(无 Dependabot 则 SHA 固定需要人工维护)",
+      "blast_radius": "全部 CI 制品",
+      "exploitability_or_trigger": "上游标签或仓库被修改",
+      "recommendation": "Action 固定到 commit SHA 并附版本注释; 基础镜像固定到 digest; pnpm 固定到 9.10.0, uv 固定到具体版本",
+      "dependencies": [
+        "OPS-4"
+      ],
+      "estimated_effort": {
+        "role": "CI",
+        "person_days_range": "1-2",
+        "assumptions": "SHA 固定需定期人工或 Dependabot 升级"
+      },
+      "verification_method": "SHA 固定的 workflow 仍能正常运行",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "OPS-7",
+      "title": "Docker 构建在锁文件校验失败时静默回退",
+      "dimension": "ops_release",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "Dockerfile"
+      ],
+      "evidence": [
+        "Dockerfile:28 RUN pnpm install --frozen-lockfile || pnpm install",
+        "Dockerfile:88 RUN uv sync --frozen \"$@\" || uv sync \"$@\"",
+        "Dockerfile:27 COPY frontend/package.json frontend/pnpm-lock.yaml* ./ —— 通配符让锁文件变成可选",
+        "对照 CI 本身是严格的: ci.yml:33 uv sync --extra dev --frozen, ci.yml:62 pnpm install --frozen-lockfile"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "发布镜像的依赖树不是被评审过的那一棵; 同一标签的两次构建可以不同",
+      "root_cause": "构建脚本用 `||` 兜底代替失败, 与 CI 的严格模式不一致",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "镜像内实际依赖不可预期, 漏洞修复与行为复现都失去基准",
+      "technical_impact": "镜像内还存在 CN 镜像源 (Dockerfile:12-13) 这一供应链面",
+      "blast_radius": "全部容器部署",
+      "exploitability_or_trigger": "锁文件缺失或与清单不同步",
+      "recommendation": "去掉两处 `||` 回退与 `*` 通配符; 锁文件缺失或不同步即构建失败",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "CI",
+        "person_days_range": "0.5",
+        "assumptions": "需先确认当前锁文件与 pyproject/package.json 同步 —— 本次未执行验证"
+      },
+      "verification_method": "故意改动 pyproject 而不更新 uv.lock, 断言镜像构建失败",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "OPS-8",
+      "title": "ruff / mypy / eslint 配置齐备但从未作为门禁运行",
+      "dimension": "ops_release",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "backend/pyproject.toml",
+        ".github/workflows/ci.yml",
+        "frontend/package.json"
+      ],
+      "evidence": [
+        "backend/pyproject.toml:113-121 定义 [tool.ruff] select = ['E','F','I','N','UP','B','SIM','RUF','BLE']; dev extra 含 ruff>=0.5, mypy>=1.10",
+        "pyproject.toml:99-100 仓库自述: '本仓 CI 目前不跑 ruff (ci.yml 只有 uv run pytest tests -q)'",
+        "frontend/package.json:10 \"lint\": \"eslint .\" 从未被任何 workflow 调用",
+        "本次实测: ruff check app tests --statistics → 214 BLE001 / 42 I001 / 37 RUF100 / 31 F401 / 16 B023 / 14 E741 等",
+        "本次实测: eslint . → 8 errors, 227 warnings (退出码 1) —— 其中 5 处是 MiningWorkbench.tsx 的 rules-of-hooks 真实问题, 2 处未使用变量, 1 处无用转义"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "lint 配置给人以门禁存在的错觉, 规则集从未对新代码生效",
+      "root_cause": "门禁接线缺失, 且存量欠账使一次性转阻断不可行",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "新增代码的错误(如 F821 未定义名、B023 循环变量闭包)不会被自动拦下",
+      "technical_impact": "存量约 700 条 ruff 告警与 235 条 eslint 问题; pyproject 注释自估 236 处 BLE001 未被 acknowledge",
+      "blast_radius": "全部后端与前端改动",
+      "exploitability_or_trigger": "任意新增代码",
+      "recommendation": "分两步: 先把 ruff/eslint 以非阻断方式接入并把存量清零(或按规则分批 ratchet), 再转阻断。阻断式接入必须先清存量 —— 本次实测 eslint 有 8 个 error, 直接接入会让 CI 立刻变红",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "CI+backend+frontend",
+        "person_days_range": "1-2 接线 + 2-5 清存量",
+        "assumptions": "清理范围按目录/规则分批推进"
+      },
+      "verification_method": "CI 日志出现 ruff/eslint 步骤; 故意写一行违规代码时作业失败",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "OPS-9",
+      "title": "没有关联 ID、没有机器可读指标导出、没有症状型告警",
+      "dimension": "ops_release",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "backend/app/api/routes.py",
+        "backend/app/main.py",
+        "backend/app/api/data.py"
+      ],
+      "evidence": [
+        "backend/app/api/routes.py:69-78 /health 仅返回 {status, version, mode, memory}; _memory_snapshot (:25-67) 只有内存数字, 没有时延/错误率/队列深度/管道新鲜度维度",
+        "backend/app/main.py:958-971 workload_middleware 只统计 screener/kline/overview/watchlist/backtest 五个分组, 落在进程内计数器 (services/workload.py:10-14 白名单)",
+        "backend/app/api/data.py:26-44 GET /api/data/workload 暴露计数器, 但在面板鉴权之后, 是给人看的页面而非可抓取的指标契约",
+        "backend/app/watchdog.py:104-109 进程楔住时只 os._exit(70), 除容器重启外无任何通知",
+        "全仓 grep prometheus|alertmanager|oncall|runbook 在运维语境下 0 命中"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "外部系统无法消费机器可读心跳; '管道 15:35 停了' 或 '内存耗尽' 只能靠人打开面板发现",
+      "root_cause": "可观测性停在进程内计数, 没有对外契约",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "故障发现与定位依赖人工",
+      "technical_impact": "暴露 /metrics 需要一次鉴权决策(现有 /api/data/workload 在面板密码之后)",
+      "blast_radius": "全部部署",
+      "exploitability_or_trigger": "任意需要外部监控的场景",
+      "recommendation": "以 Prometheus 文本格式暴露 /metrics (工作负载计数、内存/队列深度 gauge、管道最后成功时间戳); 增加 X-Request-ID 中间件; 附一份抓取配置与起步告警集",
+      "dependencies": [
+        "HA-5",
+        "SEC-002"
+      ],
+      "estimated_effort": {
+        "role": "backend+SRE",
+        "person_days_range": "3-5",
+        "assumptions": "与 SEC-002 的关联 ID 一起实现"
+      },
+      "verification_method": "curl /metrics 返回可解析文本; 发起一次请求后计数器值变化",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "OPS-10",
+      "title": "没有成文的发布门禁; 版本一致性在构建期被自动改写而非校验",
+      "dimension": "ops_release",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "scripts/sync_versions.py",
+        ".github/workflows/",
+        "VERSION"
+      ],
+      "evidence": [
+        "scripts/sync_versions.py:47-56 实现了 --check (漂移时退出码 1), 其 docstring 自称 'CI 可选' —— 但没有任何 workflow 调用 --check",
+        "只有写模式被调用: release.yml:104 与 docker.yml:32 的 python3 scripts/sync_versions.py",
+        "仓内未定义回滚方案、灰度/特性开关发布流程或数据迁移兼容门禁",
+        "当前版本一致: VERSION=v0.3.37, backend/pyproject.toml:3=0.3.37, frontend/package.json:4=0.3.37, backend/app/__init__.py:13 _FALLBACK_VERSION='0.3.37'",
+        "release.yml:52-58 对输入与 package.json 不一致会失败关闭",
+        "release.yml:25 workflow_dispatch 的默认版本仍是 v0.3.17 (因失败检查而无害, 但有误导)"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "版本漂移在发布构建时被自动改写, 仓库提交态可以不一致, 真相只出现在制品里",
+      "root_cause": "缺少'发布前必须为真'的成文定义",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "缺少可审计的发布判据",
+      "technical_impact": "本身无功能风险, 但使发布过程不可复审",
+      "blast_radius": "全部发布",
+      "exploitability_or_trigger": "任一次发布",
+      "recommendation": "在 ci.yml 增加 version-consistency 作业执行 python3 scripts/sync_versions.py --check; 新增 docs/release-gate.md 定义必备检查、回滚命令(:sha- 镜像标签与上一个安装包)与数据迁移兼容规则; 修正 release.yml 的默认版本输入",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "CI",
+        "person_days_range": "1-2",
+        "assumptions": "无"
+      },
+      "verification_method": "只改 frontend/package.json 的版本, 断言 CI 失败",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "OPS-11",
+      "title": "ci.yml 未声明 permissions 块",
+      "dimension": "ops_release",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        ".github/workflows/ci.yml"
+      ],
+      "evidence": [
+        "ci.yml 无 permissions 键; 对照 release.yml:31-32 contents: write, docker.yml:21-23 contents: read + packages: write, dco.yml:10-13 contents: read + pull-requests: read",
+        "ci job 会执行 actions/checkout@v4 与 uv run pytest tests -q, 使用默认 GITHUB_TOKEN 权限",
+        "仓内无 pull_request_target 工作流; 唯一 secret 引用是 release.yml/docker.yml 中的 secrets.GITHUB_TOKEN, 均不在 PR 上下文"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "CI token 继承仓库默认权限(部分组织下为读写)",
+      "root_cause": "门禁配置缺少最小权限声明",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "若作业内依赖或测试被投毒, 会继承该权限范围",
+      "technical_impact": "未暴露 PR 代码给 secret",
+      "blast_radius": "CI 作业",
+      "exploitability_or_trigger": "组织默认 token 权限为读写",
+      "recommendation": "在 ci.yml 顶部加 permissions: contents: read",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "CI",
+        "person_days_range": "0.25",
+        "assumptions": "无"
+      },
+      "verification_method": "workflow run 显示最小 token 范围",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "OPS-12",
+      "title": "文档漂移: 引用了不存在的脚本路径, README 对 CI 覆盖度的描述夸大",
+      "dimension": "ops_release",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        "docs/tickflow-pro-phase1-probe.md",
+        "README.md"
+      ],
+      "evidence": [
+        "docs/tickflow-pro-phase1-probe.md:9 与 :28 写 python3 scripts/probe_tickflow_pro.py, 实际文件在 backend/scripts/probe_tickflow_pro.py (backend/tests/test_probe_tickflow_pro_gate.py:8 以 from scripts.probe_tickflow_pro import ... 导入)",
+        "README.md:19 徽章 'Test: Backend + Frontend' 与 CI 实际覆盖不符 (见 OPS-1)",
+        "本次对文档中的 89 个 /api/... 字面量做了一次与路由装饰器的交叉核对, 未发现缺失的 API 路径"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "运维按文档执行命令会得到 file not found; 徽章给采用者虚假保证",
+      "root_cause": "文档路径未与仓库结构同步核对",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "排障流程被阻断",
+      "technical_impact": "影响面小",
+      "blast_radius": "排障文档",
+      "exploitability_or_trigger": "按文档执行 probe 命令",
+      "recommendation": "把文档路径改为 backend/scripts/probe_tickflow_pro.py; 修好 OPS-1 后一并修正徽章文案",
+      "dependencies": [
+        "OPS-1"
+      ],
+      "estimated_effort": {
+        "role": "docs",
+        "person_days_range": "0.25",
+        "assumptions": "无"
+      },
+      "verification_method": "执行修正后的命令",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "OPS-13",
+      "title": "MCP server 组件在所有质量门禁之外",
+      "dimension": "ops_release",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        "mcp-server/"
+      ],
+      "evidence": [
+        "mcp-server/ 含 pyproject.toml, uv.lock, smoke_test.py, src/tsp_mcp_server/server.py —— 无 pytest 套件",
+        "smoke_test.py 是需要真实服务与 TSP_TOKEN 的手工脚本",
+        "无任何 workflow 引用 mcp-server/ (ci.yml 只在 backend/ 与 frontend/ 工作)"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "对外宣称的 AI 客户端接口零自动化回归覆盖, 工具 schema 的破坏性变更可无声发布",
+      "root_cause": "新组件未纳入既有 CI 拓扑",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "README 宣传 '12 个工具把面板能力交给任意 AI 客户端', 但无门禁保护",
+      "technical_impact": "需要本地起后端才能跑 smoke test",
+      "blast_radius": "MCP 对外接口",
+      "exploitability_or_trigger": "改动 server.py 的工具定义",
+      "recommendation": "增加 mcp-server 的 CI 作业(至少对工具列表做 schema 快照测试; 或用本地起后端的 fixture 跑 smoke test)",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "backend+CI",
+        "person_days_range": "2-3",
+        "assumptions": "需要隔离的 mock/fixture 服务"
+      },
+      "verification_method": "CI 作业运行 smoke test 为绿",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "OPS-14",
+      "title": "Dockerfile 与 compose 均无容器健康检查",
+      "dimension": "ops_release",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        "Dockerfile",
+        "docker-compose.yml"
+      ],
+      "evidence": [
+        "Dockerfile 无 HEALTHCHECK 指令(最后一条是 CMD [\"uv\",\"run\",\"uvicorn\",\"app.main:app\",...])",
+        "docker-compose.yml 无 healthcheck: 键, 只有 restart: unless-stopped",
+        "唯一的存活信号是内部看门狗退出进程 (watchdog.py:104-109)"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "docker compose ps 从不报告 healthy/unhealthy, 编排器无法区分'楔住但进程还在'与'正在服务'",
+      "root_cause": "运行态契约只靠进程退出表达",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "故障静默; 恢复信号只有容器重启",
+      "technical_impact": "看门狗的 os._exit(70) 对运维不可见",
+      "blast_radius": "容器部署",
+      "exploitability_or_trigger": "容器内进程楔住",
+      "recommendation": "Dockerfile 增加 HEALTHCHECK 探测 /health (已在鉴权白名单, main.py:948), compose 增加对应 healthcheck 映射",
+      "dependencies": [
+        "HA-4"
+      ],
+      "estimated_effort": {
+        "role": "SRE",
+        "person_days_range": "0.5",
+        "assumptions": "探测间隔不宜过密"
+      },
+      "verification_method": "docker compose ps 显示健康状态; 停掉应用后变为 unhealthy",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "TEST-1",
+      "title": "业务不变量常仅以 HTTP 200 / 非空载荷方式断言",
+      "dimension": "testing",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "backend/tests/"
+      ],
+      "evidence": [
+        "415 处 `status_code == 200` 分布在 78 个后端测试文件",
+        "典型例: backend/tests/e2e_prod/test_tier1_health_auth_gateway.py:44-56 test_data_workload_records_request_groups 断言 200 后只检查四个键存在, 从未断言该 kline 请求真的被记入 groups['http.kline'] —— 与测试名声称的行为不符",
+        "对照 backend/tests/test_workload.py:23-32 断言了精确计数与总量 —— 说明正确范式存在, 弱点集中在 API 层测试"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "带 200 但载荷错误或为空的实现可以通过测试",
+      "root_cause": "API 层测试把'可访问'当成'正确'",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "计数器、阈值与载荷语义的回归直达生产",
+      "technical_impact": "415 处分散, 一次性清扫成本高, 需挑价值最高的 15-20 个文件先做",
+      "blast_radius": "API 层测试",
+      "exploitability_or_trigger": "实现返回值改变但状态码不变",
+      "recommendation": "为 API 层测试补不变量断言(精确计数值、精确字段值与单位、负向路径); 裸 200 断言只保留在冒烟测试中",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "QA+backend",
+        "person_days_range": "3-6",
+        "assumptions": "优先覆盖最高价值的 15-20 个文件"
+      },
+      "verification_method": "故意停止记录 http.kline, 断言被加强后的测试失败",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "TEST-2",
+      "title": "测试依赖真实墙钟, 在日期与会话边界退化",
+      "dimension": "testing",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "backend/tests/"
+      ],
+      "evidence": [
+        "88 处 datetime.now() / date.today() / time.time() 分布在 31 个测试文件",
+        "其中包含本身就以北京日期为对象的文件: test_ashare_date_defaults_beijing_today.py, test_pipeline_beijing_today.py, test_assistant_beijing_today.py, test_assistant_backtest_beijing_today.py, test_ext_write_date_beijing.py, test_stock_analysis_beijing_today.py, test_json_report_store_timezone.py",
+        "仓内已有正确范式: backend/app/services/workload.py:52 SubmissionLimiter(..., clock=time.monotonic), backend/tests/test_workload.py:40-51 使用同一模式 —— 但日期相关测试没有采用"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "失败集中在北京时间 00:00-09:00、15:00 收盘前后与月末/季末; CI 在 UTC 而开发机在 +08:00 会分叉",
+      "root_cause": "时间源未统一注入, 测试直接读取系统时钟",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "CI 偶发红灯难以区分真实回归与时钟漂移",
+      "technical_impact": "部分代码路径直接读 time.time(), 需要先改造才能冻结",
+      "blast_radius": "日期敏感的 31 个测试文件",
+      "exploitability_or_trigger": "在时段边界或日期边界运行",
+      "recommendation": "冻结日期敏感测试的单一时间源(monkeypatch), 并补齐开盘前/午休/收盘后/跨日四类边界用例",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "QA+backend",
+        "person_days_range": "2-4",
+        "assumptions": "部分路径需先做时间注入改造"
+      },
+      "verification_method": "以伪造系统日期跨会话边界运行套件",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "TEST-3",
+      "title": "多处测试用非隔离的 tempfile.mkdtemp 落盘夹具",
+      "dimension": "testing",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "backend/tests/"
+      ],
+      "evidence": [
+        "backend/tests/test_kline_detail_transport.py:56, test_kline_minute_holiday_fallback.py:127, test_kline_minute_lunch_expected.py:78, test_kline_minute_live.py:32 均用 self.store = SimpleNamespace(data_dir=Path(tempfile.mkdtemp())) —— 不用 tmp_path, 无清理",
+        "对照: backend/tests/test_logging_setup.py:15-18, test_factor_api.py:159 使用 pytest tmp_path (仓内多数已是 tmp_path)"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "目录泄漏到系统临时区, 失败时不清理, 且不按测试隔离; Windows 上泄漏句柄会让后续清理失败",
+      "root_cause": "个别文件沿用了早期的手工临时目录写法",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "污染开发者机器与 CI 临时区",
+      "technical_impact": "本次审计自身在 Windows 上即观察到 pytest 退出时的 PermissionError(临时目录清理被占用句柄阻断)",
+      "blast_radius": "四个测试文件",
+      "exploitability_or_trigger": "测试失败或句柄泄漏",
+      "recommendation": "改用 pytest tmp_path 夹具",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "QA",
+        "person_days_range": "0.5-1",
+        "assumptions": "无"
+      },
+      "verification_method": "运行后临时根目录无残留 tmp* 目录; 失败场景也能清理",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "TEST-4",
+      "title": "基于 sleep 的同步引入时序抖动",
+      "dimension": "testing",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "backend/tests/",
+        "frontend/vite.config.ts"
+      ],
+      "evidence": [
+        "62 处 time.sleep / asyncio.sleep, 集中在 test_screener_run_all_progressive.py(4), test_m1_ssrf_secrets.py(3), test_heavy_job_limiter.py(3), test_multi_client_http.py(3), test_backtest_etf.py(3), test_tier1_data_realtime.py(2), test_mining_lock_admin.py(2)",
+        "frontend/vite.config.ts:56-60 把 vitest testTimeout/hookTimeout 提到 20_000ms, 并注明前端套件'偶发抖动' —— 抖动在仓内是被承认的, 且因为前端套件不进 CI(OPS-1), 该抖动也从未被度量"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "在高负载 CI runner 上红绿翻动, 难以区分真实回归与时序错过",
+      "root_cause": "用固定 sleep 替代事件/条件等待",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "门禁信号可信度下降",
+      "technical_impact": "部分第三方阻塞调用难以干净 await",
+      "blast_radius": "六个最差文件 + 前端套件",
+      "exploitability_or_trigger": "CI runner 负载升高",
+      "recommendation": "用事件/条件等待(threading.Event, asyncio.Event, 带截止时间的轮询)替换 sleep, 并提高超时上限而非延长 sleep",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "QA",
+        "person_days_range": "2-3",
+        "assumptions": "先处理最差的六个文件"
+      },
+      "verification_method": "在被加载的 runner 上把受影响文件跑 20 次, 要求 0 次抖动",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "TEST-5",
+      "title": "Windows 专属行为只在手工挑选的 CI 子集中覆盖",
+      "dimension": "testing",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        ".github/workflows/ci.yml",
+        "backend/app/logfile.py"
+      ],
+      "evidence": [
+        ".github/workflows/ci.yml:73-90 的 windows-mining-lock 作业只跑 11 个指定文件(test_mining_process_lock/test_mining_lock_admin/test_mining_lock_http/test_main_mining_lifespan/test_desktop_startup/test_spa_static_routes/test_data_dir_upgrade/test_macos_data_dir/test_windows_installer_contract/test_docker_data_dir/test_enriched_generation)",
+        "ci.yml:20-38 的 backend 作业只在 ubuntu-latest 上跑, 其余 Windows 敏感文件(test_m1_edge_auth_security/test_m1_ssrf_secrets/test_mining_manager/test_logging_setup/test_atomic_write_retry/test_data_dir_upgrade)从不在 Windows 上执行",
+        "backend/app/logfile.py:32-58 明确记录 Windows 轮转会抛 WinError 32 并因此实现 StallSafeRotatingFileHandler —— 该行为在 CI 上只在 Linux 被验证"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "文件锁、轮转、路径编码、安装包契约等 Windows 回归直达用户而 CI 无信号",
+      "root_cause": "主桌面平台覆盖最弱",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "桌面版(Windows)是项目主力平台, 却是 CI 覆盖最弱的平台",
+      "technical_impact": "给 backend 作业增加 windows-latest 的第二条 matrix leg 会使 CI 时长约翻倍",
+      "blast_radius": "Windows 部署",
+      "exploitability_or_trigger": "Windows 专属路径回归",
+      "recommendation": "为 backend 增加 windows-latest 的第二条 matrix leg(或至少给文件系统/加锁/编码路径打标签做子集)",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "CI+QA",
+        "person_days_range": "1-2",
+        "assumptions": "需为 Windows 专属失败做分诊"
+      },
+      "verification_method": "一个 Windows 专属缺陷(如轮转改名失败)能让 Windows leg 失败",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "TEST-6",
+      "title": "可观测性内部单元有测试, 但其接入应用的装配路径没有测试",
+      "dimension": "testing",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        "backend/tests/test_watchdog.py",
+        "backend/tests/test_logging_setup.py",
+        "backend/tests/test_events.py",
+        "backend/app/main.py"
+      ],
+      "evidence": [
+        "backend/tests/test_watchdog.py:33-40 用注入的探针驱动 HealthWatchdog 并断言 exits == [70] —— 但从未断言 main.py 真的启动了看门狗",
+        "backend/app/main.py:198-199 设置 app.state.indicators_ready 与 repo._on_warmup_done, 但无测试断言 lifespan 里 start_watchdog 被调用或 settings.watchdog_enabled 被遵守",
+        "backend/tests/test_logging_setup.py:37-60 只在隔离环境断言轮转/迁移, 无测试断言 main.py/desktop.py 调用了 attach_rotating_log",
+        "backend/tests/test_events.py 覆盖票据生命周期与总线语义, 未覆盖 SSE 端点的心跳分帧"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "从 lifespan 里移除看门狗或日志处理器, 全部单测仍绿, 而进程会静默楔死 —— 正是看门狗被写出来要防的那次故障",
+      "root_cause": "只测了被测单元, 没测它在应用生命周期里的装配",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "自愈能力可能静默失效",
+      "technical_impact": "lifespan 测试需谨慎重置单例以避免跨测试污染",
+      "blast_radius": "自愈与日志链路",
+      "exploitability_or_trigger": "重构 lifespan 时删掉看门狗/日志挂载",
+      "recommendation": "补 lifespan 级断言: 启用时 app.state.watchdog 非 None; 启动后根 logger 上挂着轮转 handler",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "QA+backend",
+        "person_days_range": "1-2",
+        "assumptions": "需要可控的单例重置"
+      },
+      "verification_method": "从 lifespan 删除 start_watchdog 后, 新测试必须失败",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "FE-01",
+      "title": "指数页切换指数后展示上一只指数的日K",
+      "dimension": "frontend",
+      "status": "CONFIRMED",
+      "severity": "High",
+      "priority": "P1",
+      "confidence": "High",
+      "affected_components": [
+        "frontend/src/pages/Indices.tsx"
+      ],
+      "evidence": [
+        "frontend/src/pages/Indices.tsx:102-108 daily 查询的 placeholderData: (prev) => prev —— 无条件复用上一份数据",
+        "frontend/src/pages/Indices.tsx:85 topRows 来自静态 PINNED_INDEXES (:59-64), :133 selectedInfo 恒为新标的的名称",
+        "frontend/src/pages/Indices.tsx:134 chartRows 取自 daily.data?.rows, 而 :255-256 把 chartRows 与 selectedSymbol 一起交给 LightweightDaily",
+        "仓内已有正确范式: frontend/src/lib/kline.ts:25-28 placeholderData 内置'仅同 symbol 占位'守卫, 另见 custom/limit-ladder/Page.tsx:1562 与 custom/monitor/Page.tsx:172",
+        "同文件 :135 分钟行已经用 daily.data?.symbol === selectedSymbol 做了口径校验, 日K 行却没有"
+      ],
+      "reproduction_steps": "1) 打开指数页并选中上证指数; 2) 等待其日K 返回; 3) 点击左侧切换到深证成指; 4) 在新请求返回之前, 图表仍显示上证指数的 K 线, 标题已是深证成指",
+      "symptom": "标题正确、数据错误 —— 用户会把一只指数的 OHLC 读成另一只的",
+      "root_cause": "placeholderData 缺少维度守卫, 且 chartRows 未按响应标的过滤",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "违反 CONTRIBUTING §7 (切换后不得把上一上下文的缓存结果当作当前结果); 指数页是固定展示层, 错值直接影响判断",
+      "technical_impact": "仅前端展示层; 不影响落盘数据",
+      "blast_radius": "指数页的日K 图表",
+      "exploitability_or_trigger": "切换指数且新请求尚未返回",
+      "recommendation": "placeholderData 按 prevQuery.queryKey[1] === selectedSymbol 守卫(复用 lib/kline.ts 既有范式), 并让 chartRows 仅在 daily.data?.symbol === selectedSymbol 时渲染",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "frontend",
+        "person_days_range": "0.25",
+        "assumptions": "api.indexDaily 的响应已带 symbol (api.ts:3457)"
+      },
+      "verification_method": "新增 frontend/src/pages/Indices.symbolSwitch.test.tsx: 修复前断言失败(实际显示 '2026-09-09,2026-09-10'), 修复后通过; 既有 Indices.test.tsx 仍绿",
+      "rollback_strategy": "回滚 Indices.tsx 即恢复旧行为",
+      "residual_risk": "FE-02 的同类问题在看板页, 因该文件存在用户未提交改动, 本次未触碰",
+      "remediation_status": "IMPLEMENTED"
+    },
+    {
+      "id": "FE-02",
+      "title": "看板切换日期后展示上一交易日的大盘快照",
+      "dimension": "frontend",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "frontend/src/pages/Dashboard.tsx"
+      ],
+      "evidence": [
+        "frontend/src/pages/Dashboard.tsx:82-86 overview 查询 placeholderData: (prev) => prev",
+        "frontend/src/pages/Dashboard.tsx:43 selectedDate 由用户经 DatePicker 改变 (:276-280)",
+        "frontend/src/pages/Dashboard.tsx:203 currentDate = selectedDate ?? data.as_of ?? '' —— 日期标签已是新日期, 而 data 仍是旧快照"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "改日期后, 宽度计数、分布直方图、情绪雷达、涨跌停家数、涨跌幅榜与概念/行业排名整体显示上一交易日的值",
+      "root_cause": "与 FE-01 同类: 占位数据缺少日期维度守卫",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "应用首页的日期切换是高频操作, 错值范围覆盖整个市场总览",
+      "technical_impact": "backend/app/api/overview.py 按 as_of 缓存 5 秒, 陈旧窗口等于请求时延",
+      "blast_radius": "看板页",
+      "exploitability_or_trigger": "切换日期且新请求未返回",
+      "recommendation": "placeholderData 按 prevQuery.queryKey[1] === (selectedDate ?? 'latest') 守卫",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "frontend",
+        "person_days_range": "0.25",
+        "assumptions": "QK.overviewMarket 的键结构需确认"
+      },
+      "verification_method": "vitest: 断言跨日期变更时 overview-market 数据不被沿用",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "frontend/src/pages/Dashboard.tsx 存在用户未提交改动, 本次为避免覆盖用户工作未修改该文件",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "FE-03",
+      "title": "fmtPct 同名不同义, 且 api.ts 未标注指数涨跌幅单位",
+      "dimension": "frontend",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "frontend/src/lib/format.ts",
+        "frontend/src/pages/Indices.tsx",
+        "frontend/src/components/SectorRotationCard.tsx",
+        "frontend/src/lib/api.ts"
+      ],
+      "evidence": [
+        "frontend/src/lib/format.ts:27-31 fmtPct = 小数制 ×100",
+        "frontend/src/pages/Indices.tsx:49-52 同名 fmtPct = 已是百分数, 不乘 100",
+        "frontend/src/components/SectorRotationCard.tsx:263-266 第三个 fmtPct = 小数制 ×100",
+        "backend/app/services/quote_service.py:1300-1302 '统一转成百分比输出 (前端指数侧不×100)'",
+        "frontend/src/lib/api.ts:415-430 (IndexQuote) 与 :532-570 (OverviewMarket.indices) 未标注 change_pct 单位, 而 :1136 明确标注股票侧为'小数制'",
+        "当前所有指数调用点实际用对了: Layout.tsx:145,157 与 components/dashboard/shared.tsx:28-38 用 fmtIndexPct, custom/review/Page.tsx:44-51 用 fmtPctAlready 并注明'不要 *100'"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "当前无错误数字 —— 缺陷是同一个名字在两处含义相反, 且类型层不携带单位",
+      "root_cause": "命名未区分口径, 且单位只存在于注释而非类型/命名",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "§3.1 要求单位正确性可在变量名/类型中证明; 一次把局部 fmtPct 换成共享实现的常规重构就会产生 100 倍错误",
+      "technical_impact": "潜伏缺陷, 尚无线上错误",
+      "blast_radius": "指数展示层",
+      "exploitability_or_trigger": "重构时误用同名工具函数",
+      "recommendation": "删除 pages/Indices.tsx:49 的局部实现, 改从 components/dashboard/shared.tsx 引入 fmtIndexPct; 在 IndexQuote.change_pct 与 OverviewMarket.indices 上补单位注释('百分数值, 3.66=3.66%, 勿×100')",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "frontend",
+        "person_days_range": "0.25",
+        "assumptions": "无"
+      },
+      "verification_method": "单测断言 fmtPct(0.0366) === '+3.66%' 且 fmtIndexPct(3.66) === '+3.66%'",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "FE-04",
+      "title": "运行时页面插件只有错误边界, 没有能力边界",
+      "dimension": "frontend",
+      "status": "CONFIRMED",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "High",
+      "affected_components": [
+        "frontend/src/extensions/runtime.tsx",
+        "frontend/src/main.tsx",
+        "frontend/src/extensions/ExtensionBoundary.tsx",
+        "backend/app/api/ext_pages.py"
+      ],
+      "evidence": [
+        "frontend/src/extensions/runtime.tsx:174 const impl = importModule ? importModule(url) : import(/* @vite-ignore */ url) —— 上传的 bundle 在宿主 origin 下作为模块执行",
+        "frontend/src/main.tsx:83 installTspExtBridge({ api, QK, cn, format, ui: stockPreviewUi }) → runtime.tsx:195 把包含全部端点的 api 封装挂到 window.__TSP_EXT__",
+        "frontend/src/extensions/ExtensionBoundary.tsx:17-27 只捕获 React 渲染/副作用错误",
+        "backend/app/api/ext_pages.py:168-193 以 text/javascript 提供 /api/ext-pages/{pack_id}/bundle.js, 无内容沙箱",
+        "frontend/page-pack-template/src/tsp.ts:5-30 对外宣称'api 为宿主完整 API 封装'"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "已启用的页面包可直接 fetch 任意 /api/ (含破坏性端点), 绕过 api.ts 的 30 秒超时、ApiError、localizeApiError 与 main.tsx:37-49 的全局 401 跳登录拦截",
+      "root_cause": "扩展注册表校验了 id/路由/路径冲突, 但没有任何能力约束; 文档也未声明运行时包是可信代码",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "本地单用户面板下影响的是用户自身数据; 页面包亦可来自外部扩展包 (backend/app/api/ext_pages.py:88-107)",
+      "technical_impact": "同源脚本无法真正沙箱化, import() 没有隔离",
+      "blast_radius": "启用页面包后的整个前端会话",
+      "exploitability_or_trigger": "启用任一外部页面包",
+      "recommendation": "(a) 在 docs/secondary-development.md §3 写明信任模型; (b) 把 PagePackCtx.api 收窄为冻结的只读白名单而非整个封装; (c) 启用非 frontend/src/custom/ 构建的包前要求显式用户确认",
+      "dependencies": [
+        "SEC-007"
+      ],
+      "estimated_effort": {
+        "role": "frontend+backend",
+        "person_days_range": "1-2",
+        "assumptions": "可用组合既有 api 成员构造白名单封装, 无需后端改动"
+      },
+      "verification_method": "新增 frontend/src/extensions/ 下 vitest, 断言安装后的 bridge 只暴露白名单键",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "FE-05",
+      "title": "登录回跳参数未校验, 构成开放重定向",
+      "dimension": "frontend",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        "frontend/src/pages/Auth.tsx",
+        "frontend/src/main.tsx"
+      ],
+      "evidence": [
+        "frontend/src/pages/Auth.tsx:53-54 const redirect = new URLSearchParams(window.location.search).get('redirect') || '/'; navigate(redirect, { replace: true })",
+        "frontend/src/main.tsx:46-47 只产出同源编码路径, 但消费方信任 URL 参数",
+        "构造 http://127.0.0.1:3018/login?redirect=//evil.example 会让 navigate 推入协议相对路径",
+        "凭证不泄漏: 会话 Cookie 是 HttpOnly; SameSite=Lax (backend/app/api/auth.py:176-188), 且前端不把 token 存 localStorage (已 grep 确认无 document.cookie/auth_token/Authorization 存储)"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "登录成功后跳转到站外地址",
+      "root_cause": "外部输入直接用作路由目标, 未限定为同源相对路径",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "钓鱼风险; 无凭证泄漏",
+      "technical_impact": "前端单点, 修复成本极低",
+      "blast_radius": "登录页",
+      "exploitability_or_trigger": "攻击者构造带 redirect 的登录链接",
+      "recommendation": "跳转前校验: 必须匹配 /^\\/(?!\\/)/, 否则回退到 '/'",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "frontend",
+        "person_days_range": "0.25",
+        "assumptions": "把校验抽成 Auth.tsx 旁的纯函数便于单测"
+      },
+      "verification_method": "vitest 覆盖该校验函数的正反用例",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "FE-06",
+      "title": "告警查询键分裂 + 看板无条件 10 秒轮询",
+      "dimension": "frontend",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "Medium",
+      "affected_components": [
+        "frontend/src/components/dashboard/widgets.tsx",
+        "frontend/src/custom/monitor/Page.tsx",
+        "frontend/src/lib/queryKeys.ts"
+      ],
+      "evidence": [
+        "frontend/src/components/dashboard/widgets.tsx:393-397 queryKey: ['alerts', ''] 且 refetchInterval: 10000",
+        "frontend/src/custom/monitor/Page.tsx:166 queryKey: [...QK.alerts(filter === 'all' ? undefined : filter), extColumnsParam ?? ''] → ['alerts','','']",
+        "两处调用的是同一后端端点 api.alertsList (frontend/src/lib/api.ts:5107)"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "同一份告警数据存在两个缓存条目, 产生重复并发请求; 看板那份无视可见性与交易时段无条件每 10 秒轮询",
+      "root_cause": "告警查询键在注册表之外手写, 且轮询策略未统一到可感知可见性/时段的实现",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "§6.3 (相同数据优先共享缓存) 与 §7 (实时刷新不应盲目轮询)",
+      "technical_impact": "前端层面, 影响请求数",
+      "blast_radius": "看板与监控页",
+      "exploitability_or_trigger": "两页同时打开",
+      "recommendation": "两处键都改为由 QK.alerts(source) 加共享 limit 维度生成; 看板的 refetchInterval 改为按可见性与交易时段的轮询(参照 pages/Screener.tsx 的实现)",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "frontend",
+        "person_days_range": "0.5",
+        "assumptions": "无"
+      },
+      "verification_method": "扩展 useSharedQueries.test.tsx, 断言每个 (source, limit) 组合只有一个缓存条目",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "FE-07",
+      "title": "全量 echarts 导入使 manualChunks 的 tree-shaking 失效",
+      "dimension": "frontend",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        "frontend/vite.config.ts",
+        "frontend/src/custom/paper/Page.tsx",
+        "frontend/src/lib/echarts.ts"
+      ],
+      "evidence": [
+        "frontend/vite.config.ts:58-60 if (id.includes('echarts')) return 'echarts' —— 全部 echarts 模块汇入同一 chunk",
+        "frontend/src/lib/echarts.ts:1-25 正确使用 echarts/core + 按需 echarts/charts / components / renderers",
+        "frontend/src/custom/paper/Page.tsx:18 import * as echarts from 'echarts' —— 拉入完整库, 使按需导入的收益归零",
+        "本次实测构建: echarts chunk 822.23 kB (gzip 270.42 kB), 主 chunk index-*.js 909.39 kB (gzip 479.86 kB), vite 对 >500 kB chunk 给出告警"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "任何 echarts 路由都会加载包含全部图表类型的 822 kB chunk",
+      "root_cause": "一处全量导入抵消了既有的按需导入配置",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "首屏与路由切换的下载体积; 移动端/弱网环境更明显",
+      "technical_impact": "构建体积为实测值",
+      "blast_radius": "前端包体",
+      "exploitability_or_trigger": "访问任意使用 echarts 的路由",
+      "recommendation": "把 custom/paper/Page.tsx 改为使用 @/lib/echarts, 并在 lib/echarts.ts 中注册其额外需要的图表类型",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "frontend",
+        "person_days_range": "0.5-1",
+        "assumptions": "paper 页所需图表类型多数已注册"
+      },
+      "verification_method": "pnpm build 后对比 echarts chunk 体积前后差异",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "FE-08",
+      "title": "内联 queryKey 未集中, 且 screenerStrategies 键与工厂语义错位",
+      "dimension": "frontend",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        "frontend/src/pages/Screener.tsx",
+        "frontend/src/lib/queryKeys.ts",
+        "frontend/src/custom/paper/Page.tsx",
+        "frontend/src/components/screener/DefaultStrategyParamsDialog.tsx"
+      ],
+      "evidence": [
+        "frontend/src/pages/Screener.tsx:191 queryKey: [...QK.screenerStrategies('all'), 'all'] —— 工厂是 screenerStrategies(assetType='stock', timeframe='1d') (lib/queryKeys.ts:80), 键实际为 ['screener-strategies','all','1d','all'], 而请求是 api.screenerStrategies(undefined, 'all') 即 timeframe='all'; 键的第 2 位仍写着 '1d'",
+        "同一手写数组重复出现在 frontend/src/pages/Screener.tsx:1464,1481, frontend/src/components/screener/DefaultStrategyParamsDialog.tsx:48, frontend/src/custom/paper/Page.tsx:212,1268,1825, frontend/src/custom/paper/StrategyExecutionPanel.tsx:38",
+        "本次逐个核对了这些内联键, 未发现结果维度缺失(标的/市场/日期/起止/训练测试步长/资产类型均在), 因此不是陈旧缓存缺陷"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "键不再描述请求, 且不可见于 lib/queryPersist.ts 的 PERSISTABLE_KEY_ROOTS 与 SSE_INVALIDATE_PREFIXES",
+      "root_cause": "注册表是约定而非强制",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "未来给 screenerStrategies 增加参数时, 这六处会静默错键",
+      "technical_impact": "结构性问题, 当前无功能故障",
+      "blast_radius": "筛选策略列表相关页面",
+      "exploitability_or_trigger": "查询键工厂签名变更",
+      "recommendation": "在 queryKeys.ts 增加 screenerStrategiesAll: () => ['screener-strategies','all','all'] 并替换六处拼接; 其余内联键在触及时逐个迁入 QK",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "frontend",
+        "person_days_range": "0.5",
+        "assumptions": "DefaultStrategyParamsDialog.test.tsx 已固定当前键形状, 需同步更新"
+      },
+      "verification_method": "vitest 断言 QK.screenerStrategiesAll() 等于 ['screener-strategies','all','all']",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    },
+    {
+      "id": "FE-09",
+      "title": "api.ts 之外的裸 fetch 绕过统一封装",
+      "dimension": "frontend",
+      "status": "CONFIRMED",
+      "severity": "Low",
+      "priority": "P3",
+      "confidence": "High",
+      "affected_components": [
+        "frontend/src/lib/uiPrefs.ts",
+        "frontend/src/custom/global-analysis/client.ts",
+        "frontend/src/custom/assistant/client.ts",
+        "frontend/src/custom/assistant/store.ts",
+        "frontend/src/custom/paper/executionClient.ts"
+      ],
+      "evidence": [
+        "frontend/src/lib/uiPrefs.ts:117-121 void fetch(ENDPOINT, { method: 'PUT', ... }).catch(() => {}) —— 静默吞掉 401; :144 fetch('/api/settings/preferences', ...)",
+        "frontend/src/custom/global-analysis/client.ts:115,133",
+        "frontend/src/custom/assistant/client.ts:69,85,100",
+        "frontend/src/custom/assistant/store.ts:132,146",
+        "frontend/src/custom/paper/executionClient.ts:50",
+        "这些调用都没有经过 frontend/src/lib/api.ts:61 request()"
+      ],
+      "reproduction_steps": "见 evidence: 按引用代码路径触发",
+      "symptom": "得不到 30 秒中止超时、ApiError、localizeApiError 与 401→跳登录拦截(该拦截器只挂在 TanStack QueryCache/MutationCache 上, 见 main.tsx:37-49); uiPrefs.ts 按设计吞掉 401, 于是偏好同步静默停止",
+      "root_cause": "散落的请求地址绕开了统一请求层",
+      "root_cause_status": "VERIFIED",
+      "business_impact": "§7 (禁止组件直接散落请求地址); 实际症状是会话过期后这些界面进入无提示的死路",
+      "technical_impact": "前端层面",
+      "blast_radius": "偏好设置与三个自定义页",
+      "exploitability_or_trigger": "会话过期",
+      "recommendation": "这些调用改走 api.ts 的 request()(或在 api.ts 导出 api.uiPrefsPut / api.preferencesRaw), 继承超时/错误/401 处理",
+      "dependencies": [],
+      "estimated_effort": {
+        "role": "frontend",
+        "person_days_range": "0.5-1",
+        "assumptions": "assistant/global-analysis 的端点是后端扩展路由, 仍可经共享封装调用"
+      },
+      "verification_method": "既有 lib/uiPrefs vitest + 新增断言 401 会触发全局跳转",
+      "rollback_strategy": "回滚该提交; 本次改动均为纯代码路径修复, 无数据迁移",
+      "residual_risk": "修复后残余风险低; 未覆盖的相邻路径需在后续迭代复核",
+      "remediation_status": "OPEN"
+    }
+  ]
+}

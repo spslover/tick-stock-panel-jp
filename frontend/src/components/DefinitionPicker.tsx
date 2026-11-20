@@ -11,6 +11,7 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { FlaskConical, Loader2, Search, SearchX } from 'lucide-react'
 import { api } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import type { DefinitionsCatalogItem, DefinitionSmokeResult } from '@/lib/api'
 import { QK } from '@/lib/queryKeys'
 
@@ -21,7 +22,8 @@ type Kind = 'signal' | 'factor'
 
 /** 依赖列 chips: 超出 3 个折叠为 +N, 悬停看全量。 */
 function DepChips({ deps }: { deps: string[] }) {
-  if (deps.length === 0) return <span className="text-[11px] text-muted">无依赖</span>
+  const { tx } = useI18n()
+  if (deps.length === 0) return <span className="text-[11px] text-muted">{tx('无依赖')}</span>
   const visible = deps.slice(0, 3)
   const rest = deps.length - visible.length
   return (
@@ -36,13 +38,14 @@ function DepChips({ deps }: { deps: string[] }) {
 
 /** 单条冒烟结果: ok 绿勾 / issues 逐条红字。 */
 function SmokeResultView({ r }: { r: DefinitionSmokeResult }) {
+  const { tx } = useI18n()
   if (r.ok) {
     return (
       <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-accent">
-        <span>冒烟通过</span>
-        {r.warmup_bars != null && <span className="text-muted">预热 {r.warmup_bars} bars</span>}
+        <span>{tx('冒烟通过')}</span>
+        {r.warmup_bars != null && <span className="text-muted">{tx('预热 {n} bars', { n: r.warmup_bars })}</span>}
         {r.dependencies.length > 0 && (
-          <span className="text-muted">依赖 {r.dependencies.join(', ')}</span>
+          <span className="text-muted">{tx('依赖')} {r.dependencies.join(', ')}</span>
         )}
       </div>
     )
@@ -63,6 +66,7 @@ export function DefinitionPicker({ kinds = ['signal', 'factor'], onSelect, selec
   onSelect?: (item: DefinitionsCatalogItem) => void
   selectedId?: string
 }) {
+  const { tx } = useI18n()
   const [search, setSearch] = useState('')
   const [kindFilter, setKindFilter] = useState<Kind | 'all'>(kinds.length === 1 ? kinds[0] : 'all')
   const [smokeOf, setSmokeOf] = useState<string | null>(null)  // 当前展开冒烟结果的 id
@@ -113,7 +117,7 @@ export function DefinitionPicker({ kinds = ['signal', 'factor'], onSelect, selec
                     : 'text-muted hover:bg-elevated hover:text-foreground'
                 }`}
               >
-                {k === 'all' ? `全部 ${counts.signal + counts.factor}` : `${KIND_LABEL[k]} ${counts[k]}`}
+                {k === 'all' ? `${tx('全部')} ${counts.signal + counts.factor}` : `${tx(KIND_LABEL[k])} ${counts[k]}`}
               </button>
             ))}
           </div>
@@ -123,7 +127,7 @@ export function DefinitionPicker({ kinds = ['signal', 'factor'], onSelect, selec
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="搜索 id 或名称…"
+            placeholder={tx('搜索 id 或名称…')}
             className="w-full rounded-btn border border-border bg-surface py-1.5 pl-8 pr-2.5 text-xs text-foreground placeholder:text-muted focus:border-accent/40 focus:outline-none"
           />
         </div>
@@ -132,14 +136,13 @@ export function DefinitionPicker({ kinds = ['signal', 'factor'], onSelect, selec
       {/* 目录列表 */}
       {listQ.isLoading ? (
         <div className="flex items-center justify-center gap-2 py-8 text-xs text-muted">
-          <Loader2 className="h-4 w-4 animate-spin" /> 加载定义目录…
-        </div>
+          <Loader2 className="h-4 w-4 animate-spin" /> {tx('加载定义目录…')}</div>
       ) : listQ.isError ? (
-        <div className="py-8 text-center text-xs text-danger">定义目录加载失败, 请刷新重试</div>
+        <div className="py-8 text-center text-xs text-danger">{tx('定义目录加载失败, 请刷新重试')}</div>
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center gap-1.5 py-8 text-xs text-muted">
           <SearchX className="h-4 w-4" />
-          {search || kindFilter !== 'all' ? '没有匹配的定义' : '暂无自定义信号 / 因子 — 可在信号库或因子库中创建, 或从配置备份导入'}
+          {search || kindFilter !== 'all' ? tx('没有匹配的定义') : tx('暂无自定义信号 / 因子 — 可在信号库或因子库中创建, 或从配置备份导入')}
         </div>
       ) : (
         <div className="space-y-1.5">
@@ -163,7 +166,7 @@ export function DefinitionPicker({ kinds = ['signal', 'factor'], onSelect, selec
                   <span className={`shrink-0 rounded-full px-1.5 py-px text-[10px] ${
                     it.kind === 'signal' ? 'bg-accent/10 text-accent' : 'bg-secondary/10 text-secondary'
                   }`}>
-                    {KIND_LABEL[it.kind]}
+                    {tx(KIND_LABEL[it.kind])}
                   </span>
                   <span className="min-w-0 truncate text-xs font-medium text-foreground" title={it.id}>
                     {it.label}
@@ -171,16 +174,16 @@ export function DefinitionPicker({ kinds = ['signal', 'factor'], onSelect, selec
                   <span className="shrink-0 truncate font-mono text-[10px] text-muted" title={it.id}>{it.id}</span>
                   <span className="ml-auto flex shrink-0 items-center gap-1.5">
                     {it.lang && LANG_LABEL[it.lang] && (
-                      <span className="rounded-full bg-elevated px-1.5 py-px text-[10px] text-muted">{LANG_LABEL[it.lang]}</span>
+                      <span className="rounded-full bg-elevated px-1.5 py-px text-[10px] text-muted">{tx(LANG_LABEL[it.lang])}</span>
                     )}
                     {it.timeframe && it.timeframe !== 'daily' && (
                       <span className="rounded-full bg-elevated px-1.5 py-px text-[10px] text-muted">{it.timeframe}</span>
                     )}
                     {it.kind === 'signal' && it.enabled === false && (
-                      <span className="rounded-full bg-warning/10 px-1.5 py-px text-[10px] text-warning">已停用</span>
+                      <span className="rounded-full bg-warning/10 px-1.5 py-px text-[10px] text-warning">{tx('已停用')}</span>
                     )}
                     {it.archived && (
-                      <span className="rounded-full bg-muted/15 px-1.5 py-px text-[10px] text-muted" title="已归档 (仍在参与计算), 可在对应库的档案库恢复">已归档</span>
+                      <span className="rounded-full bg-muted/15 px-1.5 py-px text-[10px] text-muted" title={tx('已归档 (仍在参与计算), 可在对应库的档案库恢复')}>{tx('已归档')}</span>
                     )}
                     {it.kind === 'factor' && it.status && it.status !== 'active' && (
                       <span className="rounded-full bg-elevated px-1.5 py-px text-[10px] text-muted">{it.status}</span>
@@ -188,24 +191,23 @@ export function DefinitionPicker({ kinds = ['signal', 'factor'], onSelect, selec
                     <button
                       onClick={(e) => { e.stopPropagation(); smokeM.mutate(it) }}
                       disabled={smoking}
-                      title="冒烟: 校验 → 编译 → 依赖可解析 (不跑回测)"
+                      title={tx('冒烟: 校验 → 编译 → 依赖可解析 (不跑回测)')}
                       className="inline-flex items-center gap-1 rounded-btn border border-border px-2 py-1 text-[10px] text-muted transition-colors hover:border-accent/30 hover:text-accent disabled:opacity-50"
                     >
                       {smoking ? <Loader2 className="h-3 w-3 animate-spin" /> : <FlaskConical className="h-3 w-3" />}
-                      冒烟
-                    </button>
+                      {tx('冒烟')}</button>
                   </span>
                 </div>
 
                 {/* 元信息行: 依赖 / 预热 / 坏定义错误 */}
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
                   {it.error ? (
-                    <span className="text-[11px] text-danger" title={it.error}>定义异常: {it.error}</span>
+                    <span className="text-[11px] text-danger" title={it.error}>{tx('定义异常:')} {it.error}</span>
                   ) : (
                     <>
                       <DepChips deps={it.dependencies ?? []} />
                       {it.warmup_bars != null && (
-                        <span className="text-[10px] text-muted">预热 {it.warmup_bars} bars</span>
+                        <span className="text-[10px] text-muted">{tx('预热 {n} bars', { n: it.warmup_bars })}</span>
                       )}
                     </>
                   )}

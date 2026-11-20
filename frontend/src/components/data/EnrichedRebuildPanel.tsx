@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/useSharedQueries'
 
@@ -18,6 +19,7 @@ export function EnrichedRebuildPanel({
   purpose = 'enriched',
   historicalShareRows = 0,
 }: Props) {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const prefs = usePreferences()
   const batchSize = prefs.data?.enriched_batch_size ?? 1000
@@ -28,8 +30,8 @@ export function EnrichedRebuildPanel({
   const [hint, setHint] = useState<string | null>(null)
 
   function clampAndSave(raw: number) {
-    if (isNaN(raw) || 1 > raw) { setHint('已自动设为最小值 1'); saveBatch.mutate(1); return }
-    if (raw > 10000) { setHint('已自动设为上限 10000'); saveBatch.mutate(10000); return }
+    if (isNaN(raw) || 1 > raw) { setHint(tx('已自动设为最小值 1')); saveBatch.mutate(1); return }
+    if (raw > 10000) { setHint(tx('已自动设为上限 10000')); saveBatch.mutate(10000); return }
     setHint(null); saveBatch.mutate(raw)
   }
 
@@ -53,8 +55,8 @@ export function EnrichedRebuildPanel({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-xs font-medium text-foreground">批次大小</div>
-            <div className="text-[10px] text-muted">每批计算的标的数量，影响内存占用与进度粒度</div>
+            <div className="text-xs font-medium text-foreground">{tx('批次大小')}</div>
+            <div className="text-[10px] text-muted">{tx('每批计算的标的数量，影响内存占用与进度粒度')}</div>
           </div>
           {editing ? (
             <div className="flex items-center gap-1.5">
@@ -76,28 +78,26 @@ export function EnrichedRebuildPanel({
                 disabled={saveBatch.isPending}
                 className="px-2 py-1 text-[10px] rounded-btn bg-accent/15 text-accent hover:bg-accent/25 disabled:opacity-50 transition-colors"
               >
-                {saveBatch.isPending ? '…' : '保存'}
+                {saveBatch.isPending ? '…' : tx('保存')}
               </button>
               <button
                 onClick={() => setEditing(false)}
                 className="px-2 py-1 text-[10px] rounded-btn bg-elevated text-muted hover:text-foreground transition-colors"
               >
-                取消
-              </button>
+                {tx('取消')}</button>
             </div>
           ) : (
             <button
               onClick={() => { setDraftSize(String(batchSize)); setEditing(true) }}
               className="px-2.5 py-1 rounded-btn border border-border bg-surface text-xs font-mono text-foreground hover:border-accent/50 transition-colors tabular-nums"
             >
-              {batchSize} 只/批
+              {tx('{n} 只/批', { n: batchSize })}
             </button>
           )}
         </div>
         <div className="flex items-start gap-1.5 px-3 py-1.5 rounded-btn bg-warning/10 border border-warning/20">
           <span className="text-[10px] text-warning leading-relaxed">
-            每批内存占用 = 批次大小 × 日K历史天数。批次越大或日K历史越长，内存占用越高，可能导致程序崩溃。内存不足时请适当降低此值。
-          </span>
+            {tx('每批内存占用 = 批次大小 × 日K历史天数。批次越大或日K历史越长，内存占用越高，可能导致程序崩溃。内存不足时请适当降低此值。')}</span>
         </div>
         {hint && (
           <div className="px-3 py-1 rounded-btn bg-accent/10 border border-accent/20 text-[10px] text-accent">
@@ -114,14 +114,14 @@ export function EnrichedRebuildPanel({
               : 'border-warning/20 bg-warning/10 text-warning'
           }`}>
             {canRebuild
-              ? `已检测到 ${historicalShareRows.toLocaleString()} 条历史股本记录。重算会按公告可用日匹配历史流通股本，并覆盖全部 Enriched 分区。`
-              : '未检测到历史股本数据，请先在财务概况页面同步“股本表”，再执行重算。'}
+              ? tx('已检测到 {n} 条历史股本记录。重算会按公告可用日匹配历史流通股本，并覆盖全部 Enriched 分区。', { n: historicalShareRows.toLocaleString() })
+              : tx('未检测到历史股本数据，请先在财务概况页面同步“股本表”，再执行重算。')}
           </div>
         )}
         <div className="text-[10px] text-muted mb-2">
           {isTurnoverRebuild
-            ? '为保证数据一致性，将基于现有日 K、除权因子和历史股本重新生成 Enriched；其他指标也会按当前逻辑同步更新。'
-            : '基于已有 kline_daily + adj_factor 全量计算前复权 + 技术指标 + 信号'}
+            ? tx('为保证数据一致性，将基于现有日 K、除权因子和历史股本重新生成 Enriched；其他指标也会按当前逻辑同步更新。')
+            : tx('基于已有 kline_daily + adj_factor 全量计算前复权 + 技术指标 + 信号')}
         </div>
         <button
           onClick={() => rebuild.mutate()}
@@ -129,14 +129,14 @@ export function EnrichedRebuildPanel({
           className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-btn bg-accent/90 text-white text-xs font-medium hover:bg-accent disabled:opacity-40 disabled:pointer-events-none transition-colors duration-150"
         >
           {rebuild.isPending ? (
-            <><Loader2 className="h-3 w-3 animate-spin" />计算中…</>
+            <><Loader2 className="h-3 w-3 animate-spin" />{tx('计算中…')}</>
           ) : (
-            <>{isTurnoverRebuild ? '重新计算并覆盖' : '全量计算'}</>
+            <>{isTurnoverRebuild ? tx('重新计算并覆盖') : tx('全量计算')}</>
           )}
         </button>
         {rebuild.isError && (
           <div className="mt-2 text-[10px] text-danger">
-            启动失败：{String((rebuild.error as Error)?.message ?? rebuild.error)}
+            {tx('启动失败：{v}', { v: String((rebuild.error as Error)?.message ?? rebuild.error) })}
           </div>
         )}
       </div>

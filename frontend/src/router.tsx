@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18n'
 import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate, useSearchParams } from 'react-router-dom'
 import { Layout } from './components/Layout'
@@ -56,8 +57,13 @@ const CORE_ROUTE_PATHS = new Set([
 finalizeFrontendExtensions(CORE_ROUTE_PATHS)
 const frontendExtensionRoutes = getFrontendExtensionRoutes()
 const frontendExtensionErrors = getFrontendExtensionLoadErrors()
+
+// 扩展加载失败是启动期诊断信息: 放进函数里调用, 避免模块级 tx() 把语言冻结在导入那一刻
+function reportExtensionLoadErrors(errors: unknown[]): void {
+  console.error(tx('部分前端扩展加载失败'), errors)
+}
 if (frontendExtensionErrors.length > 0) {
-  console.error('部分前端扩展加载失败', frontendExtensionErrors)
+  reportExtensionLoadErrors(frontendExtensionErrors)
 }
 
 // 旧链接兼容: 挖掘已并入因子页 (/factors?tab=mining), 保留 run/candidate 等参数重定向

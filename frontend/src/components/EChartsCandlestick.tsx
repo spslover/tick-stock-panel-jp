@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useMemo } from 'react'
 import { chartTheme, getTheme, useTheme } from '@/lib/theme'
-import { fmtPct, pricePrecision } from '@/lib/format'
+import { compactNumber, fmtPct, pricePrecision } from '@/lib/format'
 import * as echarts from '@/lib/echarts'
 import type { ECharts, EChartsOption } from '@/lib/echarts'
 
@@ -31,9 +31,7 @@ export interface SubChartDef {
 // ===== 成交量 N 日均量 =====
 function fmtVol(v: number | null | undefined): string {
   if (v == null) return '—'
-  if (v >= 1e8) return (v / 1e8).toFixed(2) + tx('亿')
-  if (v >= 1e4) return (v / 1e4).toFixed(0) + tx('万')
-  return v.toFixed(0)
+  return compactNumber(v)
 }
 
 function fmtVolumeRatio(value: number | null, digits = 2): string {

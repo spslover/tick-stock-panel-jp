@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { MissingCapChip } from '@/lib/capability-labels'
 
@@ -36,7 +37,7 @@ export function ExtendHistoryPanel({ hasCap, isRunning, earliestDate, onStart }:
 
   return (
     <div className="px-4 pb-4 pt-3 border-t border-accent/20 space-y-3">
-      <div className="text-[10px] text-secondary">向前扩展历史数据</div>
+      <div className="text-[10px] text-secondary">{tx('向前扩展历史数据')}</div>
 
       <div className="flex items-center gap-2">
         <div className="flex items-center">
@@ -63,15 +64,15 @@ export function ExtendHistoryPanel({ hasCap, isRunning, earliestDate, onStart }:
               className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${
                 unit === u ? 'bg-accent/15 text-accent' : 'text-secondary hover:bg-elevated'
               }`}
-            >{u === 'month' ? '月' : '年'}</button>
+            >{u === 'month' ? tx('月') : tx('年')}</button>
           ))}
         </div>
       </div>
 
       {estimate && (
         <div className="text-[10px] text-muted">
-          预计扩展至 <span className="font-mono text-secondary">{estimate}</span>
-          {earliestDate && <span> (当前最早: <span className="font-mono text-secondary">{earliestDate}</span>)</span>}
+          {tx('预计扩展至')} <span className="font-mono text-secondary">{estimate}</span>
+          {earliestDate && <span> {tx('(当前最早:')} <span className="font-mono text-secondary">{earliestDate}</span>)</span>}
         </div>
       )}
 
@@ -83,10 +84,9 @@ export function ExtendHistoryPanel({ hasCap, isRunning, earliestDate, onStart }:
         {extend.isPending ? (
           <>
             <Loader2 className="h-3 w-3 animate-spin" />
-            请求中…
-          </>
+            {tx('请求中…')}</>
         ) : (
-          <>获取数据</>
+          <>{tx('获取数据')}</>
         )}
       </button>
 

@@ -11,8 +11,8 @@ import { PHRASES_EN, PHRASES_JA } from '@/locales/phrases'
  * 回归护栏（已登记文案）：**凡是已经登记进词库的**键/短语，都必须同时有英文与日文译文。
  *
  * 范围说明（不要夸大本文件的保证）：
- * - 本文件只校验「已登记」的 key/短语；缺词时 tx()/t() 会静默回退中文，
- *   界面出现“半中文”，这里会判定失败。
+ * - 本文件校验「源码里每个 t()/tx() 调用」都有英文与日文译文（同一行多处 tx() 会逐个检查）；
+ *   缺词时 tx()/t() 会静默回退中文，界面出现“半中文”，这里会判定失败。
  * - 但**未登记的硬编码中文**（压根没走 t()/tx() 的字面量）对本文件完全不可见。
  *   那类问题由 i18n.hardcoded.test.ts 扫描渲染位置来拦，两条护栏缺一不可。
  */
@@ -81,19 +81,22 @@ describe('i18n 翻译覆盖率', () => {
       fs.readFileSync(file, 'utf8')
         .split(/\r?\n/)
         .forEach((line, index) => {
-          const match = line.match(/\btx\(\s*'((?:[^'\\]|\\.)*)'/)
-          if (!match) return
-          // 源码里的 \n / \r / \t 在运行时是真实字符, 需先还原再与词库键比较
-          const phrase = match[1]
-            .replace(/\\'/g, "'")
-            .replace(/\\n/g, '\n')
-            .replace(/\\r/g, '\r')
-            .replace(/\\t/g, '\t')
-          if (!Object.prototype.hasOwnProperty.call(PHRASES_EN, phrase)) {
-            missingEn.push(`${rel}:${index + 1} ${phrase}`)
-          }
-          if (!Object.prototype.hasOwnProperty.call(PHRASES_JA, phrase)) {
-            missingJa.push(`${rel}:${index + 1} ${phrase}`)
+          // 一行里可能有多处 tx(), 必须逐个检查 —— 只查第一处会漏掉未登记的短语
+          const re = /\btx\(\s*'((?:[^'\\]|\\.)*)'/g
+          let match: RegExpExecArray | null
+          while ((match = re.exec(line)) !== null) {
+            // 源码里的 \n / \r / \t 在运行时是真实字符, 需先还原再与词库键比较
+            const phrase = match[1]
+              .replace(/\\'/g, "'")
+              .replace(/\\n/g, '\n')
+              .replace(/\\r/g, '\r')
+              .replace(/\\t/g, '\t')
+            if (!Object.prototype.hasOwnProperty.call(PHRASES_EN, phrase)) {
+              missingEn.push(`${rel}:${index + 1} ${phrase}`)
+            }
+            if (!Object.prototype.hasOwnProperty.call(PHRASES_JA, phrase)) {
+              missingJa.push(`${rel}:${index + 1} ${phrase}`)
+            }
           }
         })
     }
@@ -131,6 +134,23 @@ describe('i18n 翻译覆盖率', () => {
     }
     for (const file of files) {
       if (fs.readFileSync(file, 'utf8').includes('\uFFFD')) bad.push(path.relative(repo, file))
+    }
+    expect(bad).toEqual([])
+  })
+
+  it('日文译文不含中文专用词 —— 日语里不能直接留中文词', () => {
+    // 这些词在日语里基本不使用(标准说法不同): 行情/板块/回测/数据/涨停…
+    // 出现在日文译文中就说明翻译时把中文原样留在了日文里, 界面会出现半中半日
+    const ZH_ONLY = [
+      '行情', '板块', '回测', '数据', '涨幅', '跌幅', '盘中', '盘后', '涨停', '跌停',
+      '炸板', '翘板', '连板', '五档', '档口', '挂单', '委托', '持仓', '仓位', '加仓',
+      '减仓', '满仓', '空仓', '浮盈', '浮亏', '复权', '除权', '打板', '龙头', '题材',
+      '个股', '大盘', '尾盘', '开盘', '收盘', '量价', '涨跌',
+    ]
+    const bad: string[] = []
+    for (const [key, value] of Object.entries(PHRASES_JA)) {
+      const hit = ZH_ONLY.filter(w => value.includes(w))
+      if (hit.length) bad.push(`${key} -> ${hit.join(',')}`)
     }
     expect(bad).toEqual([])
   })

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18n'
 import type {
   FactorBacktestResult,
   FactorBatchItem,
@@ -34,7 +35,7 @@ export function factorResultCandidate(
   const factorName = String(result.config.factor_name)
   return {
     kind: 'factor',
-    name: `${label}候选`,
+    name: tx('{v}候选', { v: label }),
     source_id: factorName,
     config: {
       factor_name: factorName,
@@ -61,7 +62,7 @@ export function factorBatchCandidate(
 ): ResearchCandidateCreate {
   return {
     kind: 'factor',
-    name: `${item.label}候选`,
+    name: tx('{v}候选', { v: item.label }),
     source_id: item.factor_name,
     config: {
       factor_name: item.factor_name,
@@ -86,7 +87,7 @@ export function strategyResultCandidate(result: StrategyBacktestResult): Researc
   const sourceId = String(result.config.strategy_id || result.strategy_info?.id || '')
   return {
     kind: 'strategy',
-    name: `${result.strategy_info?.name || sourceId}候选`,
+    name: tx('{v}候选', { v: result.strategy_info?.name || sourceId }),
     source_id: sourceId,
     config: pickConfig({ ...result.config, strategy_id: sourceId }, STRATEGY_CONFIG_FIELDS),
     metrics: {

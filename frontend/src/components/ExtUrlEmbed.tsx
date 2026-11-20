@@ -1,3 +1,4 @@
+import { useI18n } from '@/lib/i18n'
 /**
  * URL 嵌入型扩展页面 — 整页内嵌外部 http(s) 页面。
  *
@@ -12,16 +13,16 @@ import { ExternalLink, Link2, ShieldAlert } from 'lucide-react'
 import { sanitizeExtUrl } from '@/components/dashboard/layout'
 
 export function ExtUrlEmbed({ label, url }: { label: string; url: string }) {
+  const { tx } = useI18n()
   const safeUrl = sanitizeExtUrl(url)
 
   if (!safeUrl) {
     return (
       <div className="mx-auto max-w-xl rounded-card border border-border bg-surface p-8 text-center">
         <ShieldAlert className="mx-auto h-6 w-6 text-accent" />
-        <h2 className="mt-3 text-lg font-semibold text-foreground">无法嵌入该地址</h2>
+        <h2 className="mt-3 text-lg font-semibold text-foreground">{tx('无法嵌入该地址')}</h2>
         <p className="mt-2 text-sm leading-6 text-secondary">
-          嵌入地址仅支持 http(s) 且不能是本站自身。请到「设置 → 页面管理 → 扩展页面」修改该页面的 URL。
-        </p>
+          {tx('嵌入地址仅支持 http(s) 且不能是本站自身。请到「设置 → 页面管理 → 扩展页面」修改该页面的 URL。')}</p>
         <p className="mt-1 break-all font-mono text-xs text-muted">{url}</p>
       </div>
     )
@@ -43,10 +44,9 @@ export function ExtUrlEmbed({ label, url }: { label: string; url: string }) {
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex shrink-0 items-center gap-1 rounded-btn px-2 py-1 text-xs text-secondary transition-colors hover:bg-elevated hover:text-foreground"
-          title="在新窗口打开"
+          title={tx('在新窗口打开')}
         >
-          <ExternalLink className="h-3.5 w-3.5" />新窗口打开
-        </a>
+          <ExternalLink className="h-3.5 w-3.5" />{tx('新窗口打开')}</a>
       </div>
       <iframe
         src={safeUrl}
@@ -57,8 +57,7 @@ export function ExtUrlEmbed({ label, url }: { label: string; url: string }) {
         className="min-h-0 w-full flex-1 border-0 bg-white"
       />
       <div className="shrink-0 px-3 py-1 text-[10px] text-muted/60">
-        若长时间空白, 该站点可能禁止被嵌入 (X-Frame-Options), 请用右上角新窗口打开
-      </div>
+        {tx('若长时间空白, 该站点可能禁止被嵌入 (X-Frame-Options), 请用右上角新窗口打开')}</div>
     </section>
   )
 }

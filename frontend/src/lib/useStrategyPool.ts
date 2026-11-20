@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { replaceEqualDeep, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { api, type StrategyLibraryMeta, type StrategyPoolGroup, type StrategyPoolSnapshot } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { storage } from '@/lib/storage'
 import { invalidateStrategyLibrary, notifyStrategyLibraryChanged } from '@/lib/strategyLibrary'
@@ -92,7 +93,7 @@ export function useStrategyPool() {
       await mutate(op, refreshLibrary)
       if (successMsg) toast(successMsg, 'success')
     } catch (error) {
-      toast(`${errorHint}：${error instanceof Error ? error.message : '请重试'}`, 'error')
+      toast(`${errorHint}：${error instanceof Error ? error.message : tx('请重试')}`, 'error')
       await qc.invalidateQueries({ queryKey: QK.strategyPool })
     }
   }, [qc, mutate])
@@ -118,7 +119,7 @@ export function useStrategyPool() {
       storage.strategyPoolV2Migrated.set(true)
     }).catch(error => {
       // 不标记完成、不改旧池。刷新/重新进入时可重试, 避免网络抖动变成永久丢池。
-      toast(`策略池迁移失败：${error instanceof Error ? error.message : '请重试'}`, 'error')
+      toast(tx('策略池迁移失败：{v}', { v: error instanceof Error ? error.message : tx('请重试') }), 'error')
     })
   }, [qc, settle, shadowSync])
 
@@ -140,11 +141,11 @@ export function useStrategyPool() {
   const groupNames = useMemo(() => new Map(groups.map(g => [g.id, g.name])), [groups])
 
   const addToPool = useCallback((id: string) => {
-    void run(() => api.strategyPoolAdd(id), '加入策略池失败')
+    void run(() => api.strategyPoolAdd(id), tx('加入策略池失败'))
   }, [run])
 
   const removeFromPool = useCallback((id: string) => {
-    void run(() => api.strategyPoolRemove(id), '移出策略池失败')
+    void run(() => api.strategyPoolRemove(id), tx('移出策略池失败'))
   }, [run])
 
   const reorderPool = useCallback((newOrder: string[]) => {
@@ -152,23 +153,23 @@ export function useStrategyPool() {
       const current = qc.getQueryData<StrategyPoolSnapshot>(QK.strategyPool)
       // 此入口还用于整组入/出池、清空和撤销, 必须保留完整替换语义。
       return api.strategyPoolSetEntries(newOrder, false, current?.revision)
-    }, '调整策略池顺序失败')
+    }, tx('调整策略池顺序失败'))
   }, [qc, run])
 
   const archiveStrategy = useCallback((id: string) => {
-    void run(() => api.strategyPoolArchiveStrategy(id), '归档失败', '已归档，可在左侧「档案库」恢复', true)
+    void run(() => api.strategyPoolArchiveStrategy(id), tx('归档失败'), tx('已归档，可在左侧「档案库」恢复'), true)
   }, [run])
 
   const unarchiveStrategy = useCallback((id: string) => {
-    void run(() => api.strategyPoolUnarchiveStrategy(id), '恢复失败', undefined, true)
+    void run(() => api.strategyPoolUnarchiveStrategy(id), tx('恢复失败'), undefined, true)
   }, [run])
 
   const discardRecord = useCallback((id: string) => {
-    void run(() => api.strategyPoolDiscardRecord(id), '移出档案库失败', undefined, true)
+    void run(() => api.strategyPoolDiscardRecord(id), tx('移出档案库失败'), undefined, true)
   }, [run])
 
   const setStrategyGroup = useCallback((id: string, group: string | null) => {
-    void run(() => api.strategyPoolSetStrategyGroup(id, group), '调整分组失败', undefined, true)
+    void run(() => api.strategyPoolSetStrategyGroup(id, group), tx('调整分组失败'), undefined, true)
   }, [run])
 
   const createGroup = useCallback(async (name: string) => {
@@ -198,7 +199,7 @@ export function useStrategyPool() {
       const current = qc.getQueryData<StrategyPoolSnapshot>(QK.strategyPool)!
       const next = current.pool.filter(id => validSet.has(id))
       return next.length === current.pool.length ? current : api.strategyPoolSetEntries(next, false, current.revision)
-    }, '清理失效策略失败')
+    }, tx('清理失效策略失败'))
   }, [qc, run])
 
   /** 策略被删除后的级联清理: 移出池并删除库级记录 (尽力而为, 不报错打扰)。 */

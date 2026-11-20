@@ -224,7 +224,7 @@ function RhPromoBanner() {
   })
   // 折扣区间来自实时模型定价 (与设置页共用 60s 缓存); 取不到时回退到集中的兜底文案
   const items = useSponsorModelItems()
-  const range = (items && discountRangeLabel(items)) ?? DEEPSEEK_FALLBACK_RANGE
+  const range = (items && discountRangeLabel(items)) ?? tx(DEEPSEEK_FALLBACK_RANGE)
   if (dismissed) return null
   const snooze = () => {
     setDismissed(true)

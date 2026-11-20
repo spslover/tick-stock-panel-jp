@@ -169,7 +169,7 @@ export function StrategyWalkForward() {
         <div>
           <label className="mb-1.5 block text-xs font-medium text-secondary">{tx('优化目标')}</label>
           <select value={objective} onChange={e => setObjective(e.target.value)} className={INPUT_CLS}>
-            {PRIMARY_OBJECTIVES.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+            {PRIMARY_OBJECTIVES.map(o => <option key={o.id} value={o.id}>{tx(o.label)}</option>)}
           </select>
         </div>
 

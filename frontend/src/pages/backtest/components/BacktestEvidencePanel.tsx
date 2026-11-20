@@ -46,7 +46,7 @@ export function BacktestEvidencePanel({ evidence }: { evidence?: BacktestEvidenc
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-xs">
           <ScanSearch className="h-4 w-4 shrink-0 text-secondary" aria-hidden="true" />
           <span className="font-medium text-foreground">{tx('未来数据检查')}</span>
-          <span className={color}>{STATUS_LABELS[lookahead.status]}</span>
+          <span className={color}>{tx(STATUS_LABELS[lookahead.status])}</span>
         </div>
         <button type="button" onClick={() => exportEvidence(evidence)} className="inline-flex items-center gap-1 rounded-btn border border-border px-2 py-1 text-xs text-secondary hover:text-accent">
           <Download className="h-3 w-3" aria-hidden="true" />{tx('导出核查报告')}</button>

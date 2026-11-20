@@ -288,7 +288,7 @@ export function SettingsSystemPanel() {
               }}
               className="w-44 h-8 px-1.5 rounded-btn border border-border bg-base text-xs text-foreground disabled:opacity-50"
             >
-              {soundOptions.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+              {soundOptions.map(s => <option key={s.key} value={s.key}>{tx(s.label)}</option>)}
             </select>
             <button
               onClick={() => previewSound(soundType)}

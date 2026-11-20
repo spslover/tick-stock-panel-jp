@@ -2,6 +2,7 @@ import { useLayoutEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, ChevronRight, Folder, FolderOpen } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { tx } from '@/lib/i18n'
 
 export function NavFolder({ label, active, expanded, rail, popupOpen, onToggle, onPopupChange, children, indicators }: {
   label: string; active: boolean; expanded: boolean; rail: boolean; popupOpen: boolean
@@ -60,7 +61,7 @@ export function NavFolder({ label, active, expanded, rail, popupOpen, onToggle, 
     {!rail && expanded && <div id={id} className="relative mt-0.5 space-y-0.5 pl-6">
       <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-3 border-l border-border/60" />{children}
     </div>}
-    {rail && popupOpen && createPortal(<div ref={panel} id={id} role="dialog" aria-label={`${label}子菜单`} tabIndex={-1}
+    {rail && popupOpen && createPortal(<div ref={panel} id={id} role="dialog" aria-label={tx('{v}子菜单', { v: label })} tabIndex={-1}
       onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) onPopupChange(false) }}
       style={position} className="fixed z-[100] w-60 max-h-[min(70vh,32rem)] overflow-y-auto rounded-xl border border-border bg-surface p-2 shadow-xl">
       <div className="px-3 py-2 text-xs font-medium text-muted">{label}</div>{children}

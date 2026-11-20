@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18n'
 import type { QuoteFreshness } from './api'
 
 /** Advance the server's live verdict without requests, including a silent SSE outage. */
@@ -31,13 +32,13 @@ export function quoteFreshnessLabel(info: QuoteFreshness): string {
     timeZone: 'Asia/Shanghai', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
   }).format(info.quote_ts)
   switch (info.state) {
-    case 'live': return time ? `更新 ${time}` : '实时行情'
-    case 'stale': return `数据过期${day ? ` · ${day}` : ''}`
-    case 'delayed': return `更新延迟${time ? ` · ${time}` : ''}`
-    case 'historical': return `历史行情${day ? ` · ${day}` : ''}`
-    case 'paused': return '行情已暂停'
-    case 'disabled': return '实时未开启'
-    case 'missing': return '待行情'
-    default: return '时间未确认'
+    case 'live': return time ? tx('更新 {t}', { t: time }) : tx('实时行情')
+    case 'stale': return tx('数据过期{d}', { d: day ? ` · ${day}` : '' })
+    case 'delayed': return tx('更新延迟{d}', { d: time ? ` · ${time}` : '' })
+    case 'historical': return tx('历史行情{d}', { d: day ? ` · ${day}` : '' })
+    case 'paused': return tx('行情已暂停')
+    case 'disabled': return tx('实时未开启')
+    case 'missing': return tx('待行情')
+    default: return tx('时间未确认')
   }
 }

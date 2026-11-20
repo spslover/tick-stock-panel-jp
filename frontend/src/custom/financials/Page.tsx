@@ -32,7 +32,7 @@ const TABLE_ICON: Record<string, typeof FileText> = {
 }
 
 export function Financials() {
-  const { tx } = useI18n()
+  const { tx, locale } = useI18n()
   const { data: caps } = useCapabilities()
   const { data: matrix } = useCapabilityMatrix()
   const { data: status, isLoading } = useFinancialStatus()
@@ -101,8 +101,7 @@ export function Financials() {
                 rel="noreferrer"
                 className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-accent hover:underline"
               >
-                前往 Issues 推荐
-                <ExternalLink className="h-3 w-3" />
+                {tx('前往 Issues 推荐')}<ExternalLink className="h-3 w-3" />
               </a>
             </div>
           </div>
@@ -123,12 +122,12 @@ export function Financials() {
         // 给用户明确反馈,并清空本次误设的记录。
         if (!r.synced?.started) {
           if (r.synced?.reason === 'already running') {
-            toast('财务数据正在同步中,请稍候', 'success')
+            toast(tx('财务数据正在同步中,请稍候'), 'success')
           } else if (r.synced?.reason === 'no FINANCIAL capability') {
             // 能力未就绪:通常发生在升级/刷新 Key 后调度器状态未同步 —— 提示用户检查 Key
-            toast('财务数据能力未就绪,请检查 API Key 或刷新页面后重试', 'error')
+            toast(tx('财务数据能力未就绪,请检查 API Key 或刷新页面后重试'), 'error')
           } else {
-            toast(`同步未能开始${r.synced?.reason ? `:${r.synced.reason}` : ''}`, 'error')
+            toast(r.synced?.reason ? tx('同步未能开始：{v}', { v: r.synced.reason }) : tx('同步未能开始'), 'error')
           }
           setSyncStartedAt(null)
           setSyncSingleTable(null)
@@ -247,13 +246,13 @@ export function Financials() {
                         ) : (
                           <TIcon className={`h-3.5 w-3.5 ${hasData ? 'text-accent' : 'text-muted'}`} />
                         )}
-                        <span className="text-xs font-medium text-foreground">{label}</span>
+                        <span className="text-xs font-medium text-foreground">{tx(label)}</span>
                       </div>
                       <button
                         className="text-muted hover:text-accent transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                         onClick={() => handleSync(key)}
                         disabled={syncing}
-                        title={syncing ? '正在同步…' : `更新${label}`}
+                        title={syncing ? tx('正在同步…') : tx('更新 {v}', { v: tx(label) })}
                       >
                         {syncing
                           ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -262,16 +261,15 @@ export function Financials() {
                     </div>
                     <div className="mt-2 text-xl font-semibold tabular-nums text-foreground">
                       {fmtBigNum(info?.rows ?? 0)}
-                      <span className="text-[10px] text-muted ml-1 font-normal">行</span>
+                      <span className="text-[10px] text-muted ml-1 font-normal">{tx('行')}</span>
                     </div>
                     <div className="text-[11px] text-muted mt-0.5">
-                      {fmtBigNum(info?.symbols ?? 0)} 只标的
-                    </div>
+                      {fmtBigNum(info?.symbols ?? 0)} {tx('只标的')}</div>
                     <div className="mt-auto pt-2 border-t border-border/40 text-[10px] text-muted flex items-center gap-1">
                       <Clock className="h-2.5 w-2.5 shrink-0" />
                       {lsTime
-                        ? new Date(lsTime).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-                        : '尚未同步'}
+                        ? new Date(lsTime).toLocaleString(locale, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+                        : tx('尚未同步')}
                     </div>
                   </div>
                 )
@@ -287,8 +285,8 @@ export function Financials() {
         ) : !available ? (
           <div className="rounded-card border border-dashed border-border bg-surface px-6 py-14 text-center">
             <Database className="mx-auto h-8 w-8 text-muted" />
-            <div className="mt-3 text-sm text-secondary">暂无财务数据</div>
-            <div className="mt-1 text-xs text-muted">点击右上角"全部同步"从当前数据源拉取</div>
+            <div className="mt-3 text-sm text-secondary">{tx('暂无财务数据')}</div>
+            <div className="mt-1 text-xs text-muted">{tx('点击右上角"全部同步"从当前数据源拉取')}</div>
           </div>
         ) : (
           <>
@@ -303,23 +301,22 @@ export function Financials() {
                   <button
                     onClick={() => setSelected(null)}
                     className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs text-secondary hover:text-foreground rounded-btn border border-border hover:bg-elevated transition-colors shrink-0"
-                    title="清除选择"
+                    title={tx('清除选择')}
                   >
                     <X className="h-3.5 w-3.5" />
-                    清除
-                  </button>
+                    {tx('清除')}</button>
                 </div>
               ) : (
                 // 未选个股:醒目居中引导
                 <div className="flex flex-col items-center gap-3 py-8">
                   <div className="flex items-center gap-2 text-sm text-secondary">
                     <Search className="h-4 w-4 text-accent" />
-                    <span>搜索个股查看详细财务数据</span>
+                    <span>{tx('搜索个股查看详细财务数据')}</span>
                   </div>
                   <div className="w-full max-w-xl">
                     <StockFinancialSearch onSelect={pick} />
                   </div>
-                  <div className="text-[11px] text-muted">支持股票代码或名称模糊匹配，如 600000 / 浦发</div>
+                  <div className="text-[11px] text-muted">{tx('支持股票代码或名称模糊匹配，如 600000 / 浦发')}</div>
                 </div>
               )}
             </div>
@@ -331,8 +328,8 @@ export function Financials() {
               ) : (
                 <EmptyState
                   icon={Search}
-                  title="未选择股票"
-                  hint="在上方搜索框输入股票代码或名称，选择后即可查看该股的核心指标、财务报表与股本历史。"
+                  title={tx('未选择股票')}
+                  hint={tx('在上方搜索框输入股票代码或名称，选择后即可查看该股的核心指标、财务报表与股本历史。')}
                 />
               )}
             </div>

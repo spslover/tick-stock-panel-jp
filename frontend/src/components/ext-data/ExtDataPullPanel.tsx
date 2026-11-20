@@ -723,7 +723,7 @@ function ExtPullConfigDialog({ config, onSaved, onClose }: {
                         ? ['周一', '周二', '周三', '周四', '周五', '周六', '周日'].map((t, i) => [i + 1, t] as [number, string])
                         : Array.from({ length: 31 }, (_, i) => [i + 1, tx('{n} 号', { n: i + 1 })] as [number, string])
                       ).map(([v, t]) => (
-                        <option key={v} value={String(v)}>{t}</option>
+                        <option key={v} value={String(v)}>{tx(t)}</option>
                       ))}
                     </select>
                     <div className="flex items-center gap-1.5">

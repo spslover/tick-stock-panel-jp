@@ -141,7 +141,7 @@ datasets:
 datasets:
   realtime:
     url: https://api.example.com/snapshot
-    pct_unit: percent   # 接口返回 3.66 表示 3.66%;小数制源声明 decimal 或省略
+    pct_unit: percent   # 接口返回 3.66 表示 3.66%;小数制源声明 decimal
 ```
 
 处理规则:
@@ -150,7 +150,7 @@ datasets:
 | --- | --- |
 | `pct_unit: percent` | `change_pct` / `amplitude` / `turnover_rate` 无条件 `/100` |
 | `pct_unit: decimal` | 三列原样透传 |
-| 未声明 | `change_pct` 按截面中位数归一(A 股涨跌停 30% 上限使两种单位物理可分);`amplitude` / `turnover_rate` **置 `None`** 交由 pipeline 按价格与股本口径重算,并记录 WARNING |
+| 未声明 | 不做任何按数值的推断(`0.05` 既是 0.05% 也是 5%,推断会掩盖真实数据错误):`change_pct` 由 `(last_price - prev_close) / prev_close` 重算 —— 价格比值与源端单位无关, 恒为小数制, 缺价格时 **置 `None`**;`amplitude` / `turnover_rate` **置 `None`** 交由 pipeline 按价格与股本口径重算,并记录 WARNING |
 | 列已配置 `transforms` | 视为用户已接管该列单位,原样透传 |
 
 ### depth5 必填

@@ -258,8 +258,8 @@ function GroupColorPicker({
             type="button"
             role="radio"
             aria-checked={selected}
-            aria-label={option.label}
-            title={option.label}
+            aria-label={tx(option.label)}
+            title={tx(option.label)}
             onClick={() => onChange(option.id)}
             className={`inline-flex h-6 w-6 items-center justify-center rounded-full border transition-transform hover:scale-110 ${
               selected

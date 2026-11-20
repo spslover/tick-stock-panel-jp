@@ -1659,7 +1659,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
   const resultRegimeSummary = resultRegimeFilter
     ? [
         resultRegimeFilter.states?.length
-          ? resultRegimeFilter.states.map(state => REGIME_STATE_LABELS[state as keyof typeof REGIME_STATE_LABELS] ?? state).join('/')
+          ? resultRegimeFilter.states.map(state => tx(REGIME_STATE_LABELS[state as keyof typeof REGIME_STATE_LABELS] ?? state)).join('/')
           : null,
         resultRegimeFilter.min_score != null ? tx('最低 {n} 分', { n: resultRegimeFilter.min_score }) : null,
       ].filter(Boolean).join(' · ')
@@ -2260,7 +2260,7 @@ export function StrategyBacktest({ loadCandidate, onLoadConsumed }: {
                   }`}
                   style={active ? { backgroundColor: REGIME_STATE_COLORS[s] } : undefined}>
                   <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: active ? '#fff' : REGIME_STATE_COLORS[s] }} />
-                  {REGIME_STATE_LABELS[s]}
+                  {tx(REGIME_STATE_LABELS[s])}
                 </button>
               )
             })}

@@ -2,14 +2,18 @@ import { Clock } from 'lucide-react'
 import type { QuoteFreshness } from '@/lib/api'
 import { advanceQuoteFreshness, quoteFreshnessLabel } from '@/lib/quote-freshness'
 import { useQuoteClock } from '@/lib/useQuoteClock'
+import { useI18n } from '@/lib/i18n'
 
 export function QuoteFreshnessBadge({ freshness, compact = false }: { freshness?: QuoteFreshness | null; compact?: boolean }) {
+  const { tx } = useI18n()
   const now = useQuoteClock()
   // The original check time survives persisted queries and window reactivation.
   const current = freshness ? advanceQuoteFreshness(freshness, Math.max(0, now - freshness.checked_at)) : null
   if (!current || (compact && current.state === 'live')) return null
   const warning = ['stale', 'delayed', 'missing', 'unknown'].includes(current.state)
-  const title = `${current.message}${current.data_date ? `；数据日期 ${current.data_date}` : ''}`
+  const title = current.data_date
+    ? tx('{m}；数据日期 {d}', { m: tx(current.message), d: current.data_date })
+    : tx(current.message)
   return (
     <span title={title} aria-label={title}
       className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] leading-5 ${warning ? 'text-warning' : 'text-muted'}`}>

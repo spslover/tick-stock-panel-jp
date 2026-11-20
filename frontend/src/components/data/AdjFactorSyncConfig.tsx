@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2, Download, Info } from 'lucide-react'
 import { api } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { MissingCapChip } from '@/lib/capability-labels'
 
@@ -13,6 +14,7 @@ export function AdjFactorSyncConfig({ hasCap, providerDisplay, onJobStart }: {
   providerDisplay: string | null
   onJobStart?: (jobId: string) => void
 }) {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const [starting, setStarting] = useState(false)
 
@@ -31,7 +33,7 @@ export function AdjFactorSyncConfig({ hasCap, providerDisplay, onJobStart }: {
     <div className="px-4 pb-4 pt-3 border-t border-accent/20 space-y-3">
       {/* 生效数据源 */}
       <div className="flex items-center justify-between">
-        <span className="text-xs text-foreground font-medium">生效数据源</span>
+        <span className="text-xs text-foreground font-medium">{tx('生效数据源')}</span>
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-secondary font-mono">{providerDisplay ?? 'TickFlow'}</span>
           {!hasCap && <MissingCapChip capKey="adj_factor" />}
@@ -42,8 +44,8 @@ export function AdjFactorSyncConfig({ hasCap, providerDisplay, onJobStart }: {
       <div className="pt-3 border-t border-border space-y-2">
         <div className="flex items-center gap-1.5">
           <Download className="h-3 w-3 text-secondary" />
-          <span className="text-[11px] text-secondary font-medium">手动同步</span>
-          <span className="text-[10px] text-muted">与盘后管道共用任务槽</span>
+          <span className="text-[11px] text-secondary font-medium">{tx('手动同步')}</span>
+          <span className="text-[10px] text-muted">{tx('与盘后管道共用任务槽')}</span>
         </div>
         <button
           onClick={handleSync}
@@ -51,24 +53,19 @@ export function AdjFactorSyncConfig({ hasCap, providerDisplay, onJobStart }: {
           className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-btn bg-accent/90 text-foreground text-xs font-medium hover:bg-accent disabled:opacity-40 transition-colors duration-150"
         >
           {starting ? (
-            <><Loader2 className="h-3.5 w-3.5 animate-spin" /><span>启动中…</span></>
+            <><Loader2 className="h-3.5 w-3.5 animate-spin" /><span>{tx('启动中…')}</span></>
           ) : (
-            <><Download className="h-3.5 w-3.5" /><span>全历史同步除权因子</span></>
+            <><Download className="h-3.5 w-3.5" /><span>{tx('全历史同步除权因子')}</span></>
           )}
         </button>
         <div className="flex items-start gap-1.5 text-[10px] text-muted leading-relaxed">
           <Info className="h-3 w-3 shrink-0 mt-px" />
           <span>
-            拉取除权事件(等比因子 + 分红/送转/配股明细),窗口按需钳到本地日K起点 —
-            更早的事件对已存价格零影响;因子发生变化的个股自动重算前复权,
-            仅明细回填不触发重算。幂等,可重复执行。
-          </span>
+            {tx('拉取除权事件(等比因子 + 分红/送转/配股明细),窗口按需钳到本地日K起点 — 更早的事件对已存价格零影响;因子发生变化的个股自动重算前复权, 仅明细回填不触发重算。幂等,可重复执行。')}</span>
         </div>
         {providerDisplay == null && (
           <div className="text-[10px] text-muted leading-relaxed">
-            当前路由 TickFlow:只返回等比因子,无事件明细。需要明细时,在
-            设置 → 数据源 将「除权因子」切换到提供明细的数据源后重跑。
-          </div>
+            {tx('当前路由 TickFlow:只返回等比因子,无事件明细。需要明细时,在 设置 → 数据源 将「除权因子」切换到提供明细的数据源后重跑。')}</div>
         )}
       </div>
     </div>

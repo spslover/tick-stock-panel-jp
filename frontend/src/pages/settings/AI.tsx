@@ -104,7 +104,7 @@ const presetMeta = (p: AiPreset) => {
 function SponsorIntro() {
   const { tx } = useI18n()
   const items = useSponsorModelItems()
-  const range = (items && discountRangeLabel(items)) ?? DEEPSEEK_FALLBACK_RANGE
+  const range = (items && discountRangeLabel(items)) ?? tx(DEEPSEEK_FALLBACK_RANGE)
   const maxPct = (items && maxDiscountPct(items)) ?? MAX_DISCOUNT_FALLBACK_PCT
   return (
     <>

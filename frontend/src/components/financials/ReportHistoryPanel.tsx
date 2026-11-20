@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { History, Trash2, FileText, Clock, Sparkles, Loader2 } from 'lucide-react'
 import { useHistoryReports, openHistoryReport, deleteReport, loadHistory } from '@/lib/aiReportStore'
+import { getLocale, tx, useI18n } from '@/lib/i18n'
 import { useActiveTasks } from '@/lib/aiReportStore'
 
 /**
@@ -12,6 +13,7 @@ import { useActiveTasks } from '@/lib/aiReportStore'
  * - 支持删除单条
  */
 export function ReportHistoryPanel() {
+  const { tx } = useI18n()
   const { reports, loaded } = useHistoryReports()
   const activeTasks = useActiveTasks()
 
@@ -33,8 +35,8 @@ export function ReportHistoryPanel() {
     return (
       <div className="rounded-card border border-dashed border-border/50 bg-surface/50 px-6 py-8 text-center">
         <History className="mx-auto h-6 w-6 text-muted/40" />
-        <div className="mt-2 text-xs text-muted">暂无历史分析报告</div>
-        <div className="mt-0.5 text-[10px] text-muted/60">选择个股后点击「AI 财务分析」生成,报告会自动保存在此</div>
+        <div className="mt-2 text-xs text-muted">{tx('暂无历史分析报告')}</div>
+        <div className="mt-0.5 text-[10px] text-muted/60">{tx('选择个股后点击「AI 财务分析」生成,报告会自动保存在此')}</div>
       </div>
     )
   }
@@ -45,10 +47,10 @@ export function ReportHistoryPanel() {
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50 bg-elevated/20">
         <div className="flex items-center gap-2">
           <History className="h-3.5 w-3.5 text-secondary" />
-          <span className="text-xs font-medium text-foreground">历史分析报告</span>
+          <span className="text-xs font-medium text-foreground">{tx('历史分析报告')}</span>
           <span className="text-[10px] text-muted">{reports.length}/20</span>
         </div>
-        <span className="text-[10px] text-muted/60">点击查看 · 报告最多保留 20 条</span>
+        <span className="text-[10px] text-muted/60">{tx('点击查看 · 报告最多保留 20 条')}</span>
       </div>
 
       {/* 列表 */}
@@ -99,7 +101,7 @@ export function ReportHistoryPanel() {
               <button
                 onClick={e => { e.stopPropagation(); deleteReport(r.id) }}
                 className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-danger/10 text-muted hover:text-danger transition-all shrink-0"
-                title="删除"
+                title={tx('删除')}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -116,10 +118,10 @@ function fmtRelative(iso: string): string {
   try {
     const t = new Date(iso).getTime()
     const diff = Date.now() - t
-    if (diff < 60_000) return '刚刚'
-    if (diff < 3600_000) return `${Math.floor(diff / 60_000)} 分钟前`
-    if (diff < 86400_000) return `${Math.floor(diff / 3600_000)} 小时前`
-    if (diff < 7 * 86400_000) return `${Math.floor(diff / 86400_000)} 天前`
-    return new Date(iso).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
+    if (diff < 60_000) return tx('刚刚')
+    if (diff < 3600_000) return tx('{n} 分钟前', { n: Math.floor(diff / 60_000) })
+    if (diff < 86400_000) return tx('{n} 小时前', { n: Math.floor(diff / 3600_000) })
+    if (diff < 7 * 86400_000) return tx('{n} 天前', { n: Math.floor(diff / 86400_000) })
+    return new Date(iso).toLocaleDateString(getLocale(), { month: '2-digit', day: '2-digit' })
   } catch { return '' }
 }

@@ -5,11 +5,12 @@
  * 调用方传 rows 时必须用共享空数组常量 (EMPTY_ROWS), 不要 `?? []` 新建引用。 */
 import { memo } from 'react'
 import type { KlineRow } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 
 export const MiniCandlestick = memo(function MiniCandlestick({ rows, width = 100, height = 80, volume = false }: { rows: KlineRow[]; width?: number; height?: number; volume?: boolean }) {
   // 空数据：返回等尺寸占位（不画内容），保证 kline 加载前后单元格尺寸一致、不闪烁
   if (!rows || rows.length === 0) {
-    return <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="block" aria-label="加载中" />
+    return <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="block" aria-label={tx('加载中')} />
   }
 
   const BULL = '#C74040'

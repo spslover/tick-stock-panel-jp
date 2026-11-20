@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { StrategyDetail, StrategyParamDef } from '@/lib/api'
+import { tx, useI18n } from '@/lib/i18n'
 import { paramDisplayLabel, visibleParams } from '@/lib/strategyParams'
 import { StrategyOptions } from '@/components/StrategyOptions'
 
@@ -60,14 +61,14 @@ function candidateCount(p: StrategyParamDef, s: Sweep): number {
 function sweepError(p: StrategyParamDef, s: Sweep): string | null {
   if (p.type === 'bool' || p.type === 'select') return null
   const lo = Number(s.min), hi = Number(s.max), step = Number(s.step)
-  if (Number.isNaN(lo) || Number.isNaN(hi) || Number.isNaN(step)) return `${p.label}: 范围/步长非法`
-  if (!(step > 0)) return `${p.label}: 步长必须为正`
+  if (Number.isNaN(lo) || Number.isNaN(hi) || Number.isNaN(step)) return tx('{v}: 范围/步长非法', { v: p.label })
+  if (!(step > 0)) return tx('{v}: 步长必须为正', { v: p.label })
   if (hi < lo) return `${p.label}: max < min`
-  if (p.min != null && lo < p.min - 1e-9) return `${p.label}: min 小于允许下限 ${p.min}`
-  if (p.max != null && hi > p.max + 1e-9) return `${p.label}: max 超出允许上限 ${p.max}`
+  if (p.min != null && lo < p.min - 1e-9) return tx('{v}: min 小于允许下限 {m}', { v: p.label, m: p.min })
+  if (p.max != null && hi > p.max + 1e-9) return tx('{v}: max 超出允许上限 {m}', { v: p.label, m: p.max })
   const nSteps = Math.round((hi - lo) / step)
   const last = lo + nSteps * step
-  if (last > hi + 1e-9) return `${p.label}: 步长 ${step} 不整除区间, 末值 ${last.toFixed(4)} 超出 max ${hi}`
+  if (last > hi + 1e-9) return tx('{v}: 步长 {s} 不整除区间, 末值 {l} 超出 max {m}', { v: p.label, s: step, l: last.toFixed(4), m: hi })
   return null
 }
 
@@ -140,9 +141,10 @@ export function StrategySelect({ strategies, value, onChange }: {
   value: string
   onChange: (id: string) => void
 }) {
+  const { tx } = useI18n()
   return (
-    <select aria-label="选择策略" value={value} onChange={e => onChange(e.target.value)} className={INPUT_CLS}>
-      <option value="">选择策略…</option>
+    <select aria-label={tx('选择策略')} value={value} onChange={e => onChange(e.target.value)} className={INPUT_CLS}>
+      <option value="">{tx('选择策略…')}</option>
       <StrategyOptions strategies={strategies} selected={[value]} />
     </select>
   )
@@ -156,13 +158,14 @@ export function SweepParamList({ params, sweeps, updateSweep, hiddenLabels = [] 
   /** 因级联规则 (visible_if) 在默认配置下隐藏的参数标签, 仅作提示 */
   hiddenLabels?: string[]
 }) {
+  const { tx } = useI18n()
   if (!params.length) return null
   return (
     <div>
-      <div className="mb-1.5 text-xs font-medium text-secondary">扫描参数 (勾选后设范围)</div>
+      <div className="mb-1.5 text-xs font-medium text-secondary">{tx('扫描参数 (勾选后设范围)')}</div>
       {hiddenLabels.length > 0 && (
         <div className="mb-1.5 text-[11px] text-muted">
-          {hiddenLabels.length} 个参数因级联规则在默认配置下隐藏，不参与扫描：{hiddenLabels.join('、')}
+          {tx('{n} 个参数因级联规则在默认配置下隐藏，不参与扫描：', { n: hiddenLabels.length })}{hiddenLabels.join('、')}
         </div>
       )}
       <div className="space-y-2">
@@ -176,7 +179,7 @@ export function SweepParamList({ params, sweeps, updateSweep, hiddenLabels = [] 
                 <div className="flex items-center gap-2 text-xs">
                   <span className="font-medium text-muted">{p.label}</span>
                   <span className="text-muted">({p.type})</span>
-                  <span className="text-[11px] text-muted">文本参数不可扫描</span>
+                  <span className="text-[11px] text-muted">{tx('文本参数不可扫描')}</span>
                 </div>
               </div>
             )
@@ -197,7 +200,7 @@ export function SweepParamList({ params, sweeps, updateSweep, hiddenLabels = [] 
               )}
               {s.enabled && !numeric && (
                 <div className="mt-1 text-[11px] text-secondary">
-                  {p.type === 'bool' ? '扫描 [是 / 否]' : `扫描全部选项 (${p.options?.length ?? 0})`}
+                  {p.type === 'bool' ? tx('扫描 [是 / 否]') : tx('扫描全部选项 ({n})', { n: p.options?.length ?? 0 })}
                 </div>
               )}
             </div>
@@ -210,6 +213,7 @@ export function SweepParamList({ params, sweeps, updateSweep, hiddenLabels = [] 
 
 /** 组合数 / 校验提示 (含上限与网格错误告警)。 */
 export function CombosHint({ show, combos, gridError }: { show: boolean; combos: number; gridError?: string | null }) {
+  const { tx } = useI18n()
   if (!show) return null
   const bad = combos > GRID_MAX_COMBINATIONS || !!gridError
   return (
@@ -217,8 +221,8 @@ export function CombosHint({ show, combos, gridError }: { show: boolean; combos:
       {gridError
         ? gridError
         : combos === 0
-          ? '请至少勾选一个参数'
-          : `共 ${combos} 组参数组合${combos > GRID_MAX_COMBINATIONS ? ` — 超过上限 ${GRID_MAX_COMBINATIONS}, 请增大 step 或缩小范围` : ''}`}
+          ? tx('请至少勾选一个参数')
+          : tx('共 {n} 组参数组合{v}', { n: combos, v: combos > GRID_MAX_COMBINATIONS ? tx(' — 超过上限 {m}, 请增大 step 或缩小范围', { m: GRID_MAX_COMBINATIONS }) : '' })}
     </div>
   )
 }

@@ -1,11 +1,12 @@
 import { ExternalLink } from 'lucide-react'
 import type { PluginDataSourceItem } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 import { MarkdownRenderer } from '@/components/financials/MarkdownRenderer'
 
 /** 数据源与扩展管理页共享清单正文，链接不依赖 Key 配置状态。 */
 export function PluginMetadata({ plugin }: { plugin: PluginDataSourceItem }) {
   const links = [
-    { url: plugin.homepage, label: plugin.homepage_label?.trim() || `${plugin.display_name} 官网` },
+    { url: plugin.homepage, label: plugin.homepage_label?.trim() || tx('{v} 官网', { v: plugin.display_name }) },
     { url: plugin.key_manage_url, label: plugin.key_manage_label?.trim() || '管理 Key / 查看账户用量' },
   ].filter(link => link.url)
 

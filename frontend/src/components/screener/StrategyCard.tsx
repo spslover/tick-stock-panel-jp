@@ -1,6 +1,7 @@
 import { Settings2, TrendingDown, RadioTower } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { storage } from '@/lib/storage'
+import { useI18n } from '@/lib/i18n'
 
 // ===== 卡片尺寸 =====
 
@@ -104,6 +105,7 @@ export function StrategyCard({
   loading, cardSize,
   onRun, disabled, onSettings, monitored, onToggleMonitor, timeframeBadge, computing, awaitRun,
 }: StrategyCardProps) {
+  const { tx } = useI18n()
   const cs = CARD_STYLES[cardSize]
   const activeCls = active
     ? 'border-accent/50 bg-accent/10 shadow-[0_0_10px_rgba(59,130,246,0.1)]'
@@ -111,7 +113,7 @@ export function StrategyCard({
   const countCls = count === 0
     ? 'text-muted'
     : 'bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent'
-  const srcLabel = cardSize === 'mini' ? (SRC_MAP[source ?? ''] ?? '自') : (SRC_MAP[source ?? ''] ?? '自定义')
+  const srcLabel = tx(SRC_MAP[source ?? ''] ?? (cardSize === 'mini' ? '自' : '自定义'))
   const badgeCls = BADGE_CLS_MAP[source ?? 'custom'] ?? BADGE_CLS_MAP.custom
 
   // 失效数 > 0 时显示
@@ -142,7 +144,7 @@ export function StrategyCard({
               <div className="mt-1.5 flex items-center gap-2">
                 <div className="flex items-center gap-1">
                   <span className={`text-sm font-mono font-bold tabular-nums ${countCls}`}>{count}</span>
-                  <span className="text-[10px] text-muted">只</span>
+                  <span className="text-[10px] text-muted">{tx('只')}</span>
                 </div>
                 {hasExpired && (
                   <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-red-500/8 border border-red-500/15">
@@ -156,7 +158,7 @@ export function StrategyCard({
               <span className="mt-1.5 text-sm font-mono font-bold text-muted/50 animate-pulse">···</span>
             )}
             {count == null && !loading && !computing && awaitRun && (
-              <span className="mt-1.5 text-[10px] text-muted/60 transition-colors group-hover:text-accent/80" title="自动计算未开启或失败 — 点击卡片实时计算">待计算</span>
+              <span className="mt-1.5 text-[10px] text-muted/60 transition-colors group-hover:text-accent/80" title={tx('自动计算未开启或失败 — 点击卡片实时计算')}>{tx('待计算')}</span>
             )}
             {loading && <div className="mt-1 h-4 w-10 rounded bg-elevated animate-pulse" />}
           </button>
@@ -178,7 +180,7 @@ export function StrategyCard({
                 <span className="text-xs font-mono font-bold text-muted/50 animate-pulse shrink-0">···</span>
               )}
               {count == null && !loading && !computing && awaitRun && (
-                <span className="text-[10px] text-muted/60 transition-colors group-hover:text-accent/80 shrink-0" title="自动计算未开启或失败 — 点击卡片实时计算">待计算</span>
+                <span className="text-[10px] text-muted/60 transition-colors group-hover:text-accent/80 shrink-0" title={tx('自动计算未开启或失败 — 点击卡片实时计算')}>{tx('待计算')}</span>
               )}
               {loading && <span className="w-5 h-3 rounded bg-elevated animate-pulse shrink-0" />}
             </div>
@@ -206,7 +208,7 @@ export function StrategyCard({
               <span className="text-xs font-mono font-bold text-muted/50 animate-pulse">···</span>
             )}
             {count == null && !loading && !computing && awaitRun && (
-              <span className="text-[9px] text-muted/60 transition-colors group-hover:text-accent/80 shrink-0" title="自动计算未开启或失败 — 点击卡片实时计算">待算</span>
+              <span className="text-[9px] text-muted/60 transition-colors group-hover:text-accent/80 shrink-0" title={tx('自动计算未开启或失败 — 点击卡片实时计算')}>{tx('待算')}</span>
             )}
             {hasExpired && (
               <span className="text-[9px] font-mono text-red-400/70">{'-' + expiredCount}</span>
@@ -217,11 +219,11 @@ export function StrategyCard({
       )}
       <div className={cardSize === 'mini' ? 'flex shrink-0 items-center gap-0.5' : 'absolute right-1.5 top-1.5 flex items-center gap-0.5'}>
         {onToggleMonitor && <button onClick={event => { event.stopPropagation(); onToggleMonitor() }}
-          className="relative rounded p-0.5 transition-colors hover:bg-elevated" title={monitored ? '取消策略监控' : '开启策略监控'}>
+          className="relative rounded p-0.5 transition-colors hover:bg-elevated" title={monitored ? tx('取消策略监控') : tx('开启策略监控')}>
           <RadioTower className={`h-3 w-3 transition-colors ${monitored ? 'text-accent' : 'text-muted hover:text-accent'}`} />
           {monitored && <span className="absolute inset-0 rounded bg-accent/20 animate-ping" />}
         </button>}
-        <button onClick={event => { event.stopPropagation(); onSettings() }} title="策略设置" className="rounded p-0.5 transition-colors hover:bg-elevated">
+        <button onClick={event => { event.stopPropagation(); onSettings() }} title={tx('策略设置')} className="rounded p-0.5 transition-colors hover:bg-elevated">
           <Settings2 className="h-3 w-3 text-muted hover:text-accent" />
         </button>
       </div>

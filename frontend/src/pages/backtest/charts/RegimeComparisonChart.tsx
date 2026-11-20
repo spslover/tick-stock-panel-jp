@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { EChartsOption } from 'echarts'
 import { useChartTheme } from '@/lib/theme'
+import { useI18n } from '@/lib/i18n'
 import { useECharts } from './useECharts'
 
 export interface RegimeComparisonRow {
@@ -31,6 +32,7 @@ function escapeHtml(value: string): string {
 }
 
 export function RegimeComparisonChart({ rows }: RegimeComparisonChartProps) {
+  const { tx, locale } = useI18n()
   const ct = useChartTheme()
   const preparedRows = useMemo(() => rows.map(row => {
     const hasEnoughSamples = Number.isFinite(row.nDates) && row.nDates >= 2
@@ -79,11 +81,11 @@ export function RegimeComparisonChart({ rows }: RegimeComparisonChartProps) {
           const state = row.state && row.state !== row.label
             ? `<span style="color:${ct.text}">${escapeHtml(row.state)}</span>`
             : ''
-          const status = row.hasEnoughSamples ? '' : '<div style="margin-top:4px">样本不足</div>'
+          const status = row.hasEnoughSamples ? '' : `<div style="margin-top:4px">${tx('样本不足')}</div>`
           return `<div style="font-size:11px;margin-bottom:5px">${escapeHtml(row.label)} ${state}</div>
-            <div style="display:flex;justify-content:space-between;gap:18px"><span>交易日</span><span style="font-family:monospace">${row.nDates.toLocaleString('zh-CN')}</span></div>
-            <div style="display:flex;justify-content:space-between;gap:18px"><span>收益</span><span style="font-family:monospace">${row.return == null ? '—' : `${(row.return * 100).toFixed(2)}%`}</span></div>
-            <div style="display:flex;justify-content:space-between;gap:18px"><span>最大回撤</span><span style="font-family:monospace">${row.maxDrawdown == null ? '—' : `${(row.maxDrawdown * 100).toFixed(2)}%`}</span></div>
+            <div style="display:flex;justify-content:space-between;gap:18px"><span>${tx('交易日')}</span><span style="font-family:monospace">${row.nDates.toLocaleString('zh-CN')}</span></div>
+            <div style="display:flex;justify-content:space-between;gap:18px"><span>${tx('收益')}</span><span style="font-family:monospace">${row.return == null ? '—' : `${(row.return * 100).toFixed(2)}%`}</span></div>
+            <div style="display:flex;justify-content:space-between;gap:18px"><span>${tx('最大回撤')}</span><span style="font-family:monospace">${row.maxDrawdown == null ? '—' : `${(row.maxDrawdown * 100).toFixed(2)}%`}</span></div>
             <div style="display:flex;justify-content:space-between;gap:18px"><span>Sharpe</span><span style="font-family:monospace">${row.sharpe == null ? '—' : row.sharpe.toFixed(2)}</span></div>${status}`
         },
       },
@@ -109,7 +111,7 @@ export function RegimeComparisonChart({ rows }: RegimeComparisonChartProps) {
       yAxis: [
         {
           type: 'value',
-          name: '比例',
+          name: tx('比例'),
           nameTextStyle: { color: ct.text, fontSize: 10 },
           axisLabel: {
             color: ct.text,
@@ -157,12 +159,12 @@ export function RegimeComparisonChart({ rows }: RegimeComparisonChartProps) {
         },
       ],
     }
-  }, [preparedRows, hasMetrics, ct])
+  }, [preparedRows, hasMetrics, ct, locale])
 
   const chartRef = useECharts(option, [preparedRows, ct])
   const emptyMessage = rows.length === 0
-    ? '暂无市场状态数据'
-    : '样本不足，暂无可比较指标'
+    ? tx('暂无市场状态数据')
+    : tx('样本不足，暂无可比较指标')
 
   return (
     <div className="relative h-[304px] w-full min-w-0 overflow-hidden">
@@ -170,7 +172,7 @@ export function RegimeComparisonChart({ rows }: RegimeComparisonChartProps) {
         ref={chartRef}
         className="h-full w-full min-w-0"
         role="img"
-        aria-label="市场状态指标比较图"
+        aria-label={tx('市场状态指标比较图')}
       />
       {!hasMetrics && (
         <div className="absolute inset-0 flex items-center justify-center bg-surface text-xs text-secondary">

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ShieldCheck, SlidersHorizontal, Waypoints } from 'lucide-react'
+import { useI18n } from '@/lib/i18n'
 import { StrategyOptimizer } from './StrategyOptimizer'
 import { StrategyWalkForward } from './StrategyWalkForward'
 import { StrategyGuardian } from './StrategyGuardian'
@@ -7,6 +8,7 @@ import { StrategyGuardian } from './StrategyGuardian'
 type Mode = 'sensitivity' | 'walkforward' | 'guardian'
 
 export function RobustnessValidation() {
+  const { tx } = useI18n()
   const [mode, setMode] = useState<Mode>('sensitivity')
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -27,7 +29,7 @@ export function RobustnessValidation() {
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
-              {label}
+              {tx(label)}
             </button>
           ))}
         </div>

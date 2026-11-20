@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { boardTag } from '@/components/stock-table/primitives'
 
@@ -18,6 +19,7 @@ interface Props {
  * 模式对齐 Watchlist.StockSearchBox:useQuery + 外部点击关闭 + 键盘导航。
  */
 export function StockFinancialSearch({ onSelect, assetTypes }: Props) {
+  const { tx } = useI18n()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
@@ -76,7 +78,7 @@ export function StockFinancialSearch({ onSelect, assetTypes }: Props) {
         <input
           ref={inputRef}
           type="text"
-          placeholder="输入股票代码或名称，如 600000 / 浦发"
+          placeholder={tx('输入股票代码或名称，如 600000 / 浦发')}
           value={query}
           onChange={(e) => { setQuery(e.target.value); setOpen(true); setActiveIdx(-1) }}
           onFocus={() => { if (trimmed) setOpen(true) }}
@@ -101,12 +103,10 @@ export function StockFinancialSearch({ onSelect, assetTypes }: Props) {
             {search.isLoading ? (
               <div className="px-4 py-6 flex items-center justify-center gap-2 text-xs text-muted">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                搜索中…
-              </div>
+                {tx('搜索中…')}</div>
             ) : results.length === 0 ? (
               <div className="px-4 py-6 text-center text-xs text-muted">
-                未找到匹配的股票
-              </div>
+                {tx('未找到匹配的股票')}</div>
             ) : (
               results.map((r, i) => (
                 <button
@@ -126,7 +126,7 @@ export function StockFinancialSearch({ onSelect, assetTypes }: Props) {
                     )
                   })()}
                   {r.asset_type === 'index' && (
-                    <span className="shrink-0 px-1 py-0.5 rounded text-[10px] leading-none bg-sky-500/10 text-sky-400">指数</span>
+                    <span className="shrink-0 px-1 py-0.5 rounded text-[10px] leading-none bg-sky-500/10 text-sky-400">{tx('指数')}</span>
                   )}
                   {r.code && <span className="text-[10px] text-muted font-mono shrink-0">{r.code}</span>}
                 </button>

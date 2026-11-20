@@ -1,5 +1,6 @@
 /** 扩展专用端点和查询键；原模拟仓继续复用 lib/api 与 QK.paper*。 */
 import { ApiError } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 export interface ExecutionSource {
   strategy_id?: string
   candidate_id?: string
@@ -53,12 +54,12 @@ async function request<T>(account: string, endpoint: string, method = 'GET', bod
     const payload = await response.json().catch(() => null)
     if (!response.ok) {
       const detail = payload?.detail
-      const message = typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map(v => v.msg).join('；') : `策略跟单请求失败 (${response.status})`
-      throw new ApiError(response.status === 401 ? `未登录 (401)：${message}` : message, response.status)
+      const message = typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map(v => v.msg).join('；') : tx('策略跟单请求失败 ({status})', { status: response.status })
+      throw new ApiError(response.status === 401 ? tx('未登录 (401)：{v}', { v: message }) : message, response.status)
     }
     return payload as T
   } catch (error) {
-    if (controller.signal.aborted) throw new Error('策略跟单请求超时，请稍后刷新状态核对结果')
+    if (controller.signal.aborted) throw new Error(tx('策略跟单请求超时，请稍后刷新状态核对结果'))
     throw error
   } finally {
     window.clearTimeout(timeout)
@@ -76,10 +77,10 @@ export const executionApi = {
 
 /** 接受完整回测结果或配置；大体量交易记录不发给后端。 */
 export function sourceFromReport(value: unknown): ExecutionSource {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('请选择有效的策略回测 JSON')
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(tx('请选择有效的策略回测 JSON'))
   const report = value as Record<string, unknown>
-  if (report.error) throw new Error('失败的回测结果不能用于跟单')
+  if (report.error) throw new Error(tx('失败的回测结果不能用于跟单'))
   const config = (report.config ?? report) as Record<string, unknown>
-  if (!config || typeof config !== 'object' || Array.isArray(config) || typeof config.strategy_id !== 'string') throw new Error('回测配置缺少策略 ID')
-  return { config, strategy_info: report.strategy_info as Record<string, unknown> | undefined, label: '导入的回测配置' }
+  if (!config || typeof config !== 'object' || Array.isArray(config) || typeof config.strategy_id !== 'string') throw new Error(tx('回测配置缺少策略 ID'))
+  return { config, strategy_info: report.strategy_info as Record<string, unknown> | undefined, label: tx('导入的回测配置') }
 }

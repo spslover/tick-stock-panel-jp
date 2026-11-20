@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18n'
 import { useSyncExternalStore } from 'react'
 import { api, friendlyStreamError } from './api'
 
@@ -190,7 +191,7 @@ export async function startAnalysis(symbol: string, name: string, focus = ''): P
   // 上限检查
   const ongoing = activeTasks.filter(t => t.phase === 'loading' || t.phase === 'streaming')
   if (ongoing.length >= MAX_ACTIVE) {
-    return { error: `同时进行的分析任务不能超过 ${MAX_ACTIVE} 个,请等待现有任务完成` }
+    return { error: tx('同时进行的分析任务不能超过 {n} 个,请等待现有任务完成', { n: MAX_ACTIVE }) }
   }
 
   const id = `task_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`

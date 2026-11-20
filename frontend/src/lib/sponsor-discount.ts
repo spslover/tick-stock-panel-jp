@@ -9,6 +9,7 @@
  */
 import { useEffect, useState } from 'react'
 import { api, type SponsorModelItem } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 
 const TTL_MS = 60_000
 
@@ -55,7 +56,7 @@ export function useSponsorModelItems(): SponsorModelItem[] | null {
 /** 折扣率 → 中文折数: 0.6 → "6折", 0.35 → "3.5折", 0.3 → "3折" */
 export function fmtFold(rate: number): string {
   const fold = Math.round(rate * 100) / 10
-  return `${Number.isInteger(fold) ? fold : fold.toFixed(1)}折`
+  return tx('{n}折', { n: Number.isInteger(fold) ? fold : fold.toFixed(1) })
 }
 
 /** 模型族折扣区间: 0.3/0.6 → "3-6折"; 单一 0.6 → "6折"; 无折扣数据 → null
@@ -84,7 +85,7 @@ export function bandDiscountLabel(m: SponsorModelItem): string | null {
   const busy = m.busy_discount_rate
   const off = m.offpeak_discount_rate
   if (busy == null || off == null) return null
-  return `忙时${fmtFold(busy)} · 闲时${fmtFold(off)}`
+  return tx('忙时{f} · 闲时{o}', { f: fmtFold(busy), o: fmtFold(off) })
 }
 
 /** 全站最大优惠百分比: 最低折扣 0.3 → 70; 无折扣数据 → null */

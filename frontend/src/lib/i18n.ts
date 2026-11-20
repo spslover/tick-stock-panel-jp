@@ -16,9 +16,9 @@ export const SUPPORTED_LOCALES: readonly {
   nativeLabel: string
   short: string
 }[] = [
-  { code: 'zh-CN', label: '简体中文', nativeLabel: '简体中文', short: '简' },
+  { code: 'zh-CN', label: '简体中文', nativeLabel: '简体中文', short: '简' }, // i18n-exempt: 语言名称按各自的原生写法展示, 不是需要翻译的界面文案
   { code: 'en', label: 'English', nativeLabel: 'English', short: 'EN' },
-  { code: 'ja', label: '日本語', nativeLabel: '日本語', short: '日' },
+  { code: 'ja', label: '日本語', nativeLabel: '日本語', short: '日' }, // i18n-exempt: 同上
 ]
 
 const DICTS = {

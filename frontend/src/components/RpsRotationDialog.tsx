@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Repeat, Sparkles, ArrowDownUp, RefreshCw, AlertCircle } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { api, friendlyStreamError } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { cn } from '@/lib/cn'
 import { fmtPct } from '@/lib/format'
@@ -48,8 +49,9 @@ function rankColorClass(rank: number, total: number): string {
 }
 
 export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
+  const { tx } = useI18n()
   // 维度文案: concept→概念, industry→行业
-  const dimLabel = kind === 'industry' ? '行业' : '概念'
+  const dimLabel = tx(kind === 'industry' ? '行业' : '概念')
   const [days, setDays] = useState(DEFAULT_DAYS)
   const [reversed, setReversed] = useState(false)        // false=高→低, true=低→高
   const [selected, setSelected] = useState<string | null>(null)  // 点中的成员名, 高亮追踪
@@ -73,7 +75,7 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
       for await (const ev of api.rotationAnalyzeStream(daysParam, focusParam, kind, lv)) {
         if (ev.type === 'meta') setAnalysisMeta({ summary: ev.summary })
         else if (ev.type === 'delta') setAnalysis(a => a + (ev.content ?? ''))
-        else if (ev.type === 'error') setAnalysisError(ev.message ?? '未知错误')
+        else if (ev.type === 'error') setAnalysisError(ev.message ?? tx('未知错误'))
         // done: 无操作
       }
     } catch (e) {
@@ -217,9 +219,9 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
             <div className="flex items-center gap-2">
               <Repeat className="h-4 w-4 text-accent" />
-              <span id="rps-rotation-title" className="text-sm font-medium text-foreground">{dimLabel}涨幅轮动</span>
+              <span id="rps-rotation-title" className="text-sm font-medium text-foreground">{dimLabel}{tx('涨幅轮动')}</span>
               <span className="text-[11px] text-muted">
-                {conceptCount > 0 ? `${dates.length} 天 · ${conceptCount} 个${dimLabel}` : '暂无数据'}
+                {conceptCount > 0 ? tx('{days} 天 · {n} 个{label}', { days: dates.length, n: conceptCount, label: dimLabel }) : tx('暂无数据')}
               </span>
               {/* 行业层级选择器: 1/2/3 级, 默认 2 级。仅 kind=industry 显示 */}
               {kind === 'industry' && (
@@ -233,13 +235,12 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
                         level === lv ? 'bg-accent text-white shadow-sm' : 'text-secondary hover:text-foreground',
                       )}
                     >
-                      {lv}级
-                    </button>
+                      {lv}{tx('级')}</button>
                   ))}
                 </div>
               )}
             </div>
-            <button aria-label="关闭" onClick={onClose} className="p-1 rounded hover:bg-elevated transition-colors cursor-pointer">
+            <button aria-label={tx('关闭')} onClick={onClose} className="p-1 rounded hover:bg-elevated transition-colors cursor-pointer">
               <X className="h-4 w-4 text-muted" />
             </button>
           </div>
@@ -249,7 +250,7 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
             {/* 标题栏: 标题 + meta 摘要 + focus 输入 + 触发按钮 */}
             <div className="flex items-center gap-2 px-4 py-1.5 bg-elevated/30 shrink-0">
               <Sparkles className={cn('h-3.5 w-3.5 text-accent/60', analyzing && 'animate-pulse')} />
-              <span className="text-[11px] text-muted shrink-0">AI 轮动分析</span>
+              <span className="text-[11px] text-muted shrink-0">{tx('AI 轮动分析')}</span>
               {analysisMeta?.summary && (
                 <span className="text-[11px] text-accent/80 truncate">{analysisMeta.summary}</span>
               )}
@@ -258,7 +259,7 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
                   type="text"
                   value={focus}
                   onChange={e => setFocus(e.target.value)}
-                  placeholder="关注点(可选)"
+                  placeholder={tx('关注点(可选)')}
                   disabled={analyzing}
                   className="w-28 px-2 py-0.5 text-[11px] bg-elevated/50 border border-border rounded-btn text-foreground placeholder:text-muted/50 focus:outline-none focus:border-accent/40 disabled:opacity-50"
                 />
@@ -273,10 +274,10 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
                   )}
                 >
                   {analyzing
-                    ? <><RefreshCw className="h-3 w-3 animate-spin" />分析中</>
+                    ? <><RefreshCw className="h-3 w-3 animate-spin" />{tx('分析中')}</>
                     : analysis
-                      ? <><RefreshCw className="h-3 w-3" />重新分析</>
-                      : <><Sparkles className="h-3 w-3" />生成分析</>}
+                      ? <><RefreshCw className="h-3 w-3" />{tx('重新分析')}</>
+                      : <><Sparkles className="h-3 w-3" />{tx('生成分析')}</>}
                 </button>
               </div>
             </div>
@@ -290,7 +291,7 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
                   <button
                     onClick={() => runAnalysis(days, focus)}
                     className="ml-auto text-accent hover:underline shrink-0"
-                  >重试</button>
+                  >{tx('重试')}</button>
                 </div>
               ) : analysis || analyzing ? (
                 <div className="px-4 py-2.5 text-[12px] leading-relaxed">
@@ -301,7 +302,7 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
                 </div>
               ) : (
                 <div className="px-4 py-4 text-center text-[11px] text-muted/60">
-                  点击「生成分析」,AI 将从主线研判 / 新晋强势 / 退潮预警 / 机构vs游资 等角度分析最近 {days} 天的概念轮动
+                  {tx('点击「生成分析」,AI 将从主线研判 / 新晋强势 / 退潮预警 / 机构vs游资 等角度分析最近 {n} 天的概念轮动', { n: days })}
                 </div>
               )}
             </div>
@@ -310,7 +311,7 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
           {/* 工具栏 */}
           <div className="flex items-center gap-3 px-4 py-2 border-b border-border shrink-0">
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-muted">天数</span>
+              <span className="text-[11px] text-muted">{tx('天数')}</span>
               <input
                 type="range"
                 min={MIN_DAYS}
@@ -330,17 +331,17 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
                   ? 'bg-accent/10 text-accent border-accent/30'
                   : 'border-border text-muted hover:text-secondary hover:bg-elevated',
               )}
-              title="翻转排序(高↔低)"
+              title={tx('翻转排序(高↔低)')}
             >
               <ArrowDownUp className="h-3 w-3" />
-              {reversed ? '低→高' : '高→低'}
+              {reversed ? tx('低→高') : tx('高→低')}
             </button>
             {selected && (
               <button
                 onClick={() => setSelected(null)}
                 className="text-[11px] text-accent hover:underline cursor-pointer"
               >
-                取消追踪「{selected}」
+                {tx('取消追踪「')}{selected}」
               </button>
             )}
           </div>
@@ -353,11 +354,10 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
               </div>
             ) : error ? (
               <div className="flex items-center justify-center py-16 text-[11px] text-danger">
-                加载失败,请稍后重试
-              </div>
+                {tx('加载失败,请稍后重试')}</div>
             ) : rowCount === 0 ? (
               <div className="flex items-center justify-center py-16 text-[11px] text-muted">
-                暂无{dimLabel}数据,请先在「{kind === 'industry' ? '行业板块' : '概念板块'}」页配置并获取{dimLabel}数据源
+                {tx('暂无数据,请先在「{page}」页配置并获取数据源', { page: kind === 'industry' ? tx('行业板块') : tx('概念板块') })}
               </div>
             ) : (
               <div
@@ -446,8 +446,7 @@ export function RpsRotationDialog({ onClose, kind = 'concept' }: Props) {
           {/* 底部提示 */}
           <div className="px-4 py-1.5 border-t border-border shrink-0">
             <span className="text-[10px] text-muted">
-              每列各自按当日涨幅排序 · 点击单元格追踪概念在各日的排名变化
-            </span>
+              {tx('每列各自按当日涨幅排序 · 点击单元格追踪概念在各日的排名变化')}</span>
           </div>
     </Modal>
   )

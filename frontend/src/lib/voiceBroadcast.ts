@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18n'
 /**
  * 语音播报 — 用浏览器原生 speechSynthesis, 无需依赖/音频文件。
  *
@@ -100,8 +101,8 @@ const MAX_SPEAK = 3  // 单批最多逐条念 3 只, 超出汇总成数量
  *  入参是小数制 (后端 change_pct, 0.0366 = 3.66%), 需 ×100 再念, 与 format.ts 的 fmtPct 一致。 */
 function fmtPctText(pct: number): string {
   const p = pct * 100
-  if (p >= 0) return `涨${p.toFixed(1)}%`
-  return `跌${Math.abs(p).toFixed(1)}%`
+  if (p >= 0) return tx('涨 {v}%', { v: p.toFixed(1) })
+  return tx('跌 {v}%', { v: Math.abs(p).toFixed(1) })
 }
 
 /**
@@ -113,7 +114,7 @@ function fmtPctText(pct: number): string {
  *   price/market/其他: "[名称] [message条件摘要] [涨跌幅]"
  */
 function buildSingleText(a: AlertEvent): string {
-  const name = a.name || '标的'
+  const name = a.name || tx('标的')
   const pctText = a.change_pct != null ? fmtPctText(a.change_pct) : ''
 
   // 板块消息已包含名称、触发条件和当前涨跌幅，避免重复播报。
@@ -129,7 +130,7 @@ function buildSingleText(a: AlertEvent): string {
     }
     const sname = strategyName(a.message ?? '')
     const parts = [name, strategyEventMeta(a.type).action]
-    const strategyText = sname ? `策略「${sname}」` : (a.message || a.rule_name || '')
+    const strategyText = sname ? tx('策略「{v}」', { v: sname }) : (a.message || a.rule_name || '')
     if (strategyText) parts.push(strategyText)
     if (pctText) parts.push(pctText)
     return parts.join(' ')
@@ -162,7 +163,7 @@ function buildText(alerts: AlertEvent[]): string {
   const parts = head.map(buildSingleText)
   let text = parts.join('；')
   if (alerts.length > MAX_SPEAK) {
-    text += `；还有${alerts.length - MAX_SPEAK}只`
+    text += tx('；还有{n}只', { n: alerts.length - MAX_SPEAK })
   }
   return text
 }
@@ -209,7 +210,7 @@ export function stopVoice() {
 }
 
 /** 试听 (设置页点"试听"用) */
-export function previewVoice(text = '语音播报已开启, 这是试听效果') {
+export function previewVoice(text = tx('语音播报已开启, 这是试听效果')) {
   try {
     if (!isVoiceSupported()) return
     activateVoice()

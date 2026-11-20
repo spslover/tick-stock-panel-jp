@@ -5,7 +5,7 @@ import type { ECharts, EChartsOption } from '@/lib/echarts'
 import type { MinuteKlineRow, MinuteKlineSession } from '@/lib/api'
 import { computeIntradayAverage, formatMinuteTime, FULL_DAY_TIMES } from '@/lib/intraday-chart'
 import { useChartTheme } from '@/lib/theme'
-import { pricePrecision } from '@/lib/format'
+import { compactNumber, pricePrecision } from '@/lib/format'
 import { intradayScale } from '@/lib/intraday-scale'
 
 const COLORS = {
@@ -35,9 +35,7 @@ interface InfoPoint {
 
 function formatAmount(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return '—'
-  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}${tx('亿')}`
-  if (value >= 10_000) return `${(value / 10_000).toFixed(0)}${tx('万')}`
-  return value.toFixed(0)
+  return compactNumber(value)
 }
 
 function priceColor(close: number, prevClose: number | null): string {
@@ -425,7 +423,7 @@ export function EChartsMultiDayIntraday({
                 <span style={{ color: infoColor }}>{changePct >= 0 ? '+' : ''}{changePct.toFixed(2)}%</span>
               )}
               {assetType !== 'index' && <><span className="text-muted">{tx('均价')}</span><span style={{ color: COLORS.average }}>{info.average != null ? info.average.toFixed(digits) : '—'}</span></>}
-              <span className="text-muted">量</span><span className="text-secondary">{info.row.volume.toFixed(0)}</span>
+              <span className="text-muted">{tx('量')}</span><span className="text-secondary">{info.row.volume.toFixed(0)}</span>
               <span className="text-muted">{tx('额')}</span><span className="text-secondary">{formatAmount(info.row.amount)}</span>
             </>
           ) : <span className="text-muted">—</span>}

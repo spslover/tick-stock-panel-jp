@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Check, Folder, Inbox, List, LoaderCircle, RefreshCw } from 'lucide-react'
 import { api } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { resolveWatchlistGroupColor } from '@/lib/watchlist-group-colors'
 
@@ -40,12 +41,16 @@ export function WatchlistGroupMenu({
   counts,
   total = 0,
   disableEmpty = false,
-  menuLabel = '选择自选分组',
+  menuLabel,
   align = 'right',
   triggerClassName = '',
-  title = '加入自选',
-  ariaLabel = title,
+  title,
+  ariaLabel,
 }: WatchlistGroupMenuProps) {
+  const { tx } = useI18n()
+  const menuLabelText = menuLabel ?? tx('选择自选分组')
+  const titleText = title ?? tx('加入自选')
+  const ariaLabelText = ariaLabel ?? titleText
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -164,8 +169,8 @@ export function WatchlistGroupMenu({
         onClick={event => { event.stopPropagation(); toggleMenu() }}
         disabled={disabled}
         className={triggerClassName}
-        title={title}
-        aria-label={ariaLabel}
+        title={titleText}
+        aria-label={ariaLabelText}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -178,13 +183,13 @@ export function WatchlistGroupMenu({
           ref={menuRef}
           id={menuId}
           role="menu"
-          aria-label={menuLabel}
+          aria-label={menuLabelText}
           data-watchlist-group-menu
           onKeyDown={handleMenuKeyDown}
           style={{ position: 'fixed', top: position.top, left: position.left }}
           className="z-[10000] w-56 overflow-hidden rounded-card border border-border bg-surface p-1.5 shadow-[0_10px_32px_rgba(0,0,0,0.42)]"
         >
-          <div className="px-2 pb-1.5 pt-1 text-[10px] font-medium text-muted">{menuLabel}</div>
+          <div className="px-2 pb-1.5 pt-1 text-[10px] font-medium text-muted">{menuLabelText}</div>
           {groupsQuery.isPending ? (
             <div className="flex h-16 items-center justify-center text-muted">
               <LoaderCircle className="h-4 w-4 animate-spin" />
@@ -196,8 +201,7 @@ export function WatchlistGroupMenu({
               className="flex h-14 w-full items-center justify-center gap-1.5 rounded-btn text-xs text-danger hover:bg-danger/10"
             >
               <RefreshCw className="h-3.5 w-3.5" />
-              重新加载分组
-            </button>
+              {tx('重新加载分组')}</button>
           ) : (
             <div className="max-h-60 overflow-y-auto">
               {includeAll && (
@@ -210,7 +214,7 @@ export function WatchlistGroupMenu({
                     className={menuItemClass}
                   >
                     <List className="h-3.5 w-3.5 shrink-0 text-accent" />
-                    <span className="min-w-0 flex-1 truncate">全部自选</span>
+                    <span className="min-w-0 flex-1 truncate">{tx('全部自选')}</span>
                     {showCounts && <span className="font-mono text-[10px] tabular-nums text-muted">{total}</span>}
                   </button>
                   <div className="my-1 border-t border-border/70" />
@@ -224,10 +228,10 @@ export function WatchlistGroupMenu({
                 className={menuItemClass}
               >
                 <Inbox className="h-3.5 w-3.5 shrink-0 text-muted" />
-                <span className="min-w-0 flex-1 truncate">未分组</span>
+                <span className="min-w-0 flex-1 truncate">{tx('未分组')}</span>
                 {showCounts && <span className="font-mono text-[10px] tabular-nums text-muted">{ungroupedCount}</span>}
                 {showPreferred && preferredGroupId == null && (
-                  <Check className="h-3.5 w-3.5 shrink-0 text-accent" aria-label="当前分组" />
+                  <Check className="h-3.5 w-3.5 shrink-0 text-accent" aria-label={tx('当前分组')} />
                 )}
               </button>
               {!includeAll && groups.length > 0 && <div className="my-1 border-t border-border/70" />}
@@ -247,7 +251,7 @@ export function WatchlistGroupMenu({
                     <span className="min-w-0 flex-1 truncate">{group.name}</span>
                     {showCounts && <span className="font-mono text-[10px] tabular-nums text-muted">{counts[group.id] ?? 0}</span>}
                     {showPreferred && preferredGroupId === group.id && (
-                      <Check className={`h-3.5 w-3.5 shrink-0 ${color.text}`} aria-label="当前分组" />
+                      <Check className={`h-3.5 w-3.5 shrink-0 ${color.text}`} aria-label={tx('当前分组')} />
                     )}
                   </button>
                 )
@@ -268,5 +272,6 @@ type WatchlistAddMenuProps = Omit<
 
 /** 所有“加入自选”入口共用的目标分组菜单。 */
 export function WatchlistAddMenu(props: WatchlistAddMenuProps) {
-  return <WatchlistGroupMenu {...props} menuLabel="加入到自选分组" />
+  const { tx } = useI18n()
+  return <WatchlistGroupMenu {...props} menuLabel={tx('加入到自选分组')} />
 }

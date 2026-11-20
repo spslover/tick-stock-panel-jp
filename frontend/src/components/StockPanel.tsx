@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { X } from 'lucide-react'
 import { type KlineRow, type FinancialMetricRecord } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 import { klineDailyQueryOptions, klineMinuteQueryOptions, klineMinuteRangeQueryOptions, DEFAULT_INTRADAY_DAYS, cnToday } from '@/lib/kline'
 import { useQuoteSubscription } from '@/lib/useQuoteSubscription'
 import { StockInfoBar } from '@/components/StockInfoBar'
@@ -255,8 +256,8 @@ export function StockPanel({
             <button
               onClick={() => onIntradayClose ? onIntradayClose() : setIntradayDismissed(true)}
               className={renderer === 'lightweight' ? 'absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded text-muted transition-colors hover:bg-elevated hover:text-foreground' : 'absolute -left-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-surface text-muted shadow-sm transition-colors hover:text-foreground hover:bg-elevated'}
-              title="收起分时图"
-              aria-label="收起分时图"
+              title={tx('收起分时图')}
+              aria-label={tx('收起分时图')}
             >
               <X className="h-3 w-3" />
             </button>

@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useECharts } from './useECharts'
 import type { EChartsOption } from 'echarts'
 import { useChartTheme } from '@/lib/theme'
+import { tx } from '@/lib/i18n'
 
 interface DistBin {
   range: string
@@ -35,7 +36,7 @@ export function ReturnDistributionChart({ distribution }: { distribution: DistBi
           const p = Array.isArray(params) ? params[0] : params
           const bin = distribution[p.dataIndex]
           if (!bin) return ''
-          return `${bin.range}<br/>数量: ${bin.count}<br/>占比: ${(bin.ratio * 100).toFixed(1)}%`
+          return `${bin.range}<br/>${tx('数量: {n}', { n: bin.count })}<br/>${tx('占比: {p}%', { p: (bin.ratio * 100).toFixed(1) })}`
         },
       },
       xAxis: {

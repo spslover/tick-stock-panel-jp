@@ -7,6 +7,8 @@
  * 信号 ID 语义与后端 backtest/strategy.py:_build_signal_mask 对齐。
  */
 
+import { tx } from '@/lib/i18n'
+
 export type SignalKind = 'entry' | 'exit' | 'both'
 
 export const MONITOR_INTRADAY_SIGNAL_LABELS: Record<string, string> = {
@@ -42,11 +44,13 @@ const FIELD_LABELS: Record<string, string> = {
 }
 
 /**
- * 信号/字段 ID → 中文显示名。
+ * 信号/字段 ID → 本地化显示名。
  * 自定义信号列 (csg_/signal_*) 查传入的命名映射; 盘中信号查 SIGNAL_LABELS;
  * 技术指标查 FIELD_LABELS; 都找不到则原样返回。
  */
 export function cnSignal(name: string, customNames?: Record<string, string>): string {
   if (customNames && name in customNames) return customNames[name]
-  return SIGNAL_LABELS[name] ?? FIELD_LABELS[name] ?? name
+  const label = SIGNAL_LABELS[name] ?? FIELD_LABELS[name]
+  // 内置标签存中文键, 取词时再按当前语言翻译; 用户自定义名原样返回
+  return label ? tx(label) : name
 }

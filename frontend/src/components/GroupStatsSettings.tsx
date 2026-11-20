@@ -1,3 +1,4 @@
+import { useI18n } from '@/lib/i18n'
 import { useEffect, useRef, useState } from 'react'
 import { Minus, Plus, SlidersHorizontal } from 'lucide-react'
 import {
@@ -17,7 +18,7 @@ import {
 export function GroupStatsSettings({
   config,
   onChange,
-  ariaLabel = '分组统计设置',
+  ariaLabel,
   showCardLimit = false,
 }: {
   config: GroupStatsConfig
@@ -25,7 +26,10 @@ export function GroupStatsSettings({
   ariaLabel?: string
   showCardLimit?: boolean
 }) {
+  const { tx } = useI18n()
   const [open, setOpen] = useState(false)
+  // ariaLabel 由调用方传入中文短语, 这里统一按当前语言取译文
+  const label = tx(ariaLabel ?? '分组统计设置')
   const rootRef = useRef<HTMLDivElement>(null)
 
   // 点击面板外部关闭 (与自选页搜索框同模式)
@@ -45,8 +49,8 @@ export function GroupStatsSettings({
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        aria-label={ariaLabel}
-        title={ariaLabel}
+        aria-label={label}
+        title={label}
         className={`inline-flex h-5 w-5 items-center justify-center rounded transition-colors ${
           open
             ? 'text-accent bg-accent/10'
@@ -57,13 +61,13 @@ export function GroupStatsSettings({
       </button>
       {open && (
         <div className="absolute right-0 top-full z-30 mt-1 w-64 rounded-card border border-border bg-base p-3 shadow-xl">
-          <div className="text-[10px] uppercase tracking-wider text-muted">指标</div>
+          <div className="text-[10px] uppercase tracking-wider text-muted">{tx('指标')}</div>
           <div className="mt-1 flex flex-wrap gap-1">
             {GROUP_METRICS.map(m => (
               <button
                 key={m.id}
                 type="button"
-                title={m.hint}
+                title={tx(m.hint)}
                 onClick={() => onChange({ metric: m.id })}
                 className={`px-2 py-0.5 rounded text-[11px] transition-colors ${
                   config.metric === m.id
@@ -71,11 +75,11 @@ export function GroupStatsSettings({
                     : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
                 }`}
               >
-                {m.label}
+                {tx(m.label)}
               </button>
             ))}
           </div>
-          <div className="mt-2.5 text-[10px] uppercase tracking-wider text-muted">排序</div>
+          <div className="mt-2.5 text-[10px] uppercase tracking-wider text-muted">{tx('排序')}</div>
           <div className="mt-1 flex flex-wrap gap-1">
             {GROUP_SORT_OPTIONS.map(s => (
               <button
@@ -88,17 +92,17 @@ export function GroupStatsSettings({
                     : 'bg-elevated text-secondary hover:text-foreground hover:bg-elevated/80'
                 }`}
               >
-                {s.label}
+                {tx(s.label)}
               </button>
             ))}
           </div>
           {showCardLimit && (
             <>
-              <div className="mt-2.5 text-[10px] uppercase tracking-wider text-muted">卡片显示</div>
-              <div className="mt-1 flex items-center gap-2" title="分组卡片默认展示组内前 N 条, 可展开查看全部">
+              <div className="mt-2.5 text-[10px] uppercase tracking-wider text-muted">{tx('卡片显示')}</div>
+              <div className="mt-1 flex items-center gap-2" title={tx('分组卡片默认展示组内前 N 条, 可展开查看全部')}>
                 <button
                   type="button"
-                  aria-label="减少卡片显示条数"
+                  aria-label={tx('减少卡片显示条数')}
                   disabled={config.cardTopN <= GROUP_CARD_TOP_N_MIN}
                   onClick={() => onChange({ cardTopN: config.cardTopN - 1 })}
                   className="inline-flex h-5 w-5 items-center justify-center rounded bg-elevated text-secondary transition-colors hover:text-foreground hover:bg-elevated/80 disabled:cursor-not-allowed disabled:opacity-40"
@@ -106,11 +110,11 @@ export function GroupStatsSettings({
                   <Minus className="h-3 w-3" />
                 </button>
                 <span className="w-16 text-center font-mono text-[11px] tabular-nums text-secondary">
-                  前 {config.cardTopN} 条
+                  {tx('前 {n} 条', { n: config.cardTopN })}
                 </span>
                 <button
                   type="button"
-                  aria-label="增加卡片显示条数"
+                  aria-label={tx('增加卡片显示条数')}
                   disabled={config.cardTopN >= GROUP_CARD_TOP_N_MAX}
                   onClick={() => onChange({ cardTopN: config.cardTopN + 1 })}
                   className="inline-flex h-5 w-5 items-center justify-center rounded bg-elevated text-secondary transition-colors hover:text-foreground hover:bg-elevated/80 disabled:cursor-not-allowed disabled:opacity-40"
@@ -119,13 +123,13 @@ export function GroupStatsSettings({
                 </button>
               </div>
               <div className="mt-2 space-y-1.5">
-                <div className="flex items-center justify-between" title="分组卡片头部是否显示分组颜色底条">
-                  <span className="text-[11px] text-secondary">头部颜色</span>
+                <div className="flex items-center justify-between" title={tx('分组卡片头部是否显示分组颜色底条')}>
+                  <span className="text-[11px] text-secondary">{tx('头部颜色')}</span>
                   <button
                     type="button"
                     role="switch"
                     aria-checked={config.cardColorBar}
-                    aria-label="切换卡片头部颜色"
+                    aria-label={tx('切换卡片头部颜色')}
                     onClick={() => onChange({ cardColorBar: !config.cardColorBar })}
                     className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${
                       config.cardColorBar ? 'bg-accent/60' : 'bg-elevated hover:bg-elevated/80'
@@ -138,13 +142,13 @@ export function GroupStatsSettings({
                     />
                   </button>
                 </div>
-                <div className="flex items-center justify-between" title="成员行左侧是否显示排名序号">
-                  <span className="text-[11px] text-secondary">序号</span>
+                <div className="flex items-center justify-between" title={tx('成员行左侧是否显示排名序号')}>
+                  <span className="text-[11px] text-secondary">{tx('序号')}</span>
                   <button
                     type="button"
                     role="switch"
                     aria-checked={config.cardRank}
-                    aria-label="切换卡片序号显示"
+                    aria-label={tx('切换卡片序号显示')}
                     onClick={() => onChange({ cardRank: !config.cardRank })}
                     className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${
                       config.cardRank ? 'bg-accent/60' : 'bg-elevated hover:bg-elevated/80'
@@ -161,7 +165,7 @@ export function GroupStatsSettings({
             </>
           )}
           <div className="mt-2.5 text-[10px] leading-relaxed text-muted">
-            {GROUP_METRICS.find(m => m.id === config.metric)?.hint}
+            {tx(GROUP_METRICS.find(m => m.id === config.metric)?.hint ?? '')}
           </div>
         </div>
       )}

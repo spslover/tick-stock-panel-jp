@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, Loader2, RefreshCw } from 'lucide-react'
 import { api, type MinuteKlineSession } from '@/lib/api'
-import { tx } from '@/lib/i18n'
+import { tx, useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { mergeMinuteRows } from '@/lib/minuteBatchIncremental'
 import { klineMinuteQueryOptions, klineMinuteRangeQueryOptions, minuteRefetchInterval } from '@/lib/kline'
@@ -35,6 +35,7 @@ export function StockMultiDayIntradayChart({
   onPriceDoubleClick,
   priceLines,
 }: Props) {
+  const { tx } = useI18n()
   const queryClient = useQueryClient()
   const history = useQuery({
     ...klineMinuteRangeQueryOptions(symbol, days),
@@ -86,7 +87,7 @@ export function StockMultiDayIntradayChart({
       autoSyncRef.current = null  // 失败清标记, 允许上限内自动重试
       const msg = e.message || ''
       if (msg.includes('403') || msg.includes('Pro')) {
-        toast('分钟K(批量)数据不可用', 'error')
+        toast(tx('分钟K(批量)数据不可用'), 'error')
       } else {
         toast(tx('补齐数据失败: {v}', { v: msg }), 'error')
       }
@@ -130,7 +131,7 @@ export function StockMultiDayIntradayChart({
     return (
       <div className="flex items-center justify-center gap-2 text-xs text-muted" style={{ height }}>
         <Loader2 className="h-4 w-4 animate-spin text-accent" />
-        正在加载近 {days} 日分时…
+        {tx('正在加载近 {n} 日分时…', { n: days })}
       </div>
     )
   }
@@ -145,8 +146,7 @@ export function StockMultiDayIntradayChart({
           className="inline-flex items-center gap-1.5 rounded-btn border border-border bg-elevated px-3 py-1.5 text-secondary hover:text-foreground"
         >
           <RefreshCw className="h-3.5 w-3.5" />
-          重新加载
-        </button>
+          {tx('重新加载')}</button>
       </div>
     )
   }
@@ -157,7 +157,7 @@ export function StockMultiDayIntradayChart({
         {syncMinute.isPending ? (
           <>
             <Loader2 className="h-5 w-5 animate-spin text-accent" />
-            <span className="text-secondary">正在获取近 {days} 日分钟 K…</span>
+            <span className="text-secondary">{tx('正在获取近 {n} 日分钟 K…', { n: days })}</span>
           </>
         ) : (
           <>
@@ -169,7 +169,7 @@ export function StockMultiDayIntradayChart({
                 className="inline-flex items-center gap-1.5 rounded-btn bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent/90"
               >
                 <Download className="h-3.5 w-3.5" />
-                获取近 {days} 日
+                {tx('获取近 {n} 日', { n: days })}
               </button>
             )}
           </>
@@ -186,12 +186,12 @@ export function StockMultiDayIntradayChart({
           {syncMinute.isPending ? (
             <span className="truncate text-accent flex items-center gap-1.5">
               <Loader2 className="h-3 w-3 animate-spin" />
-              正在补齐最近 {days} 日分时数据…
+              {tx('正在补齐最近 {n} 日分时数据…', { n: days })}
             </span>
           ) : syncMinute.isError ? (
-            <span className="truncate text-muted">当前 {sessions.length} 日，目标 {days} 日 — 补齐失败</span>
+            <span className="truncate text-muted">{tx('当前 {a} 日，目标 {b} 日 — 补齐失败', { a: sessions.length, b: days })}</span>
           ) : (
-            <span className="truncate text-muted">当前 {sessions.length} 个交易日数据，目标 {days} 日</span>
+            <span className="truncate text-muted">{tx('当前 {a} 个交易日数据，目标 {b} 日', { a: sessions.length, b: days })}</span>
           )}
           {!syncMinute.isPending && (
             <button
@@ -203,17 +203,16 @@ export function StockMultiDayIntradayChart({
               className="inline-flex shrink-0 items-center gap-1 text-accent hover:text-accent/80"
             >
               <Download className="h-3 w-3" />
-              重试补齐
-            </button>
+              {tx('重试补齐')}</button>
           )}
         </div>
       )}
       {partialDates.length > 0 && (
         <div className="flex h-8 items-center border-b border-border/60 px-3 text-[11px] text-warning">
-          <span className="truncate" title={partialDates.join('、')}>本地历史分时不完整：{partialDates.join('、')}</span>
+          <span className="truncate" title={partialDates.join('、')}>{tx('本地历史分时不完整：{v}', { v: partialDates.join('、') })}</span>
         </div>
       )}
-      <Suspense fallback={<div className="text-xs text-muted py-4">正在加载图表…</div>}>
+      <Suspense fallback={<div className="text-xs text-muted py-4">{tx('正在加载图表…')}</div>}>
       <Chart
         assetType={history.data?.asset_type ?? latest.data?.asset_type}
         {...(renderer === 'lightweight' ? {

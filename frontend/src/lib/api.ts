@@ -4,7 +4,7 @@
 // Prod:同源(FastAPI 托管前端 dist)
 
 import { toast } from '@/components/Toast'
-import { getLocale, t } from '@/lib/i18n'
+import { tx, getLocale, t } from '@/lib/i18n'
 import { localizeApiError } from './api-errors'
 import type { NavLayout } from './navLayout'
 
@@ -2861,7 +2861,7 @@ export const api = {
     ai: { provider?: string; base_url?: string; api_key?: string; model?: string; protocol?: string },
     opts?: { timeoutMs?: number },
   ) => {
-    const invalidResponse = 'AI 连接测试未收到有效的后端响应。请确认前后端版本一致，重启 TSP 后刷新页面，并检查代理是否将 /api 请求转发到 TSP 后端。'
+    const invalidResponse = tx('AI 连接测试未收到有效的后端响应。请确认前后端版本一致，重启 TSP 后刷新页面，并检查代理是否将 /api 请求转发到 TSP 后端。')
     try {
       const result = await request<{ ok: boolean; model?: string; response?: string; error?: string; error_type?: string }>('/api/settings/ai/test', {
         method: 'POST',
@@ -2873,7 +2873,7 @@ export const api = {
       return result
     } catch (error) {
       if (error instanceof ApiError && (error.status === 404 || error.status === 405)) {
-        throw new ApiError(`AI 连接测试接口不可用（HTTP ${error.status}）。请确认前后端版本一致，完整升级并重启 TSP 后刷新页面。使用代理时，请确认 POST /api/settings/ai/test 转发到 TSP 后端。`, error.status)
+        throw new ApiError(tx('AI 连接测试接口不可用（HTTP {status}）。请确认前后端版本一致，完整升级并重启 TSP 后刷新页面。使用代理时，请确认 POST /api/settings/ai/test 转发到 TSP 后端。', { status: error.status }), error.status)
       }
       if (error instanceof SyntaxError) throw new ApiError(invalidResponse, 502)
       throw error
@@ -4540,7 +4540,7 @@ export const api = {
       toast(msg, 'error')
       throw new Error(msg)
     }
-    if (!res.body) throw new Error('响应无 body')
+    if (!res.body) throw new Error(tx('响应无 body'))
 
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
@@ -4612,7 +4612,7 @@ export const api = {
       toast(msg, 'error')
       throw new Error(msg)
     }
-    if (!res.body) throw new Error('响应无 body')
+    if (!res.body) throw new Error(tx('响应无 body'))
 
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
@@ -4687,7 +4687,7 @@ export const api = {
       toast(msg, 'error')
       throw new Error(msg)
     }
-    if (!res.body) throw new Error('响应无 body')
+    if (!res.body) throw new Error(tx('响应无 body'))
 
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
@@ -4729,7 +4729,7 @@ export const api = {
       toast(msg, 'error')
       throw new Error(msg)
     }
-    if (!res.body) throw new Error('响应无 body')
+    if (!res.body) throw new Error(tx('响应无 body'))
 
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
@@ -5159,7 +5159,7 @@ export const api = {
       toast(msg, 'error')
       throw new Error(msg)
     }
-    if (!res.body) throw new Error('响应无 body')
+    if (!res.body) throw new Error(tx('响应无 body'))
 
     const reader = res.body.getReader()
     const decoder = new TextDecoder()

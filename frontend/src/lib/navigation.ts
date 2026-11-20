@@ -5,7 +5,7 @@ import {
   IconRegime, IconIndices, IconData, type BrandIconProps,
 } from '@/components/BrandIcons'
 import type { AnalysisMenu } from './api'
-import { t, type Locale } from './i18n'
+import { t, tx, type Locale } from './i18n'
 import { getFrontendExtensionNavigation } from '@/extensions/registry'
 
 export type NavigationEntry = {
@@ -53,10 +53,10 @@ export function getNavigationEntries(menus: readonly AnalysisMenu[] = [], locale
   const entries: NavigationEntry[] = [
     ...CORE_NAVIGATION.map(item => ({
       ...item,
-      label: NAV_I18N_KEY_BY_ID[item.id] ? t(NAV_I18N_KEY_BY_ID[item.id], undefined, locale) : item.label,
+      label: NAV_I18N_KEY_BY_ID[item.id] ? t(NAV_I18N_KEY_BY_ID[item.id], undefined, locale) : tx(item.label, undefined, locale),
     })),
     ...menus.map(m => ({
-      id: `/analysis/${m.id}`, to: `/analysis/${m.id}`, label: m.label,
+      id: `/analysis/${m.id}`, to: `/analysis/${m.id}`, label: tx(m.label, undefined, locale),
       type: 'analysis' as const, visible: m.visible,
       icon: m.icon === 'tags' ? Tags : BarChart3, arch: 'ext' as const,
     })),
@@ -64,7 +64,7 @@ export function getNavigationEntries(menus: readonly AnalysisMenu[] = [], locale
       id: item.route.path, to: item.route.path,
       label: NAV_I18N_KEY_BY_ID[item.route.path]
         ? t(NAV_I18N_KEY_BY_ID[item.route.path], undefined, locale)
-        : item.label,
+        : tx(item.label, undefined, locale),
       icon: item.icon,
       type: 'extension' as const, visible: true, arch: 'ext' as const,
       badge: item.badge, extensionId: item.extensionId,

@@ -373,7 +373,7 @@ function FetchDataCard({
   providerLabel: string
 }) {
   const { tx } = useI18n()
-  const stageText = stage ? (STAGE_LABELS[stage] ?? stage) : tx('正在同步行情数据…')
+  const stageText = stage ? tx(STAGE_LABELS[stage] ?? stage) : tx('正在同步行情数据…')
   return (
     <div className="mb-3 rounded-card border border-border bg-surface/85 p-3.5">
       <div className="flex items-start gap-3">

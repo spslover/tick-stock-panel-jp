@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18n'
 import { useSyncExternalStore } from 'react'
 import type { StrategyBacktestResult } from './api'
 import { fetchRunningTask, reportTaskFinished, reportTaskRunning } from './taskRegistry'
@@ -92,7 +93,7 @@ async function connectSSE(url: string): Promise<void> {
   try {
     const probe = await fetch(url, { headers: { Accept: 'text/event-stream' } })
     if (!probe.ok) {
-      let message = `回测请求失败 (${probe.status})`
+      let message = tx('回测请求失败 ({status})', { status: probe.status })
       try {
         message = (await probe.json())?.detail ?? message
       } catch { /* ignore */ }
@@ -143,7 +144,7 @@ async function connectSSE(url: string): Promise<void> {
       current = { ...current, isPending: false, result, error: null, reconnecting: false }
       emit()
     } catch {
-      current = { ...current, isPending: false, error: '结果解析失败', reconnecting: false }
+      current = { ...current, isPending: false, error: tx('结果解析失败'), reconnecting: false }
       emit()
     }
     es.close()
@@ -156,11 +157,11 @@ async function connectSSE(url: string): Promise<void> {
     // SSE error 事件: 有 data 说明是后端主动推送的错误/取消; 无 data 说明是连接断开
     if (e.data) {
       try {
-        const msg = JSON.parse(e.data)?.message ?? '回测出错'
+        const msg = JSON.parse(e.data)?.message ?? tx('回测出错')
         current = { ...current, isPending: false, error: msg, reconnecting: false }
         emit()
       } catch {
-        current = { ...current, isPending: false, error: '回测出错', reconnecting: false }
+        current = { ...current, isPending: false, error: tx('回测出错'), reconnecting: false }
         emit()
       }
       es.close()
@@ -179,7 +180,7 @@ async function connectSSE(url: string): Promise<void> {
         ...current,
         isPending: false,
         reconnecting: false,
-        error: '连接中断，请重试',
+        error: tx('连接中断，请重试'),
       }
       emit()
       return
@@ -298,7 +299,7 @@ export async function stopBacktest(): Promise<void> {
     eventSource = null
   }
   if (current?.isPending) {
-    current = { ...current, isPending: false, error: '已取消', reconnecting: false }
+    current = { ...current, isPending: false, error: tx('已取消'), reconnecting: false }
     emit()
   }
   finishTaskRegistry()

@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { EChartsOption } from 'echarts'
 import { useChartTheme } from '@/lib/theme'
+import { useI18n } from '@/lib/i18n'
 import { useECharts } from './useECharts'
 
 export interface MiningOosFold {
@@ -31,6 +32,7 @@ function escapeHtml(value: string): string {
 }
 
 export function MiningOosChart({ folds }: MiningOosChartProps) {
+  const { tx } = useI18n()
   const ct = useChartTheme()
   const preparedFolds = useMemo(() => folds.map(fold => ({
     ...fold,
@@ -55,7 +57,7 @@ export function MiningOosChart({ folds }: MiningOosChartProps) {
         itemHeight: 8,
         itemGap: 14,
         textStyle: { color: ct.text, fontSize: 10 },
-        data: ['样本外收益', 'Sharpe', '已跳过'],
+        data: [tx('样本外收益'), 'Sharpe', tx('已跳过')],
       },
       tooltip: {
         trigger: 'axis',
@@ -75,14 +77,14 @@ export function MiningOosChart({ folds }: MiningOosChartProps) {
 
           const heading = fold.label || `Fold ${fold.fold}`
           if (fold.skipped) {
-            const reason = fold.reason ? escapeHtml(fold.reason) : '未提供原因'
+            const reason = fold.reason ? escapeHtml(fold.reason) : tx('未提供原因')
             return `<div style="font-size:11px;margin-bottom:5px">${escapeHtml(heading)}</div>
-              <div style="color:${ct.text}">已跳过</div>
+              <div style="color:${ct.text}">${tx('已跳过')}</div>
               <div style="max-width:260px;white-space:normal;margin-top:4px">${reason}</div>`
           }
 
           return `<div style="font-size:11px;margin-bottom:5px">${escapeHtml(heading)}</div>
-            <div style="display:flex;justify-content:space-between;gap:18px"><span>样本外收益</span><span style="font-family:monospace">${fold.return == null ? '—' : `${(fold.return * 100).toFixed(2)}%`}</span></div>
+            <div style="display:flex;justify-content:space-between;gap:18px"><span>${tx('样本外收益')}</span><span style="font-family:monospace">${fold.return == null ? '—' : `${(fold.return * 100).toFixed(2)}%`}</span></div>
             <div style="display:flex;justify-content:space-between;gap:18px"><span>Sharpe</span><span style="font-family:monospace">${fold.sharpe == null ? '—' : fold.sharpe.toFixed(2)}</span></div>`
         },
       },
@@ -108,7 +110,7 @@ export function MiningOosChart({ folds }: MiningOosChartProps) {
       yAxis: [
         {
           type: 'value',
-          name: '收益',
+          name: tx('收益'),
           nameTextStyle: { color: ct.text, fontSize: 10 },
           axisLabel: {
             color: ct.text,
@@ -129,7 +131,7 @@ export function MiningOosChart({ folds }: MiningOosChartProps) {
       ],
       series: [
         {
-          name: '样本外收益',
+          name: tx('样本外收益'),
           type: 'bar',
           data: preparedFolds.map(fold => fold.return == null
             ? null
@@ -152,7 +154,7 @@ export function MiningOosChart({ folds }: MiningOosChartProps) {
           z: 5,
         },
         {
-          name: '已跳过',
+          name: tx('已跳过'),
           type: 'custom',
           data: preparedFolds.flatMap((fold, index) => fold.skipped ? [[index, 0, index]] : []),
           renderItem: (params: any, api: any) => {
@@ -163,7 +165,7 @@ export function MiningOosChart({ folds }: MiningOosChartProps) {
               x,
               y: coordinateSystem.y + 7,
               style: {
-                text: '跳过',
+                text: tx('跳过'),
                 fill: ct.text,
                 opacity: 0.65,
                 fontSize: 10,
@@ -180,8 +182,8 @@ export function MiningOosChart({ folds }: MiningOosChartProps) {
 
   const chartRef = useECharts(option, [preparedFolds, ct])
   const emptyMessage = folds.length === 0
-    ? '暂无样本外验证数据'
-    : '暂无可展示的样本外指标'
+    ? tx('暂无样本外验证数据')
+    : tx('暂无可展示的样本外指标')
 
   return (
     <div className="relative h-[304px] w-full min-w-0 overflow-hidden">
@@ -189,7 +191,7 @@ export function MiningOosChart({ folds }: MiningOosChartProps) {
         ref={chartRef}
         className="h-full w-full min-w-0"
         role="img"
-        aria-label="逐折样本外收益和 Sharpe 图"
+        aria-label={tx('逐折样本外收益和 Sharpe 图')}
       />
       {!hasDisplayData && (
         <div className="absolute inset-0 flex items-center justify-center bg-surface text-xs text-secondary">

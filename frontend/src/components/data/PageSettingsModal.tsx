@@ -18,6 +18,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { Check, GripVertical } from 'lucide-react'
 import { storage } from '@/lib/storage'
+import { useI18n } from '@/lib/i18n'
 
 export type CardKey =
   | 'instruments' | 'daily' | 'adj_factor' | 'enriched'
@@ -103,6 +104,7 @@ export function PageSettingsModal({
 }: {
   caps: Record<string, unknown> | undefined
 }) {
+  const { tx } = useI18n()
   const [visible, setVisible] = useState<Record<string, boolean>>(() => getCardVisibility(caps))
   const [order, setOrder] = useState<CardKey[]>(() => getCardOrder())
 
@@ -152,8 +154,7 @@ export function PageSettingsModal({
   return (
     <div className="space-y-2.5">
       <p className="text-xs text-secondary leading-relaxed">
-        拖动手柄调整卡片顺序,勾选控制显隐。未勾选的卡片将隐藏,不影响数据本身。
-      </p>
+        {tx('拖动手柄调整卡片顺序,勾选控制显隐。未勾选的卡片将隐藏,不影响数据本身。')}</p>
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -167,8 +168,8 @@ export function PageSettingsModal({
                 <SortableCardRow
                   key={def.key}
                   id={def.key}
-                  label={def.label}
-                  desc={def.desc}
+                  label={tx(def.label)}
+                  desc={tx(def.desc)}
                   on={on}
                   onToggle={() => toggle(def.key)}
                 />
@@ -182,8 +183,7 @@ export function PageSettingsModal({
           onClick={reset}
           className="px-2 py-0.5 rounded-btn text-[10px] text-secondary hover:text-foreground transition-colors"
         >
-          恢复默认
-        </button>
+          {tx('恢复默认')}</button>
       </div>
     </div>
   )
@@ -199,6 +199,7 @@ function SortableCardRow({
   on: boolean
   onToggle: () => void
 }) {
+  const { tx } = useI18n()
   const {
     attributes,
     listeners,
@@ -229,7 +230,7 @@ function SortableCardRow({
         {...attributes}
         {...listeners}
         className="cursor-grab active:cursor-grabbing text-muted hover:text-foreground transition-colors shrink-0"
-        title="拖动排序"
+        title={tx('拖动排序')}
       >
         <GripVertical className="h-4 w-4" />
       </button>

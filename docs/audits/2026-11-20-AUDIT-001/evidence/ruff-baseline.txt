@@ -1,0 +1,44 @@
+﻿214	BLE001	[ ] blind-except
+ 42	I001  	[*] unsorted-imports
+ 37	RUF100	[*] unused-noqa
+ 31	F401  	[*] unused-import
+ 26	SIM105	[ ] suppressible-exception
+ 26	UP045 	[*] non-pep604-annotation-optional
+ 21	UP037 	[*] quoted-annotation
+ 16	B023  	[ ] function-uses-loop-variable
+ 14	E741  	[ ] ambiguous-variable-name
+ 13	SIM102	[ ] collapsible-if
+ 12	E402  	[ ] module-import-not-at-top-of-file
+ 12	UP017 	[*] datetime-timezone-utc
+ 10	B905  	[ ] zip-without-explicit-strict
+ 10	F841  	[-] unused-variable
+  9	B008  	[ ] function-call-in-default-argument
+  8	N806  	[ ] non-lowercase-variable-in-function
+  7	B904  	[ ] raise-without-from-inside-except
+  7	RUF012	[ ] mutable-class-default
+  7	SIM108	[ ] if-else-block-instead-of-if-exp
+  6	RUF006	[ ] asyncio-dangling-task
+  6	RUF059	[ ] unused-unpacked-variable
+  5	E702  	[ ] multiple-statements-on-one-line-semicolon
+  5	RUF023	[*] unsorted-dunder-slots
+  5	SIM114	[*] if-with-same-arms
+  4	UP035 	[*] deprecated-import
+  3	B017  	[ ] assert-raises-exception
+  3	N801  	[ ] invalid-class-name
+  3	RUF005	[ ] collection-literal-concatenation
+  2	B007  	[ ] unused-loop-control-variable
+  2	B009  	[*] get-attr-with-constant
+  2	N815  	[ ] mixed-case-variable-in-class-scope
+  2	N818  	[ ] error-suffix-on-exception-name
+  2	RUF034	[ ] useless-if-else
+  2	RUF043	[ ] pytest-raises-ambiguous-pattern
+  2	RUF046	[*] unnecessary-cast-to-int
+  2	UP041 	[*] timeout-error-alias
+  1	F811  	[ ] redefined-while-unused
+  1	F821  	[ ] undefined-name
+  1	SIM103	[ ] needless-bool
+  1	SIM118	[ ] in-dict-keys
+  1	UP009 	[*] utf8-encoding-declaration
+  1	UP034 	[*] extraneous-parentheses
+Found 584 errors.
+[*] 193 fixable with the `--fix` option (55 hidden fixes can be enabled with the `--unsafe-fixes` option).

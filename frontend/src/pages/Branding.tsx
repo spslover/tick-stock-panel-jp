@@ -1,3 +1,4 @@
+import { useI18n } from '@/lib/i18n'
 import { motion } from 'framer-motion'
 import {
   RadioTower,
@@ -81,11 +82,12 @@ const MOCK_NAV = [
 ]
 
 export function Branding() {
+  const { tx } = useI18n()
   return (
     <>
       <PageHeader
-        title="视觉风格预览"
-        subtitle="名字保持 Tick Stock Panel,4 种赛博朋克 + 高级感的视觉处理 — 字重、字距、配色、图标各不同。挑你最喜欢的告诉我。"
+        title={tx('视觉风格预览')}
+        subtitle={tx('名字保持 Tick Stock Panel,4 种赛博朋克 + 高级感的视觉处理 — 字重、字距、配色、图标各不同。挑你最喜欢的告诉我。')}
       />
 
       <div className="px-8 py-6">
@@ -96,17 +98,15 @@ export function Branding() {
         </div>
 
         <div className="mt-8 rounded-card border border-border bg-surface p-5 text-sm text-secondary leading-relaxed max-w-2xl">
-          <div className="font-medium text-foreground mb-2">挑哪个?</div>
-          回复 <code className="font-mono text-accent">pulsar / vanta / helix / aurora</code> 任一,
-          我把该风格的字体、配色、图标、发光效果应用到真实侧栏。
-          也可以告诉我你想微调哪里(比如"用 VANTA 但换青色"),都行。
-        </div>
+          <div className="font-medium text-foreground mb-2">{tx('挑哪个?')}</div>
+          {tx('回复')} <code className="font-mono text-accent">pulsar / vanta / helix / aurora</code> {tx('任一, 我把该风格的字体、配色、图标、发光效果应用到真实侧栏。 也可以告诉我你想微调哪里(比如"用 VANTA 但换青色"),都行。')}</div>
       </div>
     </>
   )
 }
 
 function Sample({ v }: { v: Variant }) {
+  const { tx } = useI18n()
   const Icon = v.icon
 
   return (
@@ -144,7 +144,7 @@ function Sample({ v }: { v: Variant }) {
             }}
           />
           <div className="mt-2 text-xs text-secondary">
-            档位 · <span className="text-foreground font-medium font-mono">Pro</span>
+            {tx('档位 ·')} <span className="text-foreground font-medium font-mono">Pro</span>
           </div>
         </div>
 
@@ -160,7 +160,7 @@ function Sample({ v }: { v: Variant }) {
               }`}
             >
               <I className="h-4 w-4" />
-              {label}
+              {tx(label)}
             </div>
           ))}
         </nav>
@@ -171,7 +171,7 @@ function Sample({ v }: { v: Variant }) {
         <div className="flex-1">
           <div className="text-xs font-medium text-muted uppercase tracking-widest">{v.id}</div>
           <div className="mt-2 leading-relaxed text-sm text-secondary">
-            {v.hint}
+            {tx(v.hint)}
           </div>
         </div>
 

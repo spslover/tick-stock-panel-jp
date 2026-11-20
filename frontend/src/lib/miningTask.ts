@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18n'
 import { useSyncExternalStore } from 'react'
 import { api, type MiningResult, type MiningRun, type MiningRunProgress, type MiningRunStatus } from './api'
 import { fetchRunningTask, reportTaskFinished, reportTaskRunning } from './taskRegistry'
@@ -117,7 +118,7 @@ async function refreshTerminalRun(
     let result: MiningResult | null = null
     if (SUCCESS_STATES.has(run.status)) {
       result = await api.miningResult(runId)
-      if (result.run_id !== runId) throw new Error('任务结果与运行 ID 不匹配')
+      if (result.run_id !== runId) throw new Error(tx('任务结果与运行 ID 不匹配'))
     }
     if (current.runId !== runId || connectionToken !== token) return
     finishTaskRegistry()
@@ -143,7 +144,7 @@ async function refreshTerminalRun(
       cancelling: false,
       reconnecting: false,
       error: fallbackStatus === 'cancelled'
-        ? '任务已取消'
+        ? tx('任务已取消')
         : fallbackError || String((error as Error).message || error),
     })
   }
@@ -262,7 +263,7 @@ export async function startMining(payload: Parameters<typeof api.miningStart>[0]
     cancelling: false,
     reconnecting: false,
     run: null,
-    progress: { phase: 'queued', label: '创建任务' },
+    progress: { phase: 'queued', label: tx('创建任务') },
     result: null,
     previousResult: current.result ?? current.previousResult,
     error: null,
@@ -304,7 +305,7 @@ export async function startAutoMining(payload: Parameters<typeof api.miningAutoS
     cancelling: false,
     reconnecting: false,
     run: null,
-    progress: { phase: 'screening', label: '正在全量筛选因子（约 1-3 分钟）' },
+    progress: { phase: 'screening', label: tx('正在全量筛选因子（约 1-3 分钟）') },
     result: null,
     previousResult: current.result ?? current.previousResult,
     error: null,
@@ -333,14 +334,14 @@ export async function startAutoMining(payload: Parameters<typeof api.miningAutoS
     const topReasons = Object.entries(screening?.reason_counts ?? {})
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
-      .map(([reason, count]) => `${reason} ${count} 个`)
+      .map(([reason, count]) => tx('{reason} {count} 个', { reason, count }))
       .join('；')
     update({
       isPending: false,
       progress: null,
-      error: `${screening?.n_total ?? 0} 个因子里 0 个达标，未启动挖掘。`
-        + (topReasons ? `主要失败原因：${topReasons}。` : '')
-        + '可改选「探索」档（门槛更低）或拉长日期区间后重试。',
+      error: tx('{n} 个因子里 0 个达标，未启动挖掘。', { n: screening?.n_total ?? 0 })
+        + (topReasons ? tx('主要失败原因：{v}。', { v: topReasons }) : '')
+        + tx('可改选「探索」档（门槛更低）或拉长日期区间后重试。'),
     })
   } catch (error) {
     if (connectionToken !== token || current.runId !== null) return
@@ -392,7 +393,7 @@ export async function attachMiningRun(runId: string): Promise<boolean> {
     cancelling: false,
     reconnecting: true,
     run: null,
-    progress: { phase: 'reconnecting', label: '读取任务状态' },
+    progress: { phase: 'reconnecting', label: tx('读取任务状态') },
     result: null,
     previousResult,
     error: null,

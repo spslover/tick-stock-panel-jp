@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { ArrowDownRight, ArrowUpRight, Flame } from 'lucide-react'
 import { api, type MarketSnapshotRow, type OverviewDimensionRankItem, type OverviewMarket, type AlertEvent } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { fmtBigNum, fmtPct } from '@/lib/format'
 import { dimensionKindForSourceField, type DimensionMembersTarget } from '@/components/DimensionMembersDialog'
 import { cn } from '@/lib/cn'
@@ -52,6 +53,7 @@ export function IndexTicker({ item }: { item: OverviewMarket['indices'][number] 
 
 // ===== 涨跌广度 =====
 export function BreadthBar({ data }: { data: OverviewMarket['breadth'] }) {
+  const { tx } = useI18n()
   const denom = Math.max(data.total, 1)
   const upW = data.up / denom * 100
   const downW = data.down / denom * 100
@@ -65,9 +67,9 @@ export function BreadthBar({ data }: { data: OverviewMarket['breadth'] }) {
         <div className="bg-bull/85" style={{ width: `${upW}%` }} />
       </div>
       <div className="grid grid-cols-3 gap-1.5 text-[11px]">
-        <div className="rounded bg-bear/8 px-2 py-1 text-bear">跌 <span className="font-mono">{data.down}</span></div>
-        <div className="rounded bg-elevated/70 px-2 py-1 text-muted">平 <span className="font-mono">{data.flat}</span></div>
-        <div className="rounded bg-bull/8 px-2 py-1 text-bull">涨 <span className="font-mono">{data.up}</span></div>
+        <div className="rounded bg-bear/8 px-2 py-1 text-bear">{tx('跌')} <span className="font-mono">{data.down}</span></div>
+        <div className="rounded bg-elevated/70 px-2 py-1 text-muted">{tx('平')} <span className="font-mono">{data.flat}</span></div>
+        <div className="rounded bg-bull/8 px-2 py-1 text-bull">{tx('涨')} <span className="font-mono">{data.up}</span></div>
       </div>
     </div>
   )
@@ -75,6 +77,7 @@ export function BreadthBar({ data }: { data: OverviewMarket['breadth'] }) {
 
 // ===== 涨跌分布直方 =====
 export function DistributionBars({ rows }: { rows: OverviewMarket['distribution'] }) {
+  const { tx } = useI18n()
   const maxCount = Math.max(...rows.map(r => r.count), 1)
   return (
     <div className="grid h-24 grid-cols-8 items-end gap-1 pt-1">
@@ -86,7 +89,7 @@ export function DistributionBars({ rows }: { rows: OverviewMarket['distribution'
             <div
               className={`w-2 rounded-full ${positive ? 'bg-gradient-to-t from-bull/45 to-bull/90' : 'bg-gradient-to-t from-bear/45 to-bear/90'}`}
               style={{ height: `${Math.max(4, r.count / maxCount * 86)}%` }}
-              title={`${r.label}: ${r.count}只`}
+              title={tx('{label}: {n}', { label: r.label, n: r.count })}
             />
             <div className="truncate text-[9px] text-muted">{r.label}</div>
           </div>
@@ -98,12 +101,13 @@ export function DistributionBars({ rows }: { rows: OverviewMarket['distribution'
 
 // ===== 情绪雷达 (手写 SVG) =====
 export function EmotionRadar({ radar, score }: { radar: OverviewMarket['radar']; score: number }) {
+  const { tx } = useI18n()
   const size = 240
   const cx = size / 2
   const cy = size / 2
   const maxR = 78
   const color = scoreColorValue(score)
-  if (!radar.length) return <div className="flex h-52 items-center justify-center text-xs text-muted">暂无雷达数据</div>
+  if (!radar.length) return <div className="flex h-52 items-center justify-center text-xs text-muted">{tx('暂无雷达数据')}</div>
   const points = radar.map((r, i) => {
     const angle = -Math.PI / 2 + i * 2 * Math.PI / radar.length
     const radius = maxR * Math.max(0, Math.min(100, r.value)) / 100
@@ -165,21 +169,22 @@ export function EmotionRadar({ radar, score }: { radar: OverviewMarket['radar'];
 
 // ===== 涨停梯队 =====
 export function LadderMini({ limit }: { limit: OverviewMarket['limit'] }) {
+  const { tx } = useI18n()
   const tiers = limit.tiers.filter(t => t.boards >= 2).slice(0, 6)
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between rounded bg-elevated/55 px-2 py-1.5 text-[11px]">
-        <span className="text-muted">封板率</span>
+        <span className="text-muted">{tx('封板率')}</span>
         <span className="font-mono text-accent">{(limit.seal_rate ?? 0).toFixed(0)}%</span>
       </div>
-      {tiers.length === 0 && <div className="rounded border border-dashed border-border py-5 text-center text-xs text-muted">暂无 2 板以上</div>}
+      {tiers.length === 0 && <div className="rounded border border-dashed border-border py-5 text-center text-xs text-muted">{tx('暂无 2 板以上')}</div>}
       {tiers.map(t => {
         const stocks = t.stocks ?? []
         const showStocks = stocks.length > 0 && stocks.length <= 3
         return (
           <div key={t.boards} className="rounded bg-elevated/35 px-2 py-1.5">
             <div className="grid grid-cols-[42px_1fr_auto] items-center gap-2">
-              <span className={`font-mono text-sm font-bold ${t.boards >= 5 ? 'text-bull' : t.boards >= 3 ? 'text-accent' : 'text-secondary'}`}>{t.boards}板</span>
+              <span className={`font-mono text-sm font-bold ${t.boards >= 5 ? 'text-bull' : t.boards >= 3 ? 'text-accent' : 'text-secondary'}`}>{tx('{n}板', { n: t.boards })}</span>
               <div className="h-1.5 overflow-hidden rounded-full bg-base">
                 <div className="h-full rounded-full bg-bull/70" style={{ width: `${Math.min(100, t.count * 12)}%` }} />
               </div>
@@ -207,6 +212,7 @@ export function StockList({ title, rows, mode, onStockClick, activeSymbol }: {
   onStockClick?: (symbol: string, name?: string) => void;
   activeSymbol?: string;
 }) {
+  const { tx } = useI18n()
   return (
     <div className="rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_hsl(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_hsl(var(--border)/0.5)]">
       <div className="mb-1 flex items-center justify-between">
@@ -255,7 +261,7 @@ export function StockList({ title, rows, mode, onStockClick, activeSymbol }: {
             </div>
           </div>
         ))}
-        {rows.length === 0 && <div className="py-5 text-center text-xs text-muted">暂无数据</div>}
+        {rows.length === 0 && <div className="py-5 text-center text-xs text-muted">{tx('暂无数据')}</div>}
       </div>
     </div>
   )
@@ -268,6 +274,7 @@ export function RankColumn({ title, rows, tone, onStockClick, onDimensionClick, 
   onDimensionClick?: (target: DimensionMembersTarget) => void;
   activeSymbol?: string;
 }) {
+  const { tx } = useI18n()
   return (
     <div className="min-w-0 space-y-1">
       <div className={`text-[10px] font-medium ${tone === 'bull' ? 'text-bull' : 'text-bear'}`}>{title}</div>
@@ -283,7 +290,7 @@ export function RankColumn({ title, rows, tone, onStockClick, onDimensionClick, 
             value: r.name,
             sourceField: r.source_field!,
           })}
-          title={clickable ? `查看「${r.name}」成分股` : undefined}
+          title={clickable ? tx('查看「{name}」成分股', { name: r.name }) : undefined}
           className={`grid grid-cols-[14px_1fr_auto] items-center gap-1 rounded-md px-1.5 py-1 border transition-colors ${
             isActive ? 'border-accent/30 bg-accent/10' : 'border-transparent bg-elevated/40'
           } ${clickable ? 'cursor-pointer hover:border-accent/40 hover:bg-elevated/70' : 'hover:border-border/60'}`}
@@ -295,7 +302,7 @@ export function RankColumn({ title, rows, tone, onStockClick, onDimensionClick, 
               {clickable && <span className="ml-1 text-[8px] text-muted/50">↗</span>}
             </div>
             <div className="mt-0.5 flex items-center gap-1">
-              <span className="shrink-0 font-mono text-[9px] text-muted">{r.count}只</span>
+              <span className="shrink-0 font-mono text-[9px] text-muted">{tx('{n}只', { n: r.count })}</span>
               <span className="text-muted">·</span>
               {r.leader?.symbol ? (
                 <button
@@ -325,7 +332,7 @@ export function RankColumn({ title, rows, tone, onStockClick, onDimensionClick, 
         </div>
         )
       })}
-      {rows.length === 0 && <div className="rounded border border-dashed border-border py-4 text-center text-xs text-muted">暂无数据</div>}
+      {rows.length === 0 && <div className="rounded border border-dashed border-border py-4 text-center text-xs text-muted">{tx('暂无数据')}</div>}
     </div>
   )
 }
@@ -337,24 +344,24 @@ export function HotRankCard({ title, rank, configUrl, onStockClick, onDimensionC
   onDimensionClick?: (target: DimensionMembersTarget) => void;
   activeSymbol?: string;
 }) {
+  const { tx } = useI18n()
   const hasData = (rank?.leading?.length ?? 0) > 0 || (rank?.lagging?.length ?? 0) > 0
   return (
     <section className="rounded-card border border-border bg-surface/80 p-1.5 shadow-[0_1px_2px_hsl(var(--border)/0.4)] backdrop-blur-sm transition-shadow hover:shadow-[0_2px_8px_hsl(var(--border)/0.5)]">
-      <SectionTitle icon={Flame} title={title} hint="领涨/领跌 · 点击板块看成分股" />
+      <SectionTitle icon={Flame} title={title} hint={tx('领涨/领跌 · 点击板块看成分股')} />
       {hasData ? (
         <div className="grid grid-cols-2 gap-2">
-          <RankColumn title="领涨" rows={rank?.leading ?? []} tone="bull" onStockClick={onStockClick} onDimensionClick={onDimensionClick} activeSymbol={activeSymbol} />
-          <RankColumn title="领跌" rows={rank?.lagging ?? []} tone="bear" onStockClick={onStockClick} onDimensionClick={onDimensionClick} activeSymbol={activeSymbol} />
+          <RankColumn title={tx('领涨')} rows={rank?.leading ?? []} tone="bull" onStockClick={onStockClick} onDimensionClick={onDimensionClick} activeSymbol={activeSymbol} />
+          <RankColumn title={tx('领跌')} rows={rank?.lagging ?? []} tone="bear" onStockClick={onStockClick} onDimensionClick={onDimensionClick} activeSymbol={activeSymbol} />
         </div>
       ) : (
         <div className="py-4 text-center">
-          <p className="text-[11px] text-muted">未配置扩展数据源</p>
+          <p className="text-[11px] text-muted">{tx('未配置扩展数据源')}</p>
           <Link
             to={configUrl}
             className="mt-1.5 inline-block text-[11px] text-accent hover:text-accent/80 transition-colors"
           >
-            前往配置 →
-          </Link>
+            {tx('前往配置 →')}</Link>
         </div>
       )}
     </section>
@@ -380,6 +387,7 @@ export function MonitorWidget({ onStockClick, activeSymbol }: {
   onStockClick: (event: AlertEvent, navList?: NavItem[]) => void
   activeSymbol?: string
 }) {
+  const { tx } = useI18n()
   const navigate = useNavigate()
   const customNames = useCustomSignalNames()
   const alerts = useQuery({
@@ -393,7 +401,7 @@ export function MonitorWidget({ onStockClick, activeSymbol }: {
 
   if (events.length === 0) {
     return (
-      <div className="mt-1 py-6 text-center text-[11px] text-muted">暂无触发记录</div>
+      <div className="mt-1 py-6 text-center text-[11px] text-muted">{tx('暂无触发记录')}</div>
     )
   }
 
@@ -420,7 +428,7 @@ export function MonitorWidget({ onStockClick, activeSymbol }: {
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => isSector ? navigate('/monitor') : ev.symbol && onStockClick(ev, alertNav)}
-                  title={isSector ? '在监控中心查看板块告警' : ev.symbol ? `查看 ${ev.symbol} 日K` : undefined}
+                  title={isSector ? tx('在监控中心查看板块告警') : ev.symbol ? tx('查看 {symbol} 日K', { symbol: ev.symbol }) : undefined}
                   className={`inline-flex items-center gap-1 min-w-0 shrink-0 rounded hover:bg-elevated/60 transition-colors -mx-0.5 px-0.5 ${isSector || ev.symbol ? 'cursor-pointer' : 'cursor-default'}`}
                 >
                   <span className="font-mono text-[10px] font-medium text-foreground/80 hover:text-accent">{ev.symbol?.replace(/\.(SH|SZ|BJ)$/, '')}</span>
@@ -481,7 +489,7 @@ export function MonitorWidget({ onStockClick, activeSymbol }: {
                 <>
                   <div className="mt-0.5 flex items-center gap-1.5">
                     <span className={cn('shrink-0 rounded px-1 py-px text-[8px] font-medium', _SOURCE_BADGE[ev.source] ?? 'bg-elevated text-muted')}>
-                      {_SOURCE_LABEL[ev.source] ?? ev.source}
+                      {tx(_SOURCE_LABEL[ev.source] ?? ev.source)}
                     </span>
                     {ev.message && (
                       <span className="text-[9px] text-muted truncate flex-1">{ev.message}</span>

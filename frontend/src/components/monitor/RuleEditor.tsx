@@ -188,13 +188,13 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
       if (!d.name.trim()) {
         const base = tx(TYPE_DEFAULT_NAME[d.type] ?? '监控规则')
         d.name = d.type === 'sector' && d.sector_targets?.length
-          ? `${base} · ${d.sector_targets[0].name}${d.sector_targets.length > 1 ? ` 等${d.sector_targets.length}个` : ''}`
+          ? tx('{v1} · {v2}{v3}', { v1: base, v2: d.sector_targets[0].name, v3: d.sector_targets.length > 1 ? tx(' 等{n}个', { n: d.sector_targets.length }) : '' })
           : d.type === 'abnormal'
-          ? `${base} · 接近度≥${d.threshold_pct ?? 70}%${d.abnormal_window && d.abnormal_window !== 'any' ? ` (${d.abnormal_window.toUpperCase()})` : ''}`
+          ? tx('{v1} · 接近度≥{v2}%{v3}', { v1: base, v2: d.threshold_pct ?? 70, v3: d.abnormal_window && d.abnormal_window !== 'any' ? ` (${d.abnormal_window.toUpperCase()})` : '' })
           : d.scope === 'watchlist_group' && selectedGroup
           ? tx('{v1} · 分组「{v2}」', { v1: base, v2: selectedGroup.name })
           : d.scope === 'symbols' && d.symbols.length > 0
-          ? `${base} · ${d.symbols[0]}${d.symbols.length > 1 ? ` 等${d.symbols.length}只` : ''}`
+          ? tx('{v1} · {v2}{v3}', { v1: base, v2: d.symbols[0], v3: d.symbols.length > 1 ? tx(' 等{n}只', { n: d.symbols.length }) : '' })
           : base
       }
       if (d.type === 'strategy') {
@@ -709,7 +709,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                       industryLevel === level ? 'bg-accent/10 text-accent' : 'text-muted hover:text-foreground'
                     }`}
                   >
-                    {level}级
+                    {tx('{n}级', { n: level })}
                   </button>
                 ))}
               </div>
@@ -832,7 +832,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                   onChange={event => setDraft(d => ({ ...d, window_minutes: Number(event.target.value) as MonitorRule['window_minutes'] }))}
                   className="h-9 w-full rounded-btn border border-border bg-base px-3 text-xs text-foreground"
                 >
-                  {[1, 3, 5, 10, 15].map(window => <option key={window} value={window}>{window} 分钟</option>)}
+                  {[1, 3, 5, 10, 15].map(window => <option key={window} value={window}>{window} {tx('分钟')}</option>)}
                 </select>
               </label>
             )}
@@ -958,7 +958,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
             </div>
             <label className="space-y-1.5">
               <span className="text-[11px] text-muted">
-                单轮放量阈值{draft.metric === 'amount' ? tx(' (万元)') : tx(' (手)')}
+                {tx('单轮放量阈值')}{draft.metric === 'amount' ? tx(' (万元)') : tx(' (手)')}
               </span>
               <span className="relative block">
                 <input
@@ -981,8 +981,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                 </span>
               </span>
               <span className="block text-[10px] text-muted/70">
-                相邻两次全市场轮询 (当前间隔 {Math.round(quoteInterval ?? 6)} 秒) 间的增量 ≥ 此值即提醒;
-                金额口径对不同股价更公平
+                {tx('相邻两次全市场轮询 (当前间隔 {n} 秒) 间的增量 ≥ 此值即提醒; 金额口径对不同股价更公平', { n: Math.round(quoteInterval ?? 6) })}
               </span>
             </label>
           </div>
@@ -1188,7 +1187,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
                     <>
                       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${resolveWatchlistGroupColor(selectedGroup.color).dot}`} />
                       <span className="max-w-32 truncate">{selectedGroup.name}</span>
-                      <span className="shrink-0 font-mono text-[9px] tabular-nums text-muted">{groupCounts[selectedGroup.id] ?? 0}只</span>
+                      <span className="shrink-0 font-mono text-[9px] tabular-nums text-muted">{groupCounts[selectedGroup.id] ?? 0}{tx('只')}</span>
                     </>
                   ) : (
                     <span className="text-muted">{watchGroupsQ.isLoading ? tx('加载分组中...') : tx('选择自选分组...')}</span>
@@ -1590,8 +1589,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
           if (unconfigured.length === 0) return null
           return (
             <p className="text-[10px] leading-relaxed text-warning/80">
-              {unconfigured.join('、')}尚未配置,
-              <Link to="/settings?tab=monitoring&highlight=webhooks" className="text-accent hover:text-accent/80">{tx('前往设置页配置 →')}</Link>
+              {unconfigured.join('、')}{tx('尚未配置,')}<Link to="/settings?tab=monitoring&highlight=webhooks" className="text-accent hover:text-accent/80">{tx('前往设置页配置 →')}</Link>
             </p>
           )
         })()}
@@ -1605,7 +1603,7 @@ export function RuleEditor({ rule, preset, simple, onClose, onSaved }: Props) {
           if (ready.length === 0) return null
           return (
             <p className="text-[10px] leading-relaxed text-muted">
-              命中本规则时,告警将推送到已配置的{ready.join(' + ')}。
+              {tx('命中本规则时,告警将推送到已配置的{v}。', { v: ready.join(' + ') })}
             </p>
           )
         })()}

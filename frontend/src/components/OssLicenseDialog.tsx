@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18n'
 import { X, ScrollText, ShieldAlert } from 'lucide-react'
 import { Modal } from '@/components/Modal'
 import {
@@ -16,14 +17,9 @@ export function LicenseComplianceNotice({ compact = false }: { compact?: boolean
     <div className={`flex items-start gap-2.5 rounded-lg border border-warning/30 bg-warning/5 ${compact ? 'p-3 mt-4' : 'p-3'}`}>
       <ShieldAlert className="h-4 w-4 text-warning shrink-0 mt-px" />
       <div className="min-w-0">
-        <div className="text-xs font-medium text-warning">许可合规声明</div>
+        <div className="text-xs font-medium text-warning">{tx('许可合规声明')}</div>
         <p className="mt-1 text-[11px] leading-relaxed text-secondary">
-          本项目基于 MIT 协议开源, 协议要求分发本软件或其任何部分时
-          <span className="text-warning font-medium">必须完整保留原始版权声明与许可文本</span>。
-          未经版权所有者书面许可, 移除、遮蔽或篡改版权署名、许可声明及本声明,
-          以及将本项目重新分发时隐匿来源的行为, 均构成协议违约与著作权侵权;
-          版权所有者保留依法追究责任的权利。
-        </p>
+          {tx('本项目基于 MIT 协议开源, 协议要求分发本软件或其任何部分时')}<span className="text-warning font-medium">{tx('必须完整保留原始版权声明与许可文本')}</span>{tx('。 未经版权所有者书面许可, 移除、遮蔽或篡改版权署名、许可声明及本声明, 以及将本项目重新分发时隐匿来源的行为, 均构成协议违约与著作权侵权; 版权所有者保留依法追究责任的权利。')}</p>
       </div>
     </div>
   )
@@ -44,12 +40,12 @@ export function OssLicenseDialog({ onClose }: { onClose: () => void }) {
       <div className="flex items-center justify-between px-5 py-3.5 border-b border-border shrink-0">
         <div className="flex items-center gap-2">
           <ScrollText className="h-4 w-4 text-accent" />
-          <h2 id="oss-license-title" className="text-sm font-medium text-foreground">开源许可</h2>
+          <h2 id="oss-license-title" className="text-sm font-medium text-foreground">{tx('开源许可')}</h2>
         </div>
         <button
           onClick={onClose}
           className="p-1 rounded hover:bg-elevated transition-colors text-secondary"
-          aria-label="关闭"
+          aria-label={tx('关闭')}
         >
           <X className="h-4 w-4" />
         </button>
@@ -82,13 +78,11 @@ export function OssLicenseDialog({ onClose }: { onClose: () => void }) {
         </section>
 
         {/* 第三方组件 */}
-        <LicenseSection title="前端组件" entries={FRONTEND_DEPENDENCIES} />
-        <LicenseSection title="后端组件" entries={BACKEND_DEPENDENCIES} />
+        <LicenseSection title={tx('前端组件')} entries={FRONTEND_DEPENDENCIES} />
+        <LicenseSection title={tx('后端组件')} entries={BACKEND_DEPENDENCIES} />
 
         <p className="text-[10px] leading-relaxed text-muted border-t border-border pt-3">
-          清单口径: 前后端直接运行时依赖 (构建工具与开发依赖不随产物分发, 故不列于此);
-          传递依赖由各自分发包携带许可。各组件的完整许可文本见其官方仓库。
-        </p>
+          {tx('清单口径: 前后端直接运行时依赖 (构建工具与开发依赖不随产物分发, 故不列于此); 传递依赖由各自分发包携带许可。各组件的完整许可文本见其官方仓库。')}</p>
 
         {/* 弹窗内再放一份声明 — 页面声明被移除时这里仍是威慑 */}
         <LicenseComplianceNotice />
@@ -118,7 +112,7 @@ function LicenseSection({ title, entries }: { title: string; entries: OssLicense
     <section>
       <h3 className="mb-2 text-xs font-medium text-secondary">
         {title}
-        <span className="ml-1.5 text-[10px] font-normal text-muted">{entries.length} 项</span>
+        <span className="ml-1.5 text-[10px] font-normal text-muted">{entries.length} {tx('项')}</span>
       </h3>
       <div className="rounded-lg border border-border overflow-hidden">
         <ul className="divide-y divide-border">

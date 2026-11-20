@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
 import { Loader2, CheckCircle2, Settings, Table2, Download } from 'lucide-react'
 import { formatNumber } from '@/lib/format'
+import { useI18n } from '@/lib/i18n'
 import { fmtDate } from '@/lib/format'
 import { MissingCapChip } from '@/lib/capability-labels'
 import { Skeleton } from './Skeleton'
@@ -44,6 +45,7 @@ function CapBadge({ hasCap, isLocal, missingCapName, capInfo, localSuffix, custo
   localSuffix?: string
   customProvider?: string | null
 }) {
+  const { tx } = useI18n()
   // 走自定义数据源时, 显示数据源名 (能力来源对所有数据源统一表达)
   if (customProvider) {
     return (
@@ -56,14 +58,14 @@ function CapBadge({ hasCap, isLocal, missingCapName, capInfo, localSuffix, custo
   if (isLocal) {
     return (
       <span className="text-[10px] text-secondary bg-elevated rounded px-1.5 py-px font-medium">
-        本地计算{localSuffix ? ` · ${localSuffix}` : ''}
+        {tx('本地计算')}{localSuffix ? ` · ${localSuffix}` : ''}
       </span>
     )
   }
 
   if (hasCap && capInfo) {
-    const parts = ['可用', `${capInfo.rpm}/min`]
-    if (capInfo.batch != null && capInfo.batch > 1) parts.push(`${capInfo.batch}股/批`)
+    const parts = [tx('可用'), `${capInfo.rpm}/min`]
+    if (capInfo.batch != null && capInfo.batch > 1) parts.push(tx('{n}股/批', { n: capInfo.batch }))
     return (
       <span className="text-[10px] text-accent/80 bg-accent/8 rounded px-1.5 py-px font-mono font-medium">
         {parts.join(' · ')}
@@ -73,14 +75,13 @@ function CapBadge({ hasCap, isLocal, missingCapName, capInfo, localSuffix, custo
 
   if (!hasCap && missingCapName) {
     // 能力标准对所有数据源一致: 缺能力提示能力名而非档位, 点击跳数据源设置
-    return <MissingCapChip label={missingCapName} />
+    return <MissingCapChip label={tx(missingCapName)} />
   }
 
   if (hasCap) {
     return (
       <span className="text-[10px] text-accent/80 bg-accent/8 rounded px-1.5 py-px font-medium">
-        可用
-      </span>
+        {tx(tx('可用'))}</span>
     )
   }
 
@@ -121,6 +122,7 @@ export function StatCard({
   onPull?: () => void
   pullTitle?: string
 }) {
+  const { tx } = useI18n()
   const empty = loading || !stats || (stats.rows === 0 && !stats.trading_days && !stats.fields)
   const borderCls = active
     ? 'border-accent/50'
@@ -146,7 +148,7 @@ export function StatCard({
         <button
           onClick={(e) => { e.stopPropagation(); onShowFields() }}
           className="inline-flex align-middle ml-1 p-0.5 rounded hover:bg-elevated transition-colors text-secondary hover:text-accent"
-          title="查看字段说明"
+          title={tx('查看字段说明')}
         >
           <Table2 className="h-3 w-3" />
         </button>
@@ -161,7 +163,7 @@ export function StatCard({
       key={tab.table}
       onClick={(e) => { e.stopPropagation(); onShowFields?.(tab.table) }}
       className="inline-flex align-middle -mt-px p-0.5 rounded hover:bg-elevated transition-colors text-secondary hover:text-accent"
-      title={`查看${tab.label}字段说明`}
+      title={tx('查看{label}字段说明', { label: tab.label })}
     >
       <Table2 className="h-3 w-3" />
     </button>
@@ -170,16 +172,16 @@ export function StatCard({
   // subLabel 文本内容 (不含图标)
   const subLabelText = subLabel
     ?? (isInstrument
-      ? `标的 · ${((stats?.named ?? stats?.rows) ?? 0).toLocaleString()} 个含名称`
+      ? tx('标的 · {n} 个含名称', { n: ((stats?.named ?? stats?.rows) ?? 0).toLocaleString() })
       : stats?.fields
-        ? '字段 · 复权 · 技术指标'
+        ? tx('字段 · 复权 · 技术指标')
         : title === '日 K' && stats?.trading_days
-          ? '日 · A股标的 · 日线'
+          ? tx('日 · A股标的 · 日线')
           : stats?.trading_days && !stats?.rows
-            ? '日 · A股标的 · 分钟级'
+            ? tx('日 · A股标的 · 分钟级')
             : (() => {
-                const parts = [`行 · ${(stats?.symbols_covered ?? 0)} 只标的`]
-                if (stats?.trading_days) parts.push(`· ${stats.trading_days} 日`)
+                const parts = [tx('行 · {n} 只标的', { n: stats?.symbols_covered ?? 0 })]
+                if (stats?.trading_days) parts.push(tx('· {n} 日', { n: stats.trading_days }))
                 return parts.join(' ')
               })())
 
@@ -219,22 +221,21 @@ export function StatCard({
           {auto !== undefined && !loading && (
             <span className="inline-flex items-center gap-1 text-[10px] font-medium">
               <span className={`inline-block h-1.5 w-1.5 rounded-full ${auto ? 'bg-accent shadow-[0_0_4px_rgba(61,214,140,0.5)]' : 'bg-muted'}`} />
-              <span className={auto ? 'text-accent/70' : 'text-muted'}>{auto ? '自动' : '关闭'}</span>
+              <span className={auto ? 'text-accent/70' : 'text-muted'}>{auto ? tx('自动') : tx('关闭')}</span>
             </span>
           )}
           {active && <Loader2 className="h-3.5 w-3.5 text-accent animate-spin" />}
           {done && !active && !skipped && <CheckCircle2 className="h-3.5 w-3.5 text-bear" />}
           {skipped && !active && (
             <span className="text-[10px] text-muted bg-elevated rounded px-1.5 py-px font-medium">
-              本次跳过
-            </span>
+              {tx('本次跳过')}</span>
           )}
           {onPull && (
             <button
               onClick={(e) => { e.stopPropagation(); onPull() }}
               className="rounded p-0.5 text-secondary transition-colors hover:bg-elevated hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-              title={pullTitle ?? '手动拉取'}
-              aria-label={pullTitle ?? '手动拉取'}
+              title={pullTitle ?? tx('手动拉取')}
+              aria-label={pullTitle ?? tx('手动拉取')}
             >
               <Download className="h-3.5 w-3.5" />
             </button>
@@ -245,7 +246,7 @@ export function StatCard({
               className={`p-0.5 rounded hover:bg-elevated transition-colors ${
                 settingsOpen ? 'text-accent' : 'text-secondary'
               }`}
-              title="设置"
+              title={tx('设置')}
             >
               <Settings className="h-3.5 w-3.5" />
             </button>
@@ -280,7 +281,7 @@ export function StatCard({
           <>
             <div className="font-mono text-2xl font-bold tracking-tight tabular-nums text-foreground">—</div>
             <div className="text-[11px] text-muted mt-0.5">
-              暂无数据{renderFieldButtons()}
+              {tx('暂无数据')}{renderFieldButtons()}
             </div>
           </>
         ) : (
@@ -308,22 +309,22 @@ export function StatCard({
         ) : empty ? (
           <>
             <div className="flex justify-between text-[11px]">
-              <span className="text-muted">{isInstrument ? '快照日' : '起'}</span>
+              <span className="text-muted">{isInstrument ? tx('快照日') : tx('起')}</span>
               <span className="font-mono text-secondary">—</span>
             </div>
             <div className="flex justify-between text-[11px]">
-              <span className="text-muted">{isInstrument ? '标的数' : '止'}</span>
+              <span className="text-muted">{isInstrument ? tx('标的数') : tx('止')}</span>
               <span className="font-mono text-secondary">—</span>
             </div>
           </>
         ) : (
           <>
             <div className="flex justify-between text-[11px]">
-              <span className="text-muted">{isInstrument ? '快照日' : '起'}</span>
+              <span className="text-muted">{isInstrument ? tx('快照日') : tx('起')}</span>
               <span className="font-mono text-secondary">{fmtDate(isInstrument ? stats.latest_as_of : stats.earliest_date)}</span>
             </div>
             <div className="flex justify-between text-[11px]">
-              <span className="text-muted">{isInstrument ? '标的数' : '止'}</span>
+              <span className="text-muted">{isInstrument ? tx('标的数') : tx('止')}</span>
               <span className="font-mono text-secondary">{isInstrument ? String(stats.rows) : fmtDate(stats.latest_date)}</span>
             </div>
           </>

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { AlertTriangle, Info } from 'lucide-react'
 import { api } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 
 // 无除权因子能力时的同步前置确认。
@@ -59,14 +60,12 @@ export function useAdjFactorSyncGate() {
             <AlertTriangle className="h-5 w-5 text-warning" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-foreground mb-1.5">当前无除权因子能力</h3>
+            <h3 className="text-sm font-semibold text-foreground mb-1.5">{tx('当前无除权因子能力')}</h3>
             <p className="text-xs text-secondary leading-relaxed">
-              本次同步的日K将以<span className="text-foreground font-medium">不复权价格</span>入库并计算指标,
-              K 线可能包含除权跳空。后续配置除权因子能力后重新同步, 才能得到前复权口径的数据。
-            </p>
+              {tx('本次同步的日K将以')}<span className="text-foreground font-medium">{tx('不复权价格')}</span>{tx('入库并计算指标, K 线可能包含除权跳空。后续配置除权因子能力后重新同步, 才能得到前复权口径的数据。')}</p>
             <div className="mt-2 flex items-start gap-1.5 text-[11px] text-warning">
               <Info className="h-3.5 w-3.5 shrink-0 mt-px text-warning" />
-              <span>若期间发生除权(分红/送转)事件, 已有数据需要重新校准。</span>
+              <span>{tx('若期间发生除权(分红/送转)事件, 已有数据需要重新校准。')}</span>
             </div>
             <label className="mt-3 flex items-center gap-1.5 text-[11px] text-muted cursor-pointer select-none">
               <input
@@ -75,8 +74,7 @@ export function useAdjFactorSyncGate() {
                 onChange={e => setNoRemind(e.target.checked)}
                 className="h-3 w-3 accent-accent cursor-pointer"
               />
-              不再提示
-            </label>
+              {tx('不再提示')}</label>
           </div>
         </div>
         <div className="mt-5 flex justify-end gap-2">
@@ -84,8 +82,7 @@ export function useAdjFactorSyncGate() {
             onClick={() => setPending(null)}
             className="px-4 h-9 rounded-btn text-sm text-secondary hover:text-foreground hover:bg-elevated transition-colors"
           >
-            取消
-          </button>
+            {tx('取消')}</button>
           <button
             onClick={() => {
               try { localStorage.setItem(NO_REMIND_KEY, noRemind ? '1' : '0') } catch { /* 私隐模式等场景静默 */ }
@@ -94,8 +91,7 @@ export function useAdjFactorSyncGate() {
             }}
             className="px-4 h-9 rounded-btn bg-accent text-white text-sm font-medium hover:bg-accent/90 transition-colors"
           >
-            仍然同步
-          </button>
+            {tx('仍然同步')}</button>
         </div>
       </motion.div>
     </div>

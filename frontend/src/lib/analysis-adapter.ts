@@ -9,6 +9,7 @@
  */
 
 import type { ExtDataConfig, ExtDataField, ExtDataRowsResult } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 
 // ===== 公共类型 =====
 
@@ -48,12 +49,12 @@ export interface ResolvedDimension {
 // ===== 结构探测 =====
 
 const SEPARATORS = /[、,，;；|/\s]+/
-const CONSTITUENT_KEYS = [
-  'constituents', '成分股', 'stocks', 'members', 'codes', 'list',
+const CONSTITUENT_KEYS = [ // i18n-exempt: 这些是后端字段名/表头候选键, 用于结构探测, 不是展示文案
+  'constituents', '成分股', 'stocks', 'members', 'codes', 'list', // i18n-exempt: 字段名/表头候选键, 用于结构探测
   'symbol_list', 'stock_list', 'member_list',
 ]
-const DIMENSION_NAME_KEYS = [
-  'name', '概念名称', '概念', '行业名称', '行业', '板块名称', '板块',
+const DIMENSION_NAME_KEYS = [ // i18n-exempt: 同上, 字段名候选键不是展示文案
+  'name', '概念名称', '概念', '行业名称', '行业', '板块名称', '板块', // i18n-exempt: 字段名候选键, 不是展示文案
   'concept', 'industry', 'sector', 'theme', 'title', 'label',
 ]
 const INVALID_DIMENSION_VALUES = new Set(['nan', 'none', 'null'])
@@ -90,7 +91,7 @@ export function pickDimensionField(
   candidates: string[],
 ): string {
   const nonMeta = fields.filter(f =>
-    !['symbol', 'code', 'name', '股票简称', '股票代码', 'date'].includes(f.name)
+    !['symbol', 'code', 'name', '股票简称', '股票代码', 'date'].includes(f.name) // i18n-exempt: 字段名白名单
   )
   for (const c of candidates) {
     const m = nonMeta.find(f =>
@@ -258,7 +259,7 @@ export function resolveDimension(
       dimensionField: nameField,
       groups,
       allStocks,
-      hint: `检测到板块维度结构（成分股字段: ${constituentField}）`,
+      hint: tx('检测到板块维度结构（成分股字段: {v}）', { v: constituentField }),
     }
   }
 
@@ -271,7 +272,7 @@ export function resolveDimension(
       dimensionField: '',
       groups: [],
       allStocks: rows as StockRow[],
-      hint: '未找到合适的维度字段',
+      hint: tx('未找到合适的维度字段'),
     }
   }
 
@@ -284,7 +285,7 @@ export function resolveDimension(
     dimensionField,
     groups,
     allStocks,
-    hint: `按 ${dimensionField} 分组，共 ${groups.length} 个维度`,
+    hint: tx('按 {v} 分组，共 {n} 个维度', { v: dimensionField, n: groups.length }),
   }
 }
 

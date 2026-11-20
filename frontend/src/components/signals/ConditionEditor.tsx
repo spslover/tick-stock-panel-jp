@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, Plus, Search, X } from 'lucide-react'
 import type { CustomSignalCondition, CustomSignalFieldGroup } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
 
 // 多行「字段 + 运算符 + 值」条件编辑器 (受控), 从自定义信号弹窗提取共用:
@@ -38,6 +39,7 @@ interface Props {
 }
 
 export function ConditionEditor({ conditions, onChange, options, max = 8, title, headerExtra, allowEmpty = false }: Props) {
+  const { tx } = useI18n()
   const {
     fields, groups, stringFields,
     operators = ['>', '>=', '<', '<=', '==', '!='],
@@ -66,7 +68,7 @@ export function ConditionEditor({ conditions, onChange, options, max = 8, title,
     <div className="space-y-2">
       {title !== '' && (
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] text-muted">{title ?? '条件（多条件为「且」关系）'}</span>
+          <span className="text-[11px] text-muted">{title ?? tx('条件（多条件为「且」关系）')}</span>
           <div className="flex items-center gap-2 shrink-0">
             {headerExtra}
             <button
@@ -74,21 +76,20 @@ export function ConditionEditor({ conditions, onChange, options, max = 8, title,
               disabled={conditions.length >= max}
               className="inline-flex items-center gap-1 text-[11px] text-accent hover:text-accent/80 cursor-pointer disabled:opacity-40"
             >
-              <Plus className="h-3 w-3" />添加条件
-            </button>
+              <Plus className="h-3 w-3" />{tx('添加条件')}</button>
           </div>
         </div>
       )}
       <div className="space-y-2 rounded-card border border-border/70 bg-base/50 p-3">
         {conditions.length === 0 && (
-          <div className="text-[11px] text-muted/70 py-1.5">无条件 — 不叠加过滤</div>
+          <div className="text-[11px] text-muted/70 py-1.5">{tx('无条件 — 不叠加过滤')}</div>
         )}
         {conditions.map((c, i) => {
           const isStr = stringFields.includes(c.left)
           const condOps = isStr ? stringOperators : operators
           return (
             <div key={i} className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] text-muted/60 w-5 text-right shrink-0">{i === 0 ? '当' : '且'}</span>
+              <span className="text-[10px] text-muted/60 w-5 text-right shrink-0">{i === 0 ? tx('当') : tx('且')}</span>
 
               {/* 左操作数: 前N日 + 字段(弹出选择) */}
               {!hideDays && <DaysInput value={c.leftDays ?? 0} max={maxDays} onChange={v => updateCond(i, { leftDays: v })} />}
@@ -96,13 +97,13 @@ export function ConditionEditor({ conditions, onChange, options, max = 8, title,
 
               {/* 运算符: 字符串字段为 包含/等于/不等于 */}
               <select value={c.op} onChange={e => updateCond(i, { op: e.target.value })} className="w-11 h-7 px-0.5 rounded bg-base border border-border text-[11px] font-mono text-foreground text-center focus:outline-none focus:border-accent/50">
-                {condOps.map(op => <option key={op} value={op}>{OP_LABELS[op] ?? op}</option>)}
+                {condOps.map(op => <option key={op} value={op}>{tx(OP_LABELS[op] ?? op)}</option>)}
               </select>
 
               {/* 右操作数: 字符串字段为文本字面量; 其余为 前N日(仅字段) + 字段/常量(弹出选择) */}
               {isStr ? (
                 <input type="text" value={c.right} onChange={e => updateCond(i, { right: e.target.value })}
-                  placeholder="概念/行业名, 如 AI" maxLength={64}
+                  placeholder={tx('概念/行业名, 如 AI')} maxLength={64}
                   className="flex-1 min-w-0 h-7 px-1.5 rounded bg-base border border-border text-[11px] text-foreground focus:outline-none focus:border-accent/50" />
               ) : (
                 <RightValueInput cond={c} fields={fields} groups={groups} maxDays={maxDays} hideDays={hideDays}
@@ -111,7 +112,7 @@ export function ConditionEditor({ conditions, onChange, options, max = 8, title,
               )}
 
               {(conditions.length > 1 || allowEmpty) && (
-                <button onClick={() => removeCond(i)} aria-label="删除条件" className="p-1 rounded text-muted hover:text-danger hover:bg-danger/10 cursor-pointer">
+                <button onClick={() => removeCond(i)} aria-label={tx('删除条件')} className="p-1 rounded text-muted hover:text-danger hover:bg-danger/10 cursor-pointer">
                   <X className="h-3 w-3" />
                 </button>
               )}
@@ -131,6 +132,7 @@ function FieldPicker({ value, fields, groups, onChange }: {
   groups?: CustomSignalFieldGroup[]
   onChange: (v: string) => void
 }) {
+  const { tx } = useI18n()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const backdrop = useDialogBackdrop(() => setOpen(false))
@@ -180,7 +182,7 @@ function FieldPicker({ value, fields, groups, onChange }: {
                 {/* 标题 + 搜索 */}
                 <div className="p-3 border-b border-border/50 space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-foreground">选择字段</span>
+                    <span className="text-xs font-medium text-foreground">{tx('选择字段')}</span>
                     <button onClick={() => setOpen(false)} className="rounded p-1 text-muted hover:bg-elevated hover:text-foreground transition-colors">
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -191,7 +193,7 @@ function FieldPicker({ value, fields, groups, onChange }: {
                       autoFocus
                       value={query}
                       onChange={e => setQuery(e.target.value)}
-                      placeholder="搜索字段…"
+                      placeholder={tx('搜索字段…')}
                       className="flex-1 bg-transparent text-xs text-foreground focus:outline-none"
                     />
                     {query && <button onClick={() => setQuery('')} className="text-muted hover:text-foreground"><X className="h-3 w-3" /></button>}
@@ -216,7 +218,7 @@ function FieldPicker({ value, fields, groups, onChange }: {
                         ))}
                       </div>
                     )) : (
-                      <div className="px-3 py-8 text-center text-xs text-muted">无匹配字段</div>
+                      <div className="px-3 py-8 text-center text-xs text-muted">{tx('无匹配字段')}</div>
                     )
                   ) : (
                     filteredFields.map(f => (
@@ -245,21 +247,21 @@ function FieldPicker({ value, fields, groups, onChange }: {
 // ── 日期偏移控件: "最新" / "前N日" ───────────────────────
 
 function DaysInput({ value, max, onChange }: { value: number; max: number; onChange: (v: number) => void }) {
+  const { tx } = useI18n()
   if (!value) {
     return (
       <button
         type="button"
         onClick={() => onChange(1)}
-        title="点击切换为「前N日」(取 N 个交易日前的值)"
+        title={tx('点击切换为「前N日」(取 N 个交易日前的值)')}
         className="h-7 px-2 rounded bg-base border border-border text-[11px] text-muted hover:text-accent hover:border-accent/50 transition-colors shrink-0 cursor-pointer"
       >
-        最新
-      </button>
+        {tx('最新')}</button>
     )
   }
   return (
     <div className="flex items-center h-7 rounded bg-base border border-border focus-within:border-accent/50 transition-colors shrink-0">
-      <span className="pl-1.5 text-[11px] text-muted select-none">前</span>
+      <span className="pl-1.5 text-[11px] text-muted select-none">{tx('前')}</span>
       <input
         type="number"
         min={1}
@@ -271,17 +273,16 @@ function DaysInput({ value, max, onChange }: { value: number; max: number; onCha
           const n = Math.max(1, Math.min(max, parseInt(raw) || 1))
           onChange(n)
         }}
-        title={`前 ${value} 个交易日的值`}
+        title={tx('前 {n} 个交易日的值', { n: value })}
         className="w-7 h-full px-0 text-[11px] font-mono text-foreground text-center bg-transparent focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
       />
       <button
         type="button"
         onClick={() => onChange(0)}
-        title="切回「最新」"
+        title={tx('切回「最新」')}
         className="pr-1.5 pl-0.5 text-[11px] text-muted hover:text-accent transition-colors cursor-pointer"
       >
-        日
-      </button>
+        {tx('日')}</button>
     </div>
   )
 }
@@ -297,6 +298,7 @@ function RightValueInput({ cond, fields, groups, maxDays, hideDays, onChangeRigh
   onChangeRight: (v: string) => void
   onChangeDays: (v: number) => void
 }) {
+  const { tx } = useI18n()
   // 右值可为字段引用或数字常量; 迁移的历史信号 (如残月) 常量是 number — 后端
   // isinstance(int,float) 一直合法, 前端判断必须先排除非字符串再 startsWith
   const right = cond.right
@@ -310,7 +312,7 @@ function RightValueInput({ cond, fields, groups, maxDays, hideDays, onChangeRigh
         <>
           {!hideDays && <DaysInput value={cond.rightDays ?? 0} max={maxDays} onChange={onChangeDays} />}
           <FieldPicker value={fieldValue} fields={fields} groups={groups} onChange={v => onChangeRight(`field:${v}`)} />
-          <button onClick={() => onChangeRight('0')} title="切换为数字" className="p-0.5 rounded text-muted hover:text-accent cursor-pointer shrink-0">
+          <button onClick={() => onChangeRight('0')} title={tx('切换为数字')} className="p-0.5 rounded text-muted hover:text-accent cursor-pointer shrink-0">
             <ArrowRight className="h-3 w-3 rotate-90" />
           </button>
         </>
@@ -320,7 +322,7 @@ function RightValueInput({ cond, fields, groups, maxDays, hideDays, onChangeRigh
           {!hideDays && <div className="shrink-0" style={{ width: 44 }} />}
           <input type="number" value={numValue} onChange={e => onChangeRight(e.target.value)} step="any"
             className="flex-1 min-w-0 h-7 px-1.5 rounded bg-base border border-border text-[11px] font-mono text-foreground text-center focus:outline-none focus:border-accent/50" />
-          <button onClick={() => onChangeRight('field:close')} title="切换为字段" className="p-0.5 rounded text-muted hover:text-accent cursor-pointer shrink-0">
+          <button onClick={() => onChangeRight('field:close')} title={tx('切换为字段')} className="p-0.5 rounded text-muted hover:text-accent cursor-pointer shrink-0">
             <ArrowRight className="h-3 w-3 -rotate-90" />
           </button>
         </>

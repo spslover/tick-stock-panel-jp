@@ -67,7 +67,7 @@ export interface AssistantContext {
 
 async function requestJson<T>(path: string): Promise<T> {
   const res = await fetch(path)
-  if (!res.ok) throw new Error(`AI 助手接口请求失败: ${res.status}`)
+  if (!res.ok) throw new Error(tx('AI 助手接口请求失败: {status}', { status: res.status }))
   return res.json() as Promise<T>
 }
 
@@ -87,11 +87,11 @@ export async function decideAssistantAction(callId: string, approve: boolean): P
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ approve }),
   })
-  if (!res.ok) throw new Error(`确认请求失败: ${res.status}`)
+  if (!res.ok) throw new Error(tx('确认请求失败: {status}', { status: res.status }))
 }
 
 /** 对话主入口: POST NDJSON, 逐行 yield 事件; signal 支持中断。 */
-import { getLocale } from '@/lib/i18n'
+import { tx, getLocale } from '@/lib/i18n'
 
 export async function* assistantChatStream(
   body: { messages: ChatHistoryMessage[]; context?: AssistantContext },
@@ -109,7 +109,7 @@ export async function* assistantChatStream(
       const parsed = JSON.parse(await res.text()) as { detail?: string; message?: string }
       detail = parsed.detail ?? parsed.message ?? ''
     } catch { /* 忽略解析失败, 走状态码文案 */ }
-    throw new Error(detail || `AI 助手请求失败: ${res.status}`)
+    throw new Error(detail || tx('AI 助手请求失败: {status}', { status: res.status }))
   }
   if (!res.body) throw new Error('响应无 body')
 

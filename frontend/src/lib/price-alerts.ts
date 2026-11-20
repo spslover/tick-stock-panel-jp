@@ -1,4 +1,5 @@
 import type { MonitorRule } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 import { fmtAssetPrice } from '@/lib/format'
 
 export type PriceAlertDirection = 'up' | 'down'
@@ -49,7 +50,7 @@ export function buildPriceAlertMessage(
   target: number,
   assetType?: string,
 ): string {
-  return `${name || symbol}股价${direction === 'up' ? '上穿' : '下穿'} ${fmtAssetPrice(target, assetType)}`
+  return tx('{s}股价{d} {p}', { s: name || symbol, d: direction === 'up' ? tx('上穿') : tx('下穿'), p: fmtAssetPrice(target, assetType) })
 }
 
 export function buildMonitorPriceLines(rules: MonitorRule[], symbol: string): MonitorPriceLine[] {
@@ -60,7 +61,7 @@ export function buildMonitorPriceLines(rules: MonitorRule[], symbol: string): Mo
     const isUp = alert.direction === 'up'
     return [{
       value: alert.target,
-      label: `${isUp ? '上穿' : '下穿'} ${fmtAssetPrice(alert.target, rule.asset_type)}`,
+      label: tx('{d} {p}', { d: isUp ? tx('上穿') : tx('下穿'), p: fmtAssetPrice(alert.target, rule.asset_type) }),
       color: isUp ? '#C74040' : '#2D9B65',
     }]
   })

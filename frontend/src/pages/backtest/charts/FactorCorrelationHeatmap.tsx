@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { EChartsOption } from 'echarts'
 import { useChartTheme } from '@/lib/theme'
+import { tx } from '@/lib/i18n'
 import { useECharts } from './useECharts'
 
 export interface FactorCorrelationHeatmapProps {
@@ -100,7 +101,7 @@ export function FactorCorrelationHeatmap({
           const columnLabel = escapeHtml(prepared.labels[columnIndex] ?? '')
           return `<div style="font-size:11px;color:${ct.text};margin-bottom:5px">${rowLabel} × ${columnLabel}</div>
             <div style="display:flex;justify-content:space-between;gap:18px"><span>rho</span><span style="font-family:monospace">${rho.toFixed(4)}</span></div>
-            <div style="display:flex;justify-content:space-between;gap:18px"><span>配对数</span><span style="font-family:monospace">${pairCount == null ? '—' : pairCount.toLocaleString('zh-CN')}</span></div>`
+            <div style="display:flex;justify-content:space-between;gap:18px"><span>${tx('配对数')}</span><span style="font-family:monospace">${pairCount == null ? '—' : pairCount.toLocaleString('zh-CN')}</span></div>`
         },
       },
       xAxis: {
@@ -179,12 +180,11 @@ export function FactorCorrelationHeatmap({
         ref={chartRef}
         className="h-full w-full min-w-0"
         role="img"
-        aria-label="因子相关性热力图"
+        aria-label={tx('因子相关性热力图')}
       />
       {isEmpty && (
         <div className="absolute inset-0 flex items-center justify-center bg-surface text-xs text-secondary">
-          暂无相关性数据
-        </div>
+          {tx('暂无相关性数据')}</div>
       )}
     </div>
   )

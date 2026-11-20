@@ -996,7 +996,7 @@ function RulesList({ rulesQuery, onEdit }: {
                     const option = STRATEGY_NOTIFY_EVENT_OPTIONS.find(item => item.key === event)
                     return option ? (
                       <span key={event} className="rounded bg-elevated px-1.5 py-0.5 text-[9px] text-secondary">
-                        {option.label}
+                        {tx(option.label)}
                       </span>
                     ) : null
                   })}

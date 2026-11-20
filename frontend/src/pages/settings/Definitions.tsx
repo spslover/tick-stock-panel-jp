@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18n'
 /**
  * 统一定义目录面板 — "一切皆扩展"的消费面 (P4)。
  *
@@ -19,11 +20,9 @@ export function SettingsDefinitionsPanel() {
             <Library className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <div className="text-sm font-medium text-foreground">统一定义目录</div>
+            <div className="text-sm font-medium text-foreground">{tx('统一定义目录')}</div>
             <div className="mt-0.5 text-[11px] leading-relaxed text-muted">
-              自定义信号与因子的统一视图 (语言 / 依赖 / 预热 / 状态)。
-              「冒烟」当场执行 校验 → 编译 → 依赖可解析, 拼错列名 (W001)
-              无需跑回测即可发现; 导入配置备份时同一检查自动执行。
+              {tx('自定义信号与因子的统一视图 (语言 / 依赖 / 预热 / 状态)。 「冒烟」当场执行 校验 → 编译 → 依赖可解析, 拼错列名 (W001) 无需跑回测即可发现; 导入配置备份时同一检查自动执行。')}
             </div>
           </div>
         </div>

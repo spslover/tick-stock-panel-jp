@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { PenLine } from 'lucide-react'
 import { api } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 
 /** 展示与过滤可选项 (全部可选, 有默认值) */
@@ -97,7 +98,7 @@ export function SignalPicker({ signals, onChange, kind, options }: Props) {
             key={id}
             type="button"
             onClick={() => toggle(id)}
-            title={cs.archived ? '该信号已归档 (仍在生效), 可在信号库 · 档案库恢复' : '信号库定义, 可在信号库编辑'}
+            title={cs.archived ? tx('该信号已归档 (仍在生效), 可在信号库 · 档案库恢复') : tx('信号库定义, 可在信号库编辑')}
             className={`${btnCls} relative ${signals.includes(id) ? active : idle} ${cs.archived ? 'opacity-60' : ''}`}
           >
         {customOptions.names[id]}

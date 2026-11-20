@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18n'
 import { useSyncExternalStore } from 'react'
 import { fetchRunningTask, reportTaskFinished, reportTaskRunning } from './taskRegistry'
 
@@ -155,7 +156,7 @@ function connectSSE(url: string): void {
       current = { ...current, isPending: false, result, error: null }
       emit()
     } catch {
-      current = { ...current, isPending: false, error: '结果解析失败' }
+      current = { ...current, isPending: false, error: tx('结果解析失败') }
       emit()
     }
     es.close()
@@ -168,11 +169,11 @@ function connectSSE(url: string): void {
     if (current?.id !== id) return
     if (e.data) {
       try {
-        const msg = JSON.parse(e.data)?.message ?? 'walk-forward 出错'
+        const msg = JSON.parse(e.data)?.message ?? tx('walk-forward 出错')
         current = { ...current, isPending: false, error: msg }
         emit()
       } catch {
-        current = { ...current, isPending: false, error: 'walk-forward 出错' }
+        current = { ...current, isPending: false, error: tx('walk-forward 出错') }
         emit()
       }
       es.close()
@@ -189,7 +190,7 @@ function connectSSE(url: string): void {
         eventSource = null
         // 清 localStorage: 否则刷新页面 tryReconnect 会重连到这个已放弃的任务。
         finishTaskRegistry()
-        current = { ...current, isPending: false, error: '连接中断, 重连多次失败' }
+        current = { ...current, isPending: false, error: tx('连接中断, 重连多次失败') }
         emit()
       }
     }
@@ -259,7 +260,7 @@ export function stopWalkForward(): void {
     }, 5000)
   }
   if (current?.isPending) {
-    current = { ...current, isPending: false, error: '已取消' }
+    current = { ...current, isPending: false, error: tx('已取消') }
     emit()
   }
 }

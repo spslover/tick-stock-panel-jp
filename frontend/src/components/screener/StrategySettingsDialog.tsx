@@ -199,7 +199,7 @@ const ParamField = memo(function ParamField({ def, value, onChange, onApplyValue
             checked ? 'translate-x-[14px]' : 'translate-x-0.5'
           }`} />
         </button>
-        <span className="text-[10px] text-muted/60">{checked ? tx('开') : tx('关')}</span>
+        <span className="text-[10px] text-muted/60">{checked ? tx('启用') : tx('停用')}</span>
       </div>
     )
   }
@@ -573,7 +573,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
             <div className="flex items-center gap-2.5">
               <Settings2 className="h-4 w-4 text-accent" />
               <span id="strategy-settings-title" className="text-sm font-semibold text-foreground">{detail?.name ?? strategyId}</span>
-              {detail && <span className="text-[10px] px-1.5 py-0.5 rounded bg-elevated text-muted">{{ custom: '自定义', ai: 'AI', composite: '叠加' }[detail.source] ?? detail.source}</span>}
+              {detail && <span className="text-[10px] px-1.5 py-0.5 rounded bg-elevated text-muted">{tx({ custom: '自定义', ai: 'AI', composite: '叠加' }[detail.source] ?? detail.source)}</span>}
               <span className="text-[10px] text-muted/40 font-mono">{strategyId}</span>
             </div>
             <div className="flex items-center gap-2">
@@ -603,9 +603,9 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   <span className="text-[10px] text-muted/50">{tx('显示上限')}</span>
-                  <input type="number" value={displayLimit ?? ''} onChange={e => setDisplayLimit(e.target.value ? Number(e.target.value) : null)} step={1} min={10} max={200} placeholder="不限"
+                  <input type="number" value={displayLimit ?? ''} onChange={e => setDisplayLimit(e.target.value ? Number(e.target.value) : null)} step={1} min={10} max={200} placeholder={tx('不限')}
                     className="h-8 w-16 rounded-lg bg-base border border-border/40 px-1.5 text-xs font-mono text-foreground text-center focus:outline-none focus:border-accent/50" />
-                  <span className="text-[10px] text-muted/50">只</span>
+                  <span className="text-[10px] text-muted/50">{tx('只')}</span>
                 </div>
               </div>
 
@@ -644,7 +644,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                     </div>
                     {detail.timeframes.length > 0 && (
                       <div className="flex items-center justify-between text-[10px] text-muted/50">
-                        <span>周期</span>
+                        <span>{tx('周期')}</span>
                         <span className="text-muted/70">{detail.timeframes.map(t => tx(TF_LABEL[t] ?? t)).join(' / ')}</span>
                       </div>
                     )}
@@ -676,9 +676,9 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                           </>}
                         >
                           <div className="space-y-2">
-                            <RangeField label={tx('价格')} minVal={basicFilter.price_min} maxVal={basicFilter.price_max} onMinChange={v => setBF('price_min', v)} onMaxChange={v => setBF('price_max', v)} unit="元" step="1" />
-                            <RangeField label={tx('流通市值')} minVal={basicFilter.float_cap_min != null ? basicFilter.float_cap_min / 1e8 : null} maxVal={basicFilter.float_cap_max != null ? basicFilter.float_cap_max / 1e8 : null} onMinChange={v => setBF('float_cap_min', v != null ? v * 1e8 : null)} onMaxChange={v => setBF('float_cap_max', v != null ? v * 1e8 : null)} unit="亿" step="5" />
-                            <RangeField label="成交额" minVal={basicFilter.amount_min != null ? basicFilter.amount_min / 1e8 : null} maxVal={basicFilter.amount_max != null ? basicFilter.amount_max / 1e8 : null} onMinChange={v => setBF('amount_min', v != null ? v * 1e8 : null)} onMaxChange={v => setBF('amount_max', v != null ? v * 1e8 : null)} unit="亿" step="0.5" />
+                            <RangeField label={tx('价格')} minVal={basicFilter.price_min} maxVal={basicFilter.price_max} onMinChange={v => setBF('price_min', v)} onMaxChange={v => setBF('price_max', v)} unit={tx('元')} step="1" />
+                            <RangeField label={tx('流通市值')} minVal={basicFilter.float_cap_min != null ? basicFilter.float_cap_min / 1e8 : null} maxVal={basicFilter.float_cap_max != null ? basicFilter.float_cap_max / 1e8 : null} onMinChange={v => setBF('float_cap_min', v != null ? v * 1e8 : null)} onMaxChange={v => setBF('float_cap_max', v != null ? v * 1e8 : null)} unit={tx('亿')} step="5" />
+                            <RangeField label={tx('成交额')} minVal={basicFilter.amount_min != null ? basicFilter.amount_min / 1e8 : null} maxVal={basicFilter.amount_max != null ? basicFilter.amount_max / 1e8 : null} onMinChange={v => setBF('amount_min', v != null ? v * 1e8 : null)} onMaxChange={v => setBF('amount_max', v != null ? v * 1e8 : null)} unit={tx('亿')} step="0.5" />
                             <RangeField label={tx('换手率')} minVal={basicFilter.turnover_min} maxVal={basicFilter.turnover_max} onMinChange={v => setBF('turnover_min', v)} onMaxChange={v => setBF('turnover_max', v)} unit="%" step="0.5" />
                             <div className="flex items-start gap-2 pt-0.5">
                               <span className={`${FIELD_LABEL_CLS} pt-0.5`}>{tx('板块')}</span>
@@ -802,12 +802,12 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                                 if (n != null && ttpDrawdown != null && ttpDrawdown > n) setTtpDrawdown(n)
                               }}
                             />
-                            <RiskPctField label={tx('回撤止盈回撤')} value={ttpDrawdown} onChange={setTtpDrawdown} min={0.5} max={50} unit="点" />
+                            <RiskPctField label={tx('回撤止盈回撤')} value={ttpDrawdown} onChange={setTtpDrawdown} min={0.5} max={50} unit={tx('点')} />
                             <div className="flex items-center gap-2">
                               <span className={FIELD_LABEL_CLS}>{tx('最长持仓')}</span>
                               <input type="number" value={maxHoldDays ?? ''} onChange={e => setMaxHoldDays(e.target.value === '' ? null : Number(e.target.value))} step={1} min={1}
                                 className={`${FIELD_INPUT_CLS} w-[76px] px-2 text-center`} />
-                              <span className="text-[10px] text-muted">天{maxHoldDays == null && tx('（不限）')}</span>
+                              <span className="text-[10px] text-muted">{tx('天')}{maxHoldDays == null && tx('（不限）')}</span>
                             </div>
                           </div>
                           <div className="text-[10px] leading-4 text-muted/70">{tx('回撤止盈：涨幅达到「启动」后启用，从高点回撤「回撤」个百分点即卖出；留空 = 不启用对应纪律。')}</div>
@@ -845,7 +845,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                   {/* 叠加策略: 子策略列表 + 权重 (composite 专属) */}
                   <div className={page === 'children' ? PAGE_ANIM : 'hidden'}>
                     {isComposite && (() => {
-                      const SRC_LABEL: Record<string, string> = { custom: '自定义', ai: 'AI' }
+                      const SRC_LABEL: Record<string, string> = { custom: tx('自定义'), ai: 'AI' }
                       const SRC_CLS: Record<string, string> = {
                         custom: 'border-amber-400/25 bg-amber-400/10 text-amber-400',
                         ai: 'border-purple-500/25 bg-purple-500/10 text-purple-400',
@@ -885,7 +885,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                                     <Plus className="h-3 w-3 shrink-0 text-teal-400" />
                                     <span className="flex-1 truncate text-xs text-foreground">{s.name}</span>
                                     {s.source && (
-                                      <span className={`rounded border px-1 text-[8px] ${SRC_CLS[s.source] ?? ''}`}>{SRC_LABEL[s.source] ?? s.source}</span>
+                                      <span className={`rounded border px-1 text-[8px] ${SRC_CLS[s.source] ?? ''}`}>{tx(SRC_LABEL[s.source] ?? s.source)}</span>
                                     )}
                                   </button>
                                 ))}
@@ -909,7 +909,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
                                           {strategyOptionLabel(allStrategies.find(s => s.id === c.id) ?? c)}
                                         </button>
                                         {c.source && (
-                                          <span className={`shrink-0 rounded border px-1 text-[8px] ${SRC_CLS[c.source] ?? ''}`}>{SRC_LABEL[c.source] ?? c.source}</span>
+                                          <span className={`shrink-0 rounded border px-1 text-[8px] ${SRC_CLS[c.source] ?? ''}`}>{tx(SRC_LABEL[c.source] ?? c.source)}</span>
                                         )}
                                       </div>
                                       <div className="font-mono text-[10px] text-muted/50">{c.id}</div>
@@ -1014,7 +1014,7 @@ export function StrategySettingsDialog({ strategyId, onClose, onSaved, onAiModif
               )}
               <div className="flex gap-2 pt-2">
                 <button onClick={() => setShowDeleteConfirm(false)}
-                  className="flex-1 h-8 rounded-lg border border-border text-xs text-secondary hover:text-foreground">取消</button>
+                  className="flex-1 h-8 rounded-lg border border-border text-xs text-secondary hover:text-foreground">{tx('取消')}</button>
                 <button onClick={handleDelete} disabled={deleting}
                   className="flex-1 h-8 rounded-lg bg-danger text-white text-xs font-medium hover:bg-danger/90 disabled:opacity-50">
                   {deleting ? tx('删除中...') : tx('确认删除')}

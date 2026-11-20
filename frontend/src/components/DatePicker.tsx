@@ -1,3 +1,4 @@
+import { useI18n } from '@/lib/i18n'
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -21,7 +22,7 @@ interface DatePickerProps {
   align?: 'left' | 'right'
 }
 
-const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日']
+const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
 function pad(n: number) { return String(n).padStart(2, '0') }
 function toDateStr(y: number, m: number, d: number) {
@@ -44,11 +45,12 @@ export function DatePicker({
   onChange,
   min,
   max,
-  placeholder = '选择日期',
+  placeholder,
   className = '',
   buttonClassName = '',
   align = 'right',
 }: DatePickerProps) {
+  const { tx } = useI18n()
   const [open, setOpen] = useState(false)
   const [showYearPicker, setShowYearPicker] = useState(false)
   // 触发按钮 ref (外部点击检测 + 计算弹层坐标)
@@ -152,7 +154,7 @@ export function DatePicker({
     cells.push({ day: d, cur: false, dateStr: ds, disabled: !!min && ds < min || !!max && ds > max })
   }
 
-  const displayLabel = value || placeholder
+  const displayLabel = value || placeholder || tx('选择日期')
   const today = todayStr()
 
   return (
@@ -200,7 +202,7 @@ export function DatePicker({
               >
                 {showYearPicker
                   ? `${viewYear - 5} - ${viewYear + 6}`
-                  : `${viewYear} 年 ${viewMonth + 1} 月`
+                  : tx('{y} 年 {m} 月', { y: viewYear, m: viewMonth + 1 })
                 }
               </button>
               <button
@@ -242,7 +244,7 @@ export function DatePicker({
                 {/* 星期头 */}
                 <div className="grid grid-cols-7 text-center text-[10px] text-muted mb-1">
                   {WEEKDAYS.map((w) => (
-                    <div key={w}>{w}</div>
+                    <div key={w}>{tx(w)}</div>
                   ))}
                 </div>
 

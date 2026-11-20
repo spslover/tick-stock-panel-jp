@@ -647,7 +647,7 @@ export function CreateExtDialog({ onClose }: { onClose: () => void }) {
                         className="h-8 rounded-lg border border-border bg-base px-2 text-[11px] text-foreground cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/25 disabled:opacity-40"
                       >
                         {(schedulePeriod === 'weekly' ? WEEKDAY_OPTS() : MONTHDAY_OPTS()).map(([v, t]) => (
-                          <option key={v} value={String(v)}>{t}</option>
+                          <option key={v} value={String(v)}>{tx(t)}</option>
                         ))}
                       </select>
                       <div className="flex items-center gap-1.5">

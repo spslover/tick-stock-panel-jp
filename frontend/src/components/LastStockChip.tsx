@@ -1,5 +1,6 @@
 import { Clock } from 'lucide-react'
 import type { StockRef } from '@/lib/useLastStock'
+import { tx } from '@/lib/i18n'
 
 /**
  * "上次查看"个股胶囊 —— 显示在 PageHeader 右侧。
@@ -16,7 +17,7 @@ export function LastStockChip({
   return (
     <button
       onClick={() => onSelect?.(stock.symbol, stock.name)}
-      title={`继续查看 ${stock.name}`}
+      title={tx('继续查看 {v}', { v: stock.name })}
       className="group inline-flex items-center gap-1.5 rounded-lg border border-border/40 bg-elevated/40 px-2 py-1 hover:border-border hover:bg-elevated transition-colors"
     >
       <Clock className="h-3 w-3 text-muted shrink-0" />

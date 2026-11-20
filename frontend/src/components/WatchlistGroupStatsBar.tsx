@@ -1,4 +1,5 @@
 import type { WatchlistGroup } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { fmtPct } from '@/lib/format'
 import {
   groupPctColor,
@@ -51,6 +52,7 @@ export function WatchlistGroupStatsBar({
   config: GroupStatsConfig
   onConfigChange: (patch: GroupStatsConfigPatch) => void
 }) {
+  const { tx } = useI18n()
   const rows: Row[] = groups.map(group => {
     const color = resolveWatchlistGroupColor(group.color)
     return {
@@ -73,7 +75,7 @@ export function WatchlistGroupStatsBar({
     })
   }
 
-  const metricLabel = GROUP_METRICS.find(m => m.id === config.metric)?.label ?? ''
+  const metricLabel = tx(GROUP_METRICS.find(m => m.id === config.metric)?.label ?? '')
   const valueOf = (key: string) => groupMetricValue(pcts[key], config.metric)
 
   if (rows.length === 0) return null
@@ -91,7 +93,7 @@ export function WatchlistGroupStatsBar({
   return (
     <div className="border-b border-border bg-surface/40 px-5 py-2">
       <div className="mb-1 flex items-center justify-between">
-        <div className="text-[10px] uppercase tracking-wider text-muted">分组涨跌 · {metricLabel}</div>
+        <div className="text-[10px] uppercase tracking-wider text-muted">{tx('分组涨跌 ·')} {metricLabel}</div>
         <GroupStatsSettings config={config} onChange={onConfigChange} />
       </div>
       <div className="flex flex-col gap-px">
@@ -144,9 +146,9 @@ export function WatchlistGroupStatsBar({
               <span className="w-[72px] shrink-0 text-right text-[10px] tabular-nums">
                 {info && info.sampled > 0 ? (
                   <>
-                    <span className="text-bull">{info.up}涨</span>
+                    <span className="text-bull">{info.up}{tx('涨')}</span>
                     <span className="mx-0.5 text-muted/40">/</span>
-                    <span className="text-bear">{info.down}跌</span>
+                    <span className="text-bear">{info.down}{tx('跌')}</span>
                   </>
                 ) : (
                   <span className="text-muted">—</span>

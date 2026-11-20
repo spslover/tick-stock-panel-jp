@@ -40,6 +40,14 @@ export function Signals() {
 }
 
 function SignalsBody({ highlight }: { highlight: string }) {
+  const { tx } = useI18n()
+  /** 带偏移标注的字段显示: 收盘价(前1日) / MA20(最新省略)；字段名可能来自后端, 偏移后缀走词库 */
+  const fieldLabel = (key: string, fields: { key: string; label: string }[]): string =>
+    fields.find(f => f.key === key)?.label ?? key
+  const fieldWithDays = (key: string, days: number | undefined, fields: { key: string; label: string }[]): string => {
+    const label = fieldLabel(key, fields)
+    return days && days > 0 ? tx('{v}(前{n}日)', { v: tx(label), n: days }) : label
+  }
   const qc = useQueryClient()
   const list = useQuery({ queryKey: QK.customSignals, queryFn: api.customSignalsList, staleTime: 60_000 })
   const options = useQuery({ queryKey: QK.customSignalsOptions, queryFn: api.customSignalsOptions, staleTime: 60_000 })
@@ -93,10 +101,10 @@ function SignalsBody({ highlight }: { highlight: string }) {
   const setArchived = useMutation({
     mutationFn: ({ id, archived }: { id: string; archived: boolean }) => api.customSignalArchive(id, archived),
     onSuccess: (_data, variables) => {
-      toast(variables.archived ? '已归档到档案库，可随时恢复' : '已恢复到信号库', 'success')
+      toast(variables.archived ? tx('已归档到档案库，可随时恢复') : tx('已恢复到信号库'), 'success')
       void refreshResourceQueries(qc)
     },
-    onError: (error: Error) => toast(`操作失败 · ${error.message}`, 'error'),
+    onError: (error: Error) => toast(tx('操作失败 · {v}', { v: error.message }), 'error'),
   })
 
   const toggleEnabled = (sig: CustomSignal) => {
@@ -120,12 +128,11 @@ function SignalsBody({ highlight }: { highlight: string }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex h-7 items-center gap-1.5 rounded-btn border border-border bg-surface/80 px-2.5 text-[11px] font-medium text-secondary sm:text-xs">
-            条件信号
-            <span className="rounded bg-elevated px-1 py-px font-mono text-[10px] text-muted">{signals.length}</span>
-            <span className="text-muted">· {enabledCustomSignals} 个已启用</span>
+            {tx('条件信号')}<span className="rounded bg-elevated px-1 py-px font-mono text-[10px] text-muted">{signals.length}</span>
+            <span className="text-muted">· {enabledCustomSignals} {tx('个已启用')}</span>
           </div>
-          <div className="inline-flex h-7 items-center rounded-btn border border-border p-0.5" role="tablist" aria-label="信号库视图">
-            {([['library', '信号库'], ['archive', `档案库 ${archivedSignals.length}`]] as const).map(([id, label]) => (
+          <div className="inline-flex h-7 items-center rounded-btn border border-border p-0.5" role="tablist" aria-label={tx('信号库视图')}>
+            {([['library', tx('信号库')], ['archive', tx('档案库 {n}', { n: archivedSignals.length })]] as const).map(([id, label]) => (
               <button
                 key={id}
                 type="button"
@@ -140,14 +147,13 @@ function SignalsBody({ highlight }: { highlight: string }) {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-[11px] text-muted">信号保存为 <span className="font-mono text-secondary">csg_*</span> 列，条件字段可用行情指标、涨跌停判定价与全部注册因子</span>
+          <span className="text-[11px] text-muted">{tx('信号保存为')} <span className="font-mono text-secondary">csg_*</span> {tx('列，条件字段可用行情指标、涨跌停判定价与全部注册因子')}</span>
           <button
             onClick={openNew}
             className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-btn border border-amber-400/30 bg-amber-400/5 px-3 text-xs font-medium text-amber-400 transition-colors hover:bg-amber-400/10"
           >
             <Plus className="h-3.5 w-3.5" />
-            新建信号
-          </button>
+            {tx('新建信号')}</button>
         </div>
       </div>
 
@@ -161,14 +167,14 @@ function SignalsBody({ highlight }: { highlight: string }) {
                     <div className="flex items-center gap-2">
                       <h3 className="truncate text-sm font-medium text-foreground">{sig.name}</h3>
                       <span className={`rounded px-1.5 py-0.5 text-[10px] ${KIND_CLASS[sig.kind]}`}>
-                        {KIND_LABEL[sig.kind]}
+                        {tx(KIND_LABEL[sig.kind])}
                       </span>
-                      {!sig.enabled && <span className="rounded bg-muted/10 px-1.5 py-0.5 text-[10px] text-muted">已停用</span>}
-                      {sig.archived && <span className="rounded bg-muted/15 px-1.5 py-0.5 text-[10px] text-muted">已归档</span>}
+                      {!sig.enabled && <span className="rounded bg-muted/10 px-1.5 py-0.5 text-[10px] text-muted">{tx('已停用')}</span>}
+                      {sig.archived && <span className="rounded bg-muted/15 px-1.5 py-0.5 text-[10px] text-muted">{tx('已归档')}</span>}
                     </div>
                     <p className="mt-1 truncate font-mono text-[11px] text-muted">{sig.column ?? `csg_${sig.id}`}</p>
                     {sig.archived && sig.archived_at && (
-                      <p className="mt-1 text-[10px] text-muted/80">归档于 {sig.archived_at.slice(0, 16).replace('T', ' ')}</p>
+                      <p className="mt-1 text-[10px] text-muted/80">{tx('归档于')} {sig.archived_at.slice(0, 16).replace('T', ' ')}</p>
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
@@ -176,42 +182,40 @@ function SignalsBody({ highlight }: { highlight: string }) {
                       <button
                         onClick={() => setArchived.mutate({ id: sig.id, archived: false })}
                         disabled={setArchived.isPending}
-                        title="恢复到信号库 (归档可逆, 不影响计算)"
+                        title={tx('恢复到信号库 (归档可逆, 不影响计算)')}
                         className="inline-flex cursor-pointer items-center gap-1 rounded border border-accent/30 px-1.5 py-0.5 text-[10px] text-accent hover:bg-accent/10 disabled:opacity-50"
                       >
-                        <ArchiveRestore className="h-3 w-3" />恢复
-                      </button>
+                        <ArchiveRestore className="h-3 w-3" />{tx('恢复')}</button>
                     ) : (
                       <button
                         onClick={() => setArchived.mutate({ id: sig.id, archived: true })}
                         disabled={setArchived.isPending}
-                        title="归档到档案库 (可恢复, 不删除信号)"
+                        title={tx('归档到档案库 (可恢复, 不删除信号)')}
                         className="cursor-pointer rounded p-1 text-muted hover:bg-warning/10 hover:text-warning disabled:opacity-50"
                       >
                         <Archive className="h-3.5 w-3.5" />
                       </button>
                     )}
-                    <button onClick={() => toggleEnabled(sig)} title={sig.enabled ? '停用' : '启用'} className={`cursor-pointer rounded p-1 ${sig.enabled ? 'text-emerald-400 hover:bg-emerald-400/10' : 'text-muted hover:bg-elevated'}`}>
+                    <button onClick={() => toggleEnabled(sig)} title={sig.enabled ? tx('停用') : tx('启用')} className={`cursor-pointer rounded p-1 ${sig.enabled ? 'text-emerald-400 hover:bg-emerald-400/10' : 'text-muted hover:bg-elevated'}`}>
                       <Zap className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={() => openEdit(sig)} className="cursor-pointer rounded p-1 text-muted hover:bg-accent/10 hover:text-accent" title="编辑">
+                    <button onClick={() => openEdit(sig)} className="cursor-pointer rounded p-1 text-muted hover:bg-accent/10 hover:text-accent" title={tx('编辑')}>
                       <Settings2 className="h-3.5 w-3.5" />
                     </button>
                     {confirmingDeleteId === sig.id ? (
                       <button
                         onClick={() => handleDeleteClick(sig)}
                         disabled={del.isPending}
-                        title="再次点击确认删除"
+                        title={tx('再次点击确认删除')}
                         className="inline-flex animate-pulse cursor-pointer items-center gap-1 rounded-md border border-danger/30 bg-danger/15 px-1.5 py-0.5 text-[10px] font-medium text-danger disabled:opacity-50"
                       >
-                        <Trash2 className="h-2.5 w-2.5" />确认
-                      </button>
+                        <Trash2 className="h-2.5 w-2.5" />{tx('确认')}</button>
                     ) : (
                       <button
                         onClick={() => handleDeleteClick(sig)}
                         disabled={del.isPending}
                         className="cursor-pointer rounded p-1 text-muted hover:bg-danger/10 hover:text-danger disabled:opacity-50"
-                        title="删除"
+                        title={tx('删除')}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -221,7 +225,7 @@ function SignalsBody({ highlight }: { highlight: string }) {
                 <div className="mt-3 space-y-1">
                   {sig.conditions.map((c, i) => (
                     <div key={i} className="flex items-center gap-1.5 text-[11px] text-secondary">
-                      <span className="w-6 text-right text-muted/50">{i === 0 ? '当' : '且'}</span>
+                      <span className="w-6 text-right text-muted/50">{i === 0 ? tx('当') : tx('且')}</span>
                       <span className="font-mono text-foreground/80">{fieldWithDays(c.left, c.leftDays, fields)}</span>
                       <span className="font-mono text-muted">{c.op}</span>
                       <span className="font-mono text-foreground/80">
@@ -245,8 +249,8 @@ function SignalsBody({ highlight }: { highlight: string }) {
             {!list.isLoading && signals.length === 0 && (
               <div className="rounded-card border border-dashed border-border px-5 py-10 text-center text-sm text-muted md:col-span-2">
                 {view === 'archive'
-                  ? '档案库为空。信号卡右上角的归档按钮可把不用的信号收进这里，可随时恢复。'
-                  : '信号库为空。可用「字段 + 运算符 + 值」组合条件创建，或从检验页因子行一键生成；也可让 AI 按描述生成。'}
+                  ? tx('档案库为空。信号卡右上角的归档按钮可把不用的信号收进这里，可随时恢复。')
+                  : tx('信号库为空。可用「字段 + 运算符 + 值」组合条件创建，或从检验页因子行一键生成；也可让 AI 按描述生成。')}
               </div>
             )}
           </div>
@@ -258,12 +262,3 @@ function SignalsBody({ highlight }: { highlight: string }) {
   )
 }
 
-function fieldLabel(key: string, fields: { key: string; label: string }[]): string {
-  return fields.find(f => f.key === key)?.label ?? key
-}
-
-/** 带偏移标注的字段显示: 收盘价(前1日) / MA20(最新省略) */
-function fieldWithDays(key: string, days: number | undefined, fields: { key: string; label: string }[]): string {
-  const label = fieldLabel(key, fields)
-  return days && days > 0 ? `${label}(前${days}日)` : label
-}

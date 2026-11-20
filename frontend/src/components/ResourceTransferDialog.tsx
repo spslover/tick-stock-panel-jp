@@ -147,7 +147,7 @@ export function ResourceTransferDialog({ kind, initialMode = 'import', exportOnl
           <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground"><PackageOpen className="h-4 w-4 text-accent" />{kindLabel(kind)}{tx('导入与导出')}</h2>
           <p className="mt-1 text-[11px] leading-5 text-muted">{kind === 'strategy' ? tx('ZIP 包含策略、关联因子、信号和已保存调参。') : tx('{v}以 ZIP 包分享，所需的自定义依赖会自动携带。', { v: kindLabel(kind) })}</p>
         </div>
-        <button type="button" aria-label="关闭" disabled={busy} onClick={onClose} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn text-muted hover:bg-elevated hover:text-foreground disabled:opacity-40"><X className="h-4 w-4" /></button>
+        <button type="button" aria-label={tx('关闭')} disabled={busy} onClick={onClose} className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-btn text-muted hover:bg-elevated hover:text-foreground disabled:opacity-40"><X className="h-4 w-4" /></button>
       </header>
       <div className="flex shrink-0 gap-5 border-b border-border px-4 sm:px-5" role="tablist" aria-label={tx('资源传输方式')}>
         {([['import', tx('导入{v}', { v: kindLabel(kind) })], ['export', tx('批量导出')]] as const).filter(([value]) => !exportOnly || value === 'export').map(([value, label]) => (
@@ -161,7 +161,7 @@ export function ResourceTransferDialog({ kind, initialMode = 'import', exportOnl
           <Check className="mb-4 h-7 w-7 text-accent" />
           <h3 className="text-lg font-semibold text-foreground">{tx('资源已导入')}</h3>
           <p className="mt-2 text-sm text-secondary">{tx('新增或替换 {n} 个文件，复用 {m} 个已有文件。', { n: result.imported, m: result.reused })}</p>
-          <div className="mt-5 flex flex-wrap gap-5 text-sm text-foreground">{(['strategy', 'signal', 'factor'] as const).filter(kind => result.counts[kind]).map(kind => <span key={kind}>{KIND_LABEL[kind]} <strong className="ml-1 tabular-nums">{result.counts[kind]}</strong></span>)}</div>
+          <div className="mt-5 flex flex-wrap gap-5 text-sm text-foreground">{(['strategy', 'signal', 'factor'] as const).filter(kind => result.counts[kind]).map(kind => <span key={kind}>{tx(KIND_LABEL[kind])} <strong className="ml-1 tabular-nums">{result.counts[kind]}</strong></span>)}</div>
           {Boolean(result.drafts?.length) && <p className="mt-4 text-xs leading-5 text-warning">{tx('{n} 条策略保留为草稿。AI 草稿可在策略池的“AI”分组发布后使用。', { n: result.drafts!.length })}</p>}
           <p className="mt-5 text-xs leading-5 text-muted">{tx('当前页面的资源列表已刷新，可关闭窗口继续使用。')}{kind === 'strategy' && tx('导入不会改变策略池配置。')}</p>
         </div>
@@ -199,7 +199,7 @@ export function ResourceTransferDialog({ kind, initialMode = 'import', exportOnl
                     const automatic = mode === 'import' && effective.has(item.key) && !selected.has(item.key)
                     return <label key={item.key} className={`flex cursor-pointer items-start gap-2.5 rounded-btn px-3 py-3 hover:bg-elevated/60 ${selected.has(item.key) || automatic ? 'bg-accent/5' : ''}`}>
                       <input type="checkbox" className="mt-0.5 shrink-0 accent-accent" aria-label={tx('选择{v}：{l}', { v: kindLabel(item.kind), l: item.label })} checked={selected.has(item.key) || automatic} disabled={busy || automatic} onChange={() => select([item.key])} />
-                      <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><span className="break-words text-xs font-medium text-foreground">{item.label}</span><span className="text-[10px] text-muted">{KIND_LABEL[item.kind]}</span>{'draft' in item && Boolean(item.draft) && <span className="text-[10px] text-warning">{tx('草稿')}</span>}</span><span className="mt-1 block break-all text-[10px] text-muted">{item.id}</span>{automatic && <span className="mt-1 inline-flex items-center gap-1 text-[10px] text-accent"><Link2 className="h-3 w-3" />{tx('随所选资源自动携带')}</span>}</span>
+                      <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><span className="break-words text-xs font-medium text-foreground">{item.label}</span><span className="text-[10px] text-muted">{tx(KIND_LABEL[item.kind])}</span>{'draft' in item && Boolean(item.draft) && <span className="text-[10px] text-warning">{tx('草稿')}</span>}</span><span className="mt-1 block break-all text-[10px] text-muted">{item.id}</span>{automatic && <span className="mt-1 inline-flex items-center gap-1 text-[10px] text-accent"><Link2 className="h-3 w-3" />{tx('随所选资源自动携带')}</span>}</span>
                     </label>
                   })}
                 </div>
@@ -209,15 +209,15 @@ export function ResourceTransferDialog({ kind, initialMode = 'import', exportOnl
                 <div className="flex items-center justify-between gap-2"><h3 className="text-xs font-semibold">{mode === 'import' ? tx('导入预览') : tx('包内清单')}</h3>{preview && <span className="text-[11px] text-muted">{tx('自动携带 {n} 项依赖', { n: dependencyCount })}</span>}</div>
                 {!preview ? <div className="flex min-h-[220px] flex-col items-center justify-center gap-3 text-center"><Link2 className="h-6 w-6 text-muted/60" /><p className="max-w-64 text-xs leading-6 text-muted">{tx('选择资源后点击“预览导出”，查看包内定义和关联依赖。共享依赖只保留一份。')}</p></div> : (
                   <>
-                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-b border-border pb-3 text-[11px] text-secondary">{(['strategy', 'signal', 'factor', 'settings'] as const).map(kind => { const count = included.filter(item => item.kind === kind).length; return count ? <span key={kind}>{KIND_LABEL[kind]} <strong className="ml-1 font-medium text-foreground">{count}</strong></span> : null })}{!included.length && <span>{tx('尚未选择资源')}</span>}</div>
+                    <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-b border-border pb-3 text-[11px] text-secondary">{(['strategy', 'signal', 'factor', 'settings'] as const).map(kind => { const count = included.filter(item => item.kind === kind).length; return count ? <span key={kind}>{tx(KIND_LABEL[kind])} <strong className="ml-1 font-medium text-foreground">{count}</strong></span> : null })}{!included.length && <span>{tx('尚未选择资源')}</span>}</div>
                     <div className="mt-2 space-y-1">
                       {mainEntries.map(entry => <PreviewEntry key={entry.key} entry={entry} mode={mode} automatic={!selected.has(entry.key)} overwrite={overwrite.has(entry.key)} disabled={busy}
                         onOverwrite={() => setOverwrite(previous => { const next = new Set(previous); if (next.has(entry.key)) next.delete(entry.key); else next.add(entry.key); return next })} />)}
                       {attachedEntries.length > 0 && <details className="border-t border-border/60 px-2.5 pt-3 text-[11px] text-secondary" open={mode === 'import' && attachedEntries.some(entry => entry.action === 'conflict' || entry.issues.length > 0) ? true : undefined}><summary className="cursor-pointer">{tx('策略调参与辅助模块 ({n})', { n: attachedEntries.length })}</summary><div className="mt-1">{attachedEntries.map(entry => <PreviewEntry key={entry.key} entry={entry} mode={mode} automatic overwrite={overwrite.has(entry.key)} disabled={busy} onOverwrite={() => setOverwrite(previous => { const next = new Set(previous); if (next.has(entry.key)) next.delete(entry.key); else next.add(entry.key); return next })} />)}</div></details>}
                     </div>
                     {mode === 'import' && conflicts.length > 0 && <p className="mt-3 text-[11px] leading-5 text-warning">{unresolved.length ? tx('还有 {n} 项内容不同，需要逐项确认替换，或取消引用它的资源。', { n: unresolved.length }) : tx('已确认替换 {n} 项本机内容。', { n: conflicts.length })}</p>}
-                    {issues.length > 0 && <div role="alert" className="mt-3 rounded-btn border border-danger/20 bg-danger/5 px-3 py-2 text-[11px] leading-5 text-danger"><span className="font-medium">所选资源尚不可用</span><ul className="mt-1 space-y-1">{[...new Set(issues)].map((issue, index) => <li key={index} className="break-words">{issue}</li>)}</ul></div>}
-                    {mode === 'export' && <p className="mt-3 text-[11px] leading-5 text-muted">导出已保存的定义与调参。行情数据、计算结果和账号配置不包含在资源包中。</p>}
+                    {issues.length > 0 && <div role="alert" className="mt-3 rounded-btn border border-danger/20 bg-danger/5 px-3 py-2 text-[11px] leading-5 text-danger"><span className="font-medium">{tx('所选资源尚不可用')}</span><ul className="mt-1 space-y-1">{[...new Set(issues)].map((issue, index) => <li key={index} className="break-words">{issue}</li>)}</ul></div>}
+                    {mode === 'export' && <p className="mt-3 text-[11px] leading-5 text-muted">{tx('导出已保存的定义与调参。行情数据、计算结果和账号配置不包含在资源包中。')}</p>}
                   </>
                 )}
               </section>
@@ -233,8 +233,8 @@ export function ResourceTransferDialog({ kind, initialMode = 'import', exportOnl
               <p className="mt-1 text-[11px] leading-5 text-muted">{description}</p>
             </li>)}
           </ol>}
-          {error && <div role="alert" className="mx-4 my-3 flex shrink-0 items-start gap-2 rounded-btn border border-danger/20 bg-danger/5 p-3 text-xs leading-5 text-danger"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span className="min-w-0 flex-1 break-words">{error}</span>{mode === 'import' && files.length > 0 && <button type="button" className="shrink-0 underline" disabled={busy} onClick={() => void inspectFiles(files)}>重新预览</button>}</div>}
-          {exported && <p role="status" className="mx-5 my-3 text-xs text-accent">资源包已生成，浏览器已开始下载。</p>}
+          {error && <div role="alert" className="mx-4 my-3 flex shrink-0 items-start gap-2 rounded-btn border border-danger/20 bg-danger/5 p-3 text-xs leading-5 text-danger"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /><span className="min-w-0 flex-1 break-words">{error}</span>{mode === 'import' && files.length > 0 && <button type="button" className="shrink-0 underline" disabled={busy} onClick={() => void inspectFiles(files)}>{tx('重新预览')}</button>}</div>}
+          {exported && <p role="status" className="mx-5 my-3 text-xs text-accent">{tx('资源包已生成，浏览器已开始下载。')}</p>}
           </div>
         </div>
       )}
@@ -242,8 +242,8 @@ export function ResourceTransferDialog({ kind, initialMode = 'import', exportOnl
       <footer className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 sm:px-5">
         <div className="text-[11px] leading-5 text-muted" aria-live="polite"><p>{busy ? tx('正在处理，请稍候…') : result ? tx('本次导入已完成') : preview ? tx('{n} 项资源{m}', { n: primaryCount, m: dependencyCount ? tx('，含 {d} 项自动关联依赖', { d: dependencyCount }) : '' }) : mode === 'export' ? tx('已选择 {n} 项资源', { n: selected.size }) : tx('预览确认后才会写入本机')}</p>{!result && (issues.length > 0 || unresolved.length > 0) ? <button type="button" className="text-warning underline underline-offset-2" onClick={() => previewPanel.current?.scrollIntoView?.({ block: 'start' })}>{issues.length ? tx('{n} 项校验问题，查看原因', { n: issues.length }) : tx('{n} 项冲突待处理，查看冲突', { n: unresolved.length })}</button> : !result && preview ? <button type="button" className="text-accent underline underline-offset-2 md:hidden" onClick={() => previewPanel.current?.scrollIntoView?.({ block: 'start' })}>{tx('查看依赖清单')}</button> : null}</div>
         <div className="ml-auto flex items-center gap-2">
-          {result ? <><button type="button" className={BUTTON} disabled={busy} onClick={reset}><ArrowLeft className="h-3.5 w-3.5" />继续导入</button><button type="button" className={PRIMARY} disabled={busy} onClick={onClose}>完成</button></> : <>
-            <button type="button" className={BUTTON} disabled={busy} onClick={onClose}>取消</button>
+          {result ? <><button type="button" className={BUTTON} disabled={busy} onClick={reset}><ArrowLeft className="h-3.5 w-3.5" />{tx('继续导入')}</button><button type="button" className={PRIMARY} disabled={busy} onClick={onClose}>{tx('完成')}</button></> : <>
+            <button type="button" className={BUTTON} disabled={busy} onClick={onClose}>{tx('取消')}</button>
             {mode === 'export' ? <button type="button" className={PRIMARY} disabled={busy || !catalog.isSuccess || catalog.isFetching || !selected.size || (preview !== null && issues.length > 0)} onClick={() => void (preview ? download() : previewExport())}>{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}{preview ? tx('下载 ZIP 包') : tx('预览导出')}</button>
               : <button type="button" className={PRIMARY} disabled={busy || !preview || !primaryCount || issues.length > 0 || unresolved.length > 0} onClick={() => void importSelected()}>{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}{primaryCount ? tx('导入 {n} 项资源', { n: primaryCount }) : tx('导入所选资源')}</button>}
           </>}
@@ -260,9 +260,9 @@ function PreviewEntry({ entry, mode, automatic, overwrite, disabled, onOverwrite
   return <div className={`rounded-btn px-2.5 py-2.5 ${mode === 'import' && entry.action === 'conflict' ? 'border border-warning/25 bg-warning/5' : ''}`}>
     <div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="break-words text-xs text-foreground">{entry.label}</p><p className="mt-1 text-[10px] text-muted">{kindLabel(entry.kind)}{automatic ? tx(' · 自动携带') : tx(' · 手动选择')}</p></div>{mode === 'import' && <span className={`shrink-0 text-[10px] ${entry.action === 'conflict' ? 'text-warning' : entry.action === 'create' ? 'text-accent' : 'text-muted'}`}>{labels[entry.action]}</span>}</div>
     {mode === 'import' && entry.action === 'conflict' && <label className="mt-2 flex cursor-pointer items-center gap-2 text-[11px] text-warning"><input type="checkbox" aria-label={tx('确认替换{v}', { v: entry.label })} checked={overwrite} disabled={disabled} onChange={onOverwrite} className="accent-accent" />{tx('用包内版本替换本机版本')}</label>}
-    {mode === 'import' && entry.action === 'conflict' && entry.referenced_by && entry.referenced_by.length > 0 && <p className="mt-2 break-words text-[10px] leading-5 text-warning">本机引用方：{entry.referenced_by.join('、')}</p>}
+    {mode === 'import' && entry.action === 'conflict' && entry.referenced_by && entry.referenced_by.length > 0 && <p className="mt-2 break-words text-[10px] leading-5 text-warning">{tx('本机引用方：')}{entry.referenced_by.join('、')}</p>}
     {mode === 'import' && entry.comparison && <details className="mt-2 text-[11px] text-secondary"><summary className="cursor-pointer">{tx('对比本机与包内内容')}</summary><div className="mt-2 space-y-2">{([['local', tx('本机版本')], ['incoming', tx('包内版本')]] as const).map(([key, label]) => <div key={key}><p className="mb-1 text-[10px] text-muted">{label}</p><pre className="max-h-36 overflow-auto whitespace-pre-wrap break-all rounded-input border border-border bg-base p-2 text-[10px] leading-5">{entry.comparison![key]}</pre></div>)}</div>{entry.comparison.truncated && <p className="mt-1 text-[10px] text-muted">{tx('较长内容仅展示前 6000 个字符。')}</p>}</details>}
-    {entry.local_dependencies.length > 0 && <p className="mt-1 break-words text-[10px] text-muted">使用本机已有依赖：{entry.local_dependencies.map(key => key.split(':').slice(1).join(':')).join('、')}</p>}
-    {entry.dependencies.length > 0 && <details className="mt-1 text-[10px] text-muted"><summary className="inline-flex cursor-pointer list-none items-center gap-1"><ChevronDown className="h-3 w-3" />查看依赖 ({entry.dependencies.length})</summary><p className="mt-1 break-all leading-5">{entry.dependencies.map(key => key.split(':').slice(1).join(':')).join('、')}</p></details>}
+    {entry.local_dependencies.length > 0 && <p className="mt-1 break-words text-[10px] text-muted">{tx('使用本机已有依赖：')}{entry.local_dependencies.map(key => key.split(':').slice(1).join(':')).join('、')}</p>}
+    {entry.dependencies.length > 0 && <details className="mt-1 text-[10px] text-muted"><summary className="inline-flex cursor-pointer list-none items-center gap-1"><ChevronDown className="h-3 w-3" />{tx('查看依赖 (')}{entry.dependencies.length})</summary><p className="mt-1 break-all leading-5">{entry.dependencies.map(key => key.split(':').slice(1).join(':')).join('、')}</p></details>}
   </div>
 }

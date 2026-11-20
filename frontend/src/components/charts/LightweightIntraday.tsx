@@ -130,7 +130,7 @@ export function LightweightIntraday({ symbol, assetType, data, sessions: supplie
       <div className="mt-1 flex min-h-4 flex-wrap items-center gap-x-4 gap-y-1 text-[10px]">
         <span className="text-muted">{tx('分时价')} <span style={{ color: change == null || change === 0 ? C.flat : change > 0 ? C.up : C.down }}>{fmt(shown?.close)}{change != null && ` ${fmtPct(change)}`}</span></span>
         {showAvgLine && assetType !== 'index' && <span style={{ color: C.average }}>{tx('均价')} {fmt(point?.average)}</span>}
-        <span className="text-muted">量 <span className="text-secondary">{fmtBigNum(shown?.volume)}</span></span>
+        <span className="text-muted">{tx('量')} <span className="text-secondary">{fmtBigNum(shown?.volume)}</span></span>
         <span className="text-muted">{tx('额')} <span className="text-secondary">{fmtBigNum(shown?.amount)}</span></span>
         {supplied && <span className="ml-auto text-muted">{tx('{v} 分钟', { v: [...model.points.values()].length })}</span>}
       </div>

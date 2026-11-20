@@ -43,12 +43,6 @@ _REQUIRED = {
     "financial": {"symbol"},
 }
 
-# 小数制下 change_pct 的物理上限: A股最大涨跌停 30% (+容差)。
-# 中位数口径下小数制批次不可能超过该值, 百分制批次(典型中位数 0.5~3)必然超过。
-# 仅对 change_pct 有效——amplitude/turnover_rate 的两种单位在数值区间上重叠
-# (百分制 0.05 = 0.05% 与小数制 0.05 = 5%), 无物理依据可判。
-_PCT_FRACTION_MAX = 0.31
-
 _PCT_COLUMNS = ("change_pct", "amplitude", "turnover_rate")
 
 
@@ -62,13 +56,15 @@ def _normalize_pct_units(
 
       - pct_unit="percent"  → 三列无条件 /100 (声明即契约, 即使数值看着像小数制);
       - pct_unit="decimal"  → 原样透传 (即使数值看着像百分制也不动);
-      - 未声明 → change_pct 保留截面中位数判定(涨跌停 30% 上限使其物理可判:
-        样本 >= 5 用 |值| 中位数, 小样本退用最大值, 整批同除 100);
+      - 未声明 → 不按数值推断 (百分制 0.05 与小数制 0.05 数值相同, 任何截面
+        启发式都会掩盖真实数据错误, CONTRIBUTING §3.1):
+        change_pct 由 (last_price - prev_close)/prev_close 重算 —— 价格比值与
+        源端单位无关, 恒为小数制; 缺价格时置 None;
         amplitude/turnover_rate 置 None 交下游重算(enriched 管道按
         high/low/prev_close 与股本口径重算), 除非该列已被 transforms 显式
         处理过(视为用户已接管单位, 原样透传)。
     """
-    dropped_undeclared = False
+    dropped: set[str] = set()
     for col in _PCT_COLUMNS:
         if col not in df.columns:
             continue
@@ -77,20 +73,27 @@ def _normalize_pct_units(
             df = df.with_columns((pl.col(col) / 100).alias(col))
         elif pct_unit == "decimal" or col in transformed_cols:
             continue
-        elif col == "change_pct":
-            vals = df[col].drop_nulls().abs()
-            if vals.is_empty():
-                continue
-            stat = vals.median() if vals.len() >= 5 else vals.max()
-            if stat > _PCT_FRACTION_MAX:
-                df = df.with_columns((pl.col(col) / 100).alias(col))
         else:
             df = df.with_columns(pl.lit(None, dtype=pl.Float64).alias(col))
-            dropped_undeclared = True
-    if dropped_undeclared:
+            dropped.add(col)
+    if "change_pct" in dropped and {"last_price", "prev_close"} <= set(df.columns):
+        # 价格比值与源端单位无关: 源端给小数制还是百分制, 该比值恒为小数制。
+        df = df.with_columns(
+            pl.when(
+                pl.col("last_price").is_not_null()
+                & pl.col("prev_close").is_not_null()
+                & (pl.col("prev_close") != 0)
+            )
+            .then((pl.col("last_price") - pl.col("prev_close")) / pl.col("prev_close"))
+            .otherwise(None)
+            .cast(pl.Float64)
+            .alias("change_pct")
+        )
+    if dropped:
         logger.warning(
-            "自定义源 realtime 未声明 pct_unit: amplitude/turnover_rate 的单位"
-            "无法从数值判定, 已置 None 交由下游按股本/价格口径重算;"
+            "自定义源 realtime 未声明 pct_unit: change_pct/amplitude/turnover_rate "
+            "的单位无法从数值判定 (0.05 既是 0.05% 也是 5%), 已按价格重算 change_pct "
+            "并把 amplitude/turnover_rate 置 None 交由下游重算; "
             "请在 realtime 数据集配置中显式声明 pct_unit: percent 或 decimal"
         )
     return df

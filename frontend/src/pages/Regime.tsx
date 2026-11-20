@@ -876,7 +876,7 @@ export function Regime() {
           <div ref={phaseChartRef} className="regime-chart regime-phase-chart" role="img" aria-label={tx('情绪周期高度、宽度与晋级率历史趋势图')} />
           <div className="regime-state-strip" role="img" aria-label={tx('情绪阶段时间轴')}>
             {rows.map(r => (
-              <div key={r.date} title={`${r.date} ${MARKET_PHASE_LABELS[r.phase as MarketPhase]}`}
+              <div key={r.date} title={`${r.date} ${tx(MARKET_PHASE_LABELS[r.phase as MarketPhase])}`}
                 className="min-w-0 flex-1"
                 style={{ backgroundColor: MARKET_PHASE_COLORS[r.phase as MarketPhase] }} />
             ))}
@@ -885,7 +885,7 @@ export function Regime() {
             {MARKET_PHASE_ORDER.map(p => (
               <span key={p} className="flex items-center gap-1">
                 <span className="inline-block h-2.5 w-2.5 rounded" style={{ backgroundColor: MARKET_PHASE_COLORS[p] }} />
-                {MARKET_PHASE_LABELS[p]}
+                {tx(MARKET_PHASE_LABELS[p])}
               </span>
             ))}
           </div>
@@ -1084,7 +1084,7 @@ export function Regime() {
               <section className={cn(cardCls, 'regime-timeline')}>
                 <SectionTitle icon={Activity} title={tx('状态时间轴')} hint={tx('{start} — {end} · {n} 天', { start: rows[0].date, end: latest!.date, n: rows.length })} />
                 <div className="regime-state-strip" role="img" aria-label={tx('{n} 个交易日的环境状态分布时间轴', { n: rows.length })}>
-                  {rows.map(r => <span key={r.date} title={`${r.date} ${REGIME_STATE_LABELS[r.state]}(${r.score})`} style={{ backgroundColor: REGIME_STATE_COLORS[r.state] }} />)}
+                  {rows.map(r => <span key={r.date} title={`${r.date} ${tx(REGIME_STATE_LABELS[r.state])}(${r.score})`} style={{ backgroundColor: REGIME_STATE_COLORS[r.state] }} />)}
                 </div>
                 <div className="regime-legend">
                   {STATE_ORDER.map(state => <span key={state}><i className="regime-state-dot" style={{ backgroundColor: REGIME_STATE_COLORS[state] }} />{REGIME_STATE_LABELS[state]}</span>)}
@@ -1142,7 +1142,7 @@ export function Regime() {
                   </div>
                   <div className="regime-calendar-grid">
                     {month.weeks.flat().map((cell, index) => cell ?
-                      <div key={index} className="regime-calendar-day" title={`${cell.date} ${REGIME_STATE_LABELS[cell.state]}(${cell.score})`} style={{ backgroundColor: REGIME_STATE_COLORS[cell.state] }} />
+                      <div key={index} className="regime-calendar-day" title={`${cell.date} ${tx(REGIME_STATE_LABELS[cell.state])}(${cell.score})`} style={{ backgroundColor: REGIME_STATE_COLORS[cell.state] }} />
                       : <div key={index} className="regime-calendar-day" />)}
                   </div>
                 </div>

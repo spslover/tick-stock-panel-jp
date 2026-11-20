@@ -1,3 +1,4 @@
+import { tx, useI18n } from '@/lib/i18n'
 /**
  * 走势小卡 — 纯 SVG 零依赖, 支持日K蜡烛(daily_kline)与当日分时(intraday)。
  *
@@ -23,7 +24,7 @@ function titleOf(chart: AssistantChart): ReactNode {
     <>
       {chart.name || chart.symbol}
       {chart.name ? <span className="ml-1.5 font-mono text-muted">{chart.symbol}</span> : null}
-      <span className="ml-1.5 text-muted">· {chart.kind === 'daily_kline' ? '日K' : '分时'}</span>
+      <span className="ml-1.5 text-muted">· {chart.kind === 'daily_kline' ? tx('日K') : tx('分时')}</span>
     </>
   )
 }
@@ -74,6 +75,7 @@ function ChartShell({
 }
 
 function KlineCard({ chart }: { chart: Extract<AssistantChart, { kind: 'daily_kline' }> }) {
+  const { tx } = useI18n()
   const points = chart.points
   const opens = points.map(p => p[1])
   const highs = points.map(p => p[2])
@@ -96,17 +98,17 @@ function KlineCard({ chart }: { chart: Extract<AssistantChart, { kind: 'daily_kl
   return (
     <ChartShell
       chart={chart}
-      meta={`近 ${n} 日`}
-      footerLeft={`低 ${fmt(min)} · 高 ${fmt(max)}`}
+      meta={tx('近 {n} 日', { n })}
+      footerLeft={tx('低 {a} · 高 {b}', { a: fmt(min), b: fmt(max) })}
       footerRight={
         <>
-          最新 <span className="text-foreground">{fmt(last)}</span>
+          {tx('最新')} <span className="text-foreground">{fmt(last)}</span>
           <span className={`ml-1.5 font-medium ${up ? 'text-bull' : 'text-bear'}`}>
             {up ? '+' : ''}{(chg * 100).toFixed(2)}%
           </span>
         </>
       }
-      ariaLabel={`${chart.name || chart.symbol} 近 ${n} 个交易日日K`}
+      ariaLabel={tx('{v} 近 {n} 个交易日日K', { v: chart.name || chart.symbol, n })}
     >
       {volumes.map((v, i) => {
         const bullBar = closes[i] >= opens[i]
@@ -155,6 +157,7 @@ function KlineCard({ chart }: { chart: Extract<AssistantChart, { kind: 'daily_kl
 }
 
 function IntradayCard({ chart }: { chart: Extract<AssistantChart, { kind: 'intraday' }> }) {
+  const { tx } = useI18n()
   const points = chart.points
   const prices = points.map(p => p[1])
   const volumes = points.map(p => p[2])
@@ -178,16 +181,16 @@ function IntradayCard({ chart }: { chart: Extract<AssistantChart, { kind: 'intra
     <ChartShell
       chart={chart}
       meta={`${points[0][0]} – ${points[n - 1][0]}`}
-      footerLeft={`低 ${fmt(min)} · 高 ${fmt(max)}`}
+      footerLeft={tx('低 {a} · 高 {b}', { a: fmt(min), b: fmt(max) })}
       footerRight={
         <>
-          最新 <span className="text-foreground">{fmt(last)}</span>
+          {tx('最新')} <span className="text-foreground">{fmt(last)}</span>
           <span className={`ml-1.5 font-medium ${up ? 'text-bull' : 'text-bear'}`}>
             {up ? '+' : ''}{(chg * 100).toFixed(2)}%
           </span>
         </>
       }
-      ariaLabel={`${chart.name || chart.symbol} 当日分时走势`}
+      ariaLabel={tx('{v} 当日分时走势', { v: chart.name || chart.symbol })}
     >
       {baseline != null && (
         <line

@@ -57,7 +57,7 @@ function renderInline(text: string, keyBase: string): ReactNode[] {
       )
     } else if (m[6]) {
       // 涨跌停: 徽章式底色, 对齐信号标签样式
-      const up = m[6] === '涨停'
+      const up = m[6] === '涨停' // i18n-exempt: 与 AI 报告正文比对的关键词
       nodes.push(
         <span key={`${keyBase}-l-${i}`} className={`rounded px-1 font-medium ${up ? 'bg-bull/10 text-bull' : 'bg-bear/10 text-bear'}`}>
           {m[6]}
@@ -65,7 +65,7 @@ function renderInline(text: string, keyBase: string): ReactNode[] {
       )
     } else if (m[7]) {
       // 方向词: 仅着色不加底色
-      const up = m[7] === '上涨' || m[7] === '高开' || m[7] === '走强'
+      const up = m[7] === '上涨' || m[7] === '高开' || m[7] === '走强' // i18n-exempt: 与 AI 报告正文比对的关键词
       nodes.push(
         <span key={`${keyBase}-d-${i}`} className={up ? 'text-bull' : 'text-bear'}>
           {m[7]}

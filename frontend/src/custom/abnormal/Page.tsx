@@ -581,7 +581,7 @@ const IntradayRowView = memo(function IntradayRowView({ row, rank, onPreview }: 
         <div className="flex flex-wrap items-center gap-1">
           {row.signals.map(s => (
             <span key={s} className={`rounded border px-1 text-[9px] font-medium leading-tight ${SIGNAL_META[s].cls}`}>
-              {SIGNAL_META[s].label}
+              {tx(SIGNAL_META[s].label)}
             </span>
           ))}
         </div>

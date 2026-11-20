@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Store, Hammer, Download, Zap } from 'lucide-react'
 import { useDialogBackdrop } from '@/lib/useDialogBackdrop'
+import { tx } from '@/lib/i18n'
 
 interface Props {
   open: boolean
@@ -34,8 +35,7 @@ export function StrategyStoreDialog({ open, onClose }: Props) {
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
               <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
                 <Store className="h-4 w-4 text-accent" />
-                获取策略
-              </span>
+                {tx('获取策略')}</span>
               <button onClick={onClose} className="p-1 rounded hover:bg-elevated transition-colors cursor-pointer">
                 <X className="h-4 w-4 text-muted" />
               </button>
@@ -51,22 +51,18 @@ export function StrategyStoreDialog({ open, onClose }: Props) {
               </div>
 
               <h3 className="text-[16px] leading-6 font-semibold text-foreground mb-1.5">
-                不定时更新更多策略
-              </h3>
+                {tx('不定时更新更多策略')}</h3>
               <p className="text-sm text-muted leading-relaxed max-w-[380px]">
-                敬请期待。
-              </p>
+                {tx('敬请期待。')}</p>
 
               <div className="mt-6 flex items-center gap-4 text-[11px] text-muted">
                 <span className="flex items-center gap-1">
                   <Download className="h-3.5 w-3.5" />
-                  一键下载
-                </span>
+                  {tx('一键下载')}</span>
                 <span className="w-px h-3 bg-border" />
                 <span className="flex items-center gap-1">
                   <Zap className="h-3.5 w-3.5" />
-                  无需配置 即可使用
-                </span>
+                  {tx('无需配置 即可使用')}</span>
               </div>
             </div>
 
@@ -78,8 +74,7 @@ export function StrategyStoreDialog({ open, onClose }: Props) {
                   border border-border bg-surface text-xs font-medium text-secondary
                   hover:text-accent hover:border-accent/50 transition-colors cursor-pointer"
               >
-                知道了
-              </button>
+                {tx('知道了')}</button>
             </div>
           </motion.div>
         </motion.div>

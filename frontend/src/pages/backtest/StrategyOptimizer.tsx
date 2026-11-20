@@ -150,7 +150,7 @@ export function StrategyOptimizer() {
         <div>
           <label className="mb-1.5 block text-xs font-medium text-secondary">{tx('优化目标 (白名单)')}</label>
           <select value={objective} onChange={e => setObjective(e.target.value)} className={INPUT_CLS}>
-            {PRIMARY_OBJECTIVES.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+            {PRIMARY_OBJECTIVES.map(o => <option key={o.id} value={o.id}>{tx(o.label)}</option>)}
           </select>
           <div className="mt-1 text-[10px] text-muted">{tx('胜率/持仓天数等退化目标已排除 (交易少时可被运气推高)')}</div>
         </div>

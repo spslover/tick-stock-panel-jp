@@ -1,3 +1,4 @@
+import { useI18n } from '@/lib/i18n'
 /**
  * 看板外部链接组件 — 在网格内嵌入任意 http(s) 页面。
  *
@@ -12,6 +13,7 @@ import { useMemo } from 'react'
 import { ExternalLink, Link2 } from 'lucide-react'
 
 export function ExternalLinkWidget({ title, url }: { title: string; url: string }) {
+  const { tx } = useI18n()
   const host = useMemo(() => {
     try {
       return new URL(url).hostname
@@ -33,10 +35,9 @@ export function ExternalLinkWidget({ title, url }: { title: string; url: string 
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex shrink-0 items-center gap-1 rounded-btn px-1.5 py-0.5 text-[10px] text-secondary transition-colors hover:bg-elevated hover:text-foreground"
-          title="在新窗口打开"
+          title={tx('在新窗口打开')}
         >
-          <ExternalLink className="h-3 w-3" />新窗口
-        </a>
+          <ExternalLink className="h-3 w-3" />{tx('新窗口')}</a>
       </div>
       <iframe
         src={url}
@@ -47,8 +48,7 @@ export function ExternalLinkWidget({ title, url }: { title: string; url: string 
         className="min-h-0 w-full flex-1 border-0 bg-white"
       />
       <div className="shrink-0 px-2 py-0.5 text-[9px] text-muted/60">
-        若长时间空白, 该站点可能禁止嵌入, 请用右上角新窗口打开
-      </div>
+        {tx('若长时间空白, 该站点可能禁止嵌入, 请用右上角新窗口打开')}</div>
     </section>
   )
 }

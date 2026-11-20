@@ -90,7 +90,7 @@ function ArchivedRow({ strategy, addedAt, archivedAt, groupName, onRestore, onDi
         {groupName && <span className="max-w-24 shrink-0 truncate rounded border border-border px-1 text-[9px] text-muted" title={groupName}>{groupName}</span>}
       </div>
       <p className="mt-1 truncate text-[10px] text-muted">
-        归档于 {archivedAt || '—'}{addedAt && ` · ${tx('加入于 {v}', { v: addedAt })}`}
+        {tx('归档于')} {archivedAt || '—'}{addedAt && ` · ${tx('加入于 {v}', { v: addedAt })}`}
       </p>
     </div>
     <div className="flex shrink-0 items-center gap-1">
@@ -146,7 +146,7 @@ function GroupsManagerModal({ groups, active, onClose, onCreate, onRename, onReo
     panelClassName="flex max-h-[80%] w-[92%] max-w-md flex-col overflow-hidden rounded-card border border-border bg-surface shadow-2xl">
     <header className="flex items-center justify-between border-b border-border px-4 py-3">
       <h3 className="text-sm font-semibold text-foreground">{tx('管理分组')}</h3>
-      <button type="button" aria-label="关闭" onClick={onClose} className="rounded p-1 text-muted hover:bg-elevated hover:text-foreground"><X className="h-4 w-4" /></button>
+      <button type="button" aria-label={tx('关闭')} onClick={onClose} className="rounded p-1 text-muted hover:bg-elevated hover:text-foreground"><X className="h-4 w-4" /></button>
     </header>
     <div className="flex gap-2 border-b border-border px-4 py-3">
       <input value={name} onChange={event => setName(event.target.value)} maxLength={24} placeholder={tx('新分组名称')} aria-label={tx('新分组名称')}
@@ -166,18 +166,18 @@ function GroupsManagerModal({ groups, active, onClose, onCreate, onRename, onReo
               <input value={renameDraft} onChange={event => setRenameDraft(event.target.value)} maxLength={24} autoFocus aria-label={tx('分组名称')}
                 onKeyDown={event => { if (event.key === 'Enter') submitRename(group.id); if (event.key === 'Escape') setRenamingId(null) }}
                 className="h-7 min-w-0 flex-1 rounded border border-border bg-base px-2 text-xs focus:border-accent focus:outline-none" />
-              <button type="button" onClick={() => submitRename(group.id)} disabled={busy} className="text-[11px] text-accent disabled:opacity-40">保存</button>
-              <button type="button" onClick={() => setRenamingId(null)} className="text-[11px] text-muted">取消</button>
+              <button type="button" onClick={() => submitRename(group.id)} disabled={busy} className="text-[11px] text-accent disabled:opacity-40">{tx('保存')}</button>
+              <button type="button" onClick={() => setRenamingId(null)} className="text-[11px] text-muted">{tx('取消')}</button>
             </>
           ) : (
             <>
               <span className="min-w-0 flex-1 truncate text-xs text-foreground" title={group.name}>{group.name}</span>
-              <button type="button" aria-label={tx('上移分组：{v}', { v: group.name })} disabled={busy || index === 0} onClick={() => move(index, -1)} title="上移" className="inline-flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-elevated hover:text-accent disabled:opacity-25"><ArrowUp className="h-3 w-3" /></button>
-              <button type="button" aria-label={tx('下移分组：{v}', { v: group.name })} disabled={busy || index === groups.length - 1} onClick={() => move(index, 1)} title="下移" className="inline-flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-elevated hover:text-accent disabled:opacity-25"><ArrowDown className="h-3 w-3" /></button>
+              <button type="button" aria-label={tx('上移分组：{v}', { v: group.name })} disabled={busy || index === 0} onClick={() => move(index, -1)} title={tx('上移')} className="inline-flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-elevated hover:text-accent disabled:opacity-25"><ArrowUp className="h-3 w-3" /></button>
+              <button type="button" aria-label={tx('下移分组：{v}', { v: group.name })} disabled={busy || index === groups.length - 1} onClick={() => move(index, 1)} title={tx('下移')} className="inline-flex h-7 w-7 items-center justify-center rounded text-muted hover:bg-elevated hover:text-accent disabled:opacity-25"><ArrowDown className="h-3 w-3" /></button>
               <button type="button" onClick={() => { setRenamingId(group.id); setRenameDraft(group.name) }} title={tx('重命名')} className="rounded px-1.5 py-1 text-[11px] text-secondary hover:text-accent">{tx('改名')}</button>
               {confirmDeleteId === group.id ? (
                 <button type="button" disabled={busy} onClick={() => { void guard(async () => { await onDelete(group.id); setConfirmDeleteId(null) }) }}
-                  className="rounded border border-danger/40 bg-danger/10 px-1.5 py-1 text-[11px] text-danger disabled:opacity-40">确认删除</button>
+                  className="rounded border border-danger/40 bg-danger/10 px-1.5 py-1 text-[11px] text-danger disabled:opacity-40">{tx('确认删除')}</button>
               ) : (
                 <button type="button" onClick={() => setConfirmDeleteId(group.id)} title={tx('删除分组 (组内策略保留, 转为未分组)')}
                   className="rounded p-1 text-muted hover:bg-danger/10 hover:text-danger"><Trash2 className="h-3 w-3" /></button>
@@ -194,7 +194,7 @@ function GroupsManagerModal({ groups, active, onClose, onCreate, onRename, onReo
 }
 
 export function StrategyPoolDialog({ pool, onAdded, onClose }: Props) {
-  const { tx } = useI18n()
+  const { tx, locale } = useI18n()
   const { pool: poolIds, groups, groupNames, metaMap, archivedIds } = pool
   const [allStrategies, setAllStrategies] = useState<StrategyDetail[]>([])
   const [loading, setLoading] = useState(true)
@@ -257,10 +257,10 @@ export function StrategyPoolDialog({ pool, onAdded, onClose }: Props) {
     const sorted = [...list]
     if (sort === 'added_desc') sorted.sort((a, b) => addedOf(b).localeCompare(addedOf(a)))
     else if (sort === 'added_asc') sorted.sort((a, b) => addedOf(a).localeCompare(addedOf(b)))
-    else if (sort === 'name_asc') sorted.sort((a, b) => nameOf(a).localeCompare(nameOf(b), 'zh-Hans-CN'))
-    else sorted.sort((a, b) => nameOf(b).localeCompare(nameOf(a), 'zh-Hans-CN'))
+    else if (sort === 'name_asc') sorted.sort((a, b) => nameOf(a).localeCompare(nameOf(b), locale))
+    else sorted.sort((a, b) => nameOf(b).localeCompare(nameOf(a), locale))
     return sorted
-  }, [matchingStrategies, groupFilter, sort, metaMap])
+  }, [matchingStrategies, groupFilter, sort, metaMap, locale])
   const drafts = allStrategies.filter(strategy => strategy.research_only && strategy.source === 'ai'
     && !archivedSet.has(strategy.id) && matches(strategy) && matchesGroup(strategy, groupFilter))
 
@@ -341,7 +341,7 @@ export function StrategyPoolDialog({ pool, onAdded, onClose }: Props) {
       panelClassName="strategy-library-dialog flex h-[92%] w-[96%] max-w-[1440px] max-h-[900px] flex-col overflow-hidden rounded-card border border-border bg-surface shadow-2xl">
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-2.5 sm:px-5">
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-1"><h2 className="flex shrink-0 items-center gap-2 text-sm font-semibold text-foreground"><Layers className="h-4 w-4 self-center text-accent" />{tx('策略库')}</h2><p className="text-[11px] leading-5 text-muted">{tx('勾选参与扫描，拖动调整顺序；分组与归档即时生效。')}</p></div>
-        <button type="button" aria-label="关闭" disabled={!!publishingId} onClick={onClose} className="rounded-btn p-1.5 text-muted hover:bg-elevated hover:text-foreground disabled:opacity-40"><X className="h-4 w-4" /></button>
+        <button type="button" aria-label={tx('关闭')} disabled={!!publishingId} onClick={onClose} className="rounded-btn p-1.5 text-muted hover:bg-elevated hover:text-foreground disabled:opacity-40"><X className="h-4 w-4" /></button>
       </header>
       {loadError && <div role="alert" className="flex shrink-0 items-center gap-3 border-b border-danger/20 bg-danger/5 px-4 py-3 text-xs text-danger"><span className="min-w-0 flex-1 break-words">{tx('策略列表加载失败：{v}', { v: loadError })}</span><button type="button" onClick={() => void loadStrategies()} className="shrink-0 underline">{tx('重试')}</button></div>}
       {publishError && <p role="alert" className="shrink-0 border-b border-danger/20 bg-danger/5 px-4 py-2 text-xs text-danger">{tx('发布失败：{v}', { v: publishError })}</p>}
@@ -361,7 +361,7 @@ export function StrategyPoolDialog({ pool, onAdded, onClose }: Props) {
             <div aria-label={tx('策略筛选')} className="shrink-0 space-y-2 border-b border-border bg-surface px-3 py-2.5">
               <div className="strategy-library-filter-fields grid grid-cols-2 gap-2">
                 <div className="strategy-library-search relative col-span-2 min-w-0"><Search className="pointer-events-none absolute left-2 top-2 h-3.5 w-3.5 text-muted" /><input aria-label={tx('搜索策略')} placeholder={tx('搜索名称、ID 或描述')} value={search} onChange={event => setSearch(event.target.value)} className="h-8 w-full rounded-input border border-border bg-base pl-7 pr-3 text-xs focus:border-accent focus:outline-none" /></div>
-                <select aria-label={tx('策略周期')} value={timeframe} onChange={event => setTimeframe(event.target.value)} className="h-8 rounded-input border border-border bg-base px-2 text-xs text-secondary focus:border-accent focus:outline-none"><option value="all">{tx('全部周期')}</option><option value="1d">日线</option><option value="1m">{tx('分钟')}</option></select>
+                <select aria-label={tx('策略周期')} value={timeframe} onChange={event => setTimeframe(event.target.value)} className="h-8 rounded-input border border-border bg-base px-2 text-xs text-secondary focus:border-accent focus:outline-none"><option value="all">{tx('全部周期')}</option><option value="1d">{tx('日线')}</option><option value="1m">{tx('分钟')}</option></select>
                 <select aria-label={tx('策略池排序')} value={sort} onChange={event => changeSort(event.target.value as LibrarySort)} className="h-8 rounded-input border border-border bg-base px-2 text-xs text-secondary focus:border-accent focus:outline-none">
                   {SORT_OPTIONS.map(option => <option key={option.id} value={option.id}>{tx(option.label)}</option>)}
                 </select>
@@ -371,13 +371,13 @@ export function StrategyPoolDialog({ pool, onAdded, onClose }: Props) {
                 <span className="mr-0.5 text-[10px] text-muted/80">{tx('来源')}</span>
                 {TABS.map(tab => {
                 const count = allStrategies.filter(strategy => (!strategy.research_only || strategy.source === 'ai') && !archivedSet.has(strategy.id) && (tab.id === 'all' || strategy.source === tab.id)).length
-                return <button type="button" key={tab.id} aria-pressed={activeTab === tab.id} onClick={() => { setActiveTab(tab.id); setGroupFilter('all') }} className={cn('rounded-btn px-2 py-0.5 text-[11px] transition-colors', activeTab === tab.id ? 'bg-accent/10 font-medium text-accent' : 'text-secondary hover:bg-elevated')}>{tab.label}<span className="ml-1 tabular-nums text-muted">{count}</span></button>
+                return <button type="button" key={tab.id} aria-pressed={activeTab === tab.id} onClick={() => { setActiveTab(tab.id); setGroupFilter('all') }} className={cn('rounded-btn px-2 py-0.5 text-[11px] transition-colors', activeTab === tab.id ? 'bg-accent/10 font-medium text-accent' : 'text-secondary hover:bg-elevated')}>{tx(tab.label)}<span className="ml-1 tabular-nums text-muted">{count}</span></button>
               })}</div>
               {/* 分组横向铺开: 点名称筛选该分组, 勾选框整组入池/出池 (全选/反选) */}
               <div className="flex items-center gap-2" aria-label={tx('策略分组')}>
                 <span className="shrink-0 text-[10px] text-muted/80">{tx('分组')}</span>
                 <div role="region" aria-label={tx('分组列表')} tabIndex={0} className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overscroll-x-contain py-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent/50">
-                {([['all', '全部'], ['none', '未分组'], ...groups.map(group => [group.id, group.name] as const)] as const).map(([key, label]) => {
+                {([['all', tx('全部')], ['none', tx('未分组')], ...groups.map(group => [group.id, group.name] as const)] as const).map(([key, label]) => {
                   const ids = groupMemberIds(key)
                   const state = groupChipState(ids)
                   return (
@@ -415,8 +415,8 @@ export function StrategyPoolDialog({ pool, onAdded, onClose }: Props) {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start gap-2">
                         <span className="strategy-library-strategy-name min-w-0 break-words text-xs font-medium text-foreground" title={strategy.name}>{strategy.name}</span>
-                        <span className={cn('shrink-0 rounded border px-1 py-px text-[10px] leading-tight', SOURCE_CLS[strategy.source] ?? SOURCE_CLS.custom)}>{SOURCE_LABEL[strategy.source] ?? strategy.source}</span>
-                        <span className="shrink-0 text-[10px] text-muted">{strategy.timeframes?.includes('1m') ? '分钟' : '日线'}</span>
+                        <span className={cn('shrink-0 rounded border px-1 py-px text-[10px] leading-tight', SOURCE_CLS[strategy.source] ?? SOURCE_CLS.custom)}>{tx(SOURCE_LABEL[strategy.source] ?? strategy.source)}</span>
+                        <span className="shrink-0 text-[10px] text-muted">{strategy.timeframes?.includes('1m') ? tx('分钟') : tx('日线')}</span>
                       </div>
                       <p className="mt-0.5 truncate text-[10px] leading-4 text-muted" title={`${strategy.id}${meta?.added_at ? ` · ${tx('加入于 {v}', { v: fmtTime(meta.added_at) })}` : ''}`}>{strategy.id}{meta?.added_at && <span className="ml-2">{tx('加入于 {v}', { v: fmtTime(meta.added_at) })}</span>}</p>
                       {strategy.description && <p className="mt-0.5 truncate text-[11px] leading-4 text-secondary" title={strategy.description}>{strategy.description}</p>}
@@ -428,7 +428,7 @@ export function StrategyPoolDialog({ pool, onAdded, onClose }: Props) {
                       onChange={event => pool.setStrategyGroup(strategy.id, event.target.value || null)}
                       title={groups.length === 0 ? tx('暂无分组，点击「管理分组」新建') : tx('所属分组')}
                       className={cn(SELECT_CLS, 'w-24 max-w-28')}>
-                      <option value="">未分组</option>
+                      <option value="">{tx('未分组')}</option>
                       {groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)}
                     </select>
                     <button type="button" aria-label={tx('归档：{v}', { v: strategy.name })} disabled={disabled}
@@ -470,14 +470,14 @@ export function StrategyPoolDialog({ pool, onAdded, onClose }: Props) {
               <p className="mt-0.5 text-[10px] leading-4 text-muted">{tx('拖动手柄排序，或用箭头微调。')}</p>
             </div>
             {clearedPool && poolIds.length === 0
-              ? <button type="button" disabled={disabled} onClick={undoClear} className="shrink-0 text-[11px] text-accent disabled:opacity-40">撤销清空</button>
-              : <button type="button" disabled={disabled || !poolIds.length} onClick={clearSelected} className="shrink-0 text-[11px] text-muted hover:text-danger disabled:opacity-40">清空所选</button>}
+              ? <button type="button" disabled={disabled} onClick={undoClear} className="shrink-0 text-[11px] text-accent disabled:opacity-40">{tx('撤销清空')}</button>
+              : <button type="button" disabled={disabled || !poolIds.length} onClick={clearSelected} className="shrink-0 text-[11px] text-muted hover:text-danger disabled:opacity-40">{tx('清空所选')}</button>}
           </div>
           <Reorder.Group as="ol" axis="y" layoutScroll aria-label={tx('已选策略列表')} tabIndex={0}
             values={poolIds} onReorder={next => { if (!disabled) pool.reorderPool(next) }}
             className="scrollbar-gutter-stable min-h-0 flex-1 divide-y divide-border/60 overflow-y-auto overscroll-contain px-2 py-1 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent/50">
             {!poolIds.length
-              ? <li className="px-2 py-10 text-center text-xs leading-6 text-muted">尚未选择策略，在策略库勾选后会出现在这里。</li>
+              ? <li className="px-2 py-10 text-center text-xs leading-6 text-muted">{tx('尚未选择策略，在策略库勾选后会出现在这里。')}</li>
               : poolIds.map((id, index) => {
                   const meta = metaMap.get(id)
                   return <SelectedRow key={id} id={id} label={labelOf(id)} strategy={stratMap.get(id)}
@@ -490,8 +490,8 @@ export function StrategyPoolDialog({ pool, onAdded, onClose }: Props) {
         </section>
       </div>
       <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-4 py-2 sm:px-5">
-        <p className="text-[11px] text-muted" aria-live="polite">已选 <strong className="font-medium tabular-nums text-foreground">{poolIds.length}</strong> 项 · 档案 <strong className="font-medium tabular-nums text-foreground">{archivedRows.length}</strong> 项 · 调整即时生效</p>
-        <button type="button" disabled={!!publishingId} onClick={onClose} className={cn(BUTTON, 'border-blue-600 bg-blue-600 font-medium text-white hover:bg-blue-700 hover:text-white')}>完成</button>
+        <p className="text-[11px] text-muted" aria-live="polite">{tx('已选')} <strong className="font-medium tabular-nums text-foreground">{poolIds.length}</strong> {tx('项 · 档案')} <strong className="font-medium tabular-nums text-foreground">{archivedRows.length}</strong> {tx('项 · 调整即时生效')}</p>
+        <button type="button" disabled={!!publishingId} onClick={onClose} className={cn(BUTTON, 'border-blue-600 bg-blue-600 font-medium text-white hover:bg-blue-700 hover:text-white')}>{tx('完成')}</button>
       </footer>
     </Modal>
     {showGroups && <GroupsManagerModal groups={groups} active onClose={() => setShowGroups(false)}

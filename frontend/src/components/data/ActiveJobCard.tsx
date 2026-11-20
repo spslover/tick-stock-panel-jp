@@ -2,6 +2,7 @@ import { useRef, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { formatDuration, formatLogTime } from '@/lib/format'
+import { useI18n } from '@/lib/i18n'
 import { Pill } from './StatCard'
 import type { PipelineJob } from '@/lib/api'
 
@@ -22,6 +23,7 @@ export const STAGE_LABELS: Record<string, string> = {
 }
 
 function LogViewer({ log }: { log: PipelineJob['log'] }) {
+  const { tx } = useI18n()
   const containerRef = useRef<HTMLDivElement>(null)
 
   const displayLog = useMemo(() => {
@@ -50,26 +52,27 @@ function LogViewer({ log }: { log: PipelineJob['log'] }) {
       {displayLog.map((line, i) => (
         <div key={`${line.ts}-${i}`} className="flex gap-2 text-secondary">
           <span className="text-muted shrink-0">{formatLogTime(line.ts)}</span>
-          <span className="text-accent/70 shrink-0">[{STAGE_LABELS[line.stage] ?? line.stage}]</span>
+          <span className="text-accent/70 shrink-0">[{tx(STAGE_LABELS[line.stage] ?? line.stage)}]</span>
           <span>{line.msg}</span>
         </div>
       ))}
-      {displayLog.length === 0 && <div className="text-muted">等待启动…</div>}
+      {displayLog.length === 0 && <div className="text-muted">{tx('等待启动…')}</div>}
     </div>
   )
 }
 
 export function ActiveJobCard({ job }: { job: PipelineJob }) {
+  const { tx } = useI18n()
   const statusMap = {
-    running:   { icon: Loader2,     color: 'text-accent',   label: '运行中', spinning: true,  border: 'border-accent/40', bg: 'bg-accent/5' },
-    pending:   { icon: Loader2,     color: 'text-muted',    label: '排队中', spinning: true,  border: 'border-border',    bg: 'bg-surface' },
-    succeeded: { icon: CheckCircle2, color: 'text-bear',     label: '完成',   spinning: false, border: 'border-bear/30',   bg: 'bg-bear/5' },
-    failed:    { icon: XCircle,     color: 'text-danger',   label: '失败',   spinning: false, border: 'border-danger/40', bg: 'bg-danger/5' },
+    running:   { icon: Loader2,     color: 'text-accent',   label: tx('运行中'), spinning: true,  border: 'border-accent/40', bg: 'bg-accent/5' },
+    pending:   { icon: Loader2,     color: 'text-muted',    label: tx('排队中'), spinning: true,  border: 'border-border',    bg: 'bg-surface' },
+    succeeded: { icon: CheckCircle2, color: 'text-bear',     label: tx('完成'),   spinning: false, border: 'border-bear/30',   bg: 'bg-bear/5' },
+    failed:    { icon: XCircle,     color: 'text-danger',   label: tx('失败'),   spinning: false, border: 'border-danger/40', bg: 'bg-danger/5' },
   } as const
   const meta = statusMap[job.status]
   const Icon = meta.icon
   const isDone = job.status === 'succeeded' || job.status === 'failed'
-  const stageLabel = isDone ? meta.label : (STAGE_LABELS[job.stage] ?? job.stage)
+  const stageLabel = isDone ? meta.label : tx(STAGE_LABELS[job.stage] ?? job.stage)
 
   return (
     <div className={`rounded-card border ${meta.border} ${meta.bg} p-5`}>
@@ -81,7 +84,7 @@ export function ActiveJobCard({ job }: { job: PipelineJob }) {
               {meta.label}{!isDone && ` · ${stageLabel}`}
             </div>
             <div className="text-xs text-secondary font-mono mt-0.5">
-              {job.id} · {job.duration_s != null ? formatDuration(job.duration_s) : '进行中'}
+              {job.id} · {job.duration_s != null ? formatDuration(job.duration_s) : tx('进行中')}
             </div>
           </div>
         </div>
@@ -103,7 +106,7 @@ export function ActiveJobCard({ job }: { job: PipelineJob }) {
           </div>
           {job.stage_pct > 0 && (
             <div className="flex items-center justify-between mt-1">
-              <span className="text-[10px] text-muted">当前阶段</span>
+              <span className="text-[10px] text-muted">{tx('当前阶段')}</span>
               <span className="text-[10px] font-mono text-secondary">{job.stage_pct}%</span>
             </div>
           )}
@@ -115,15 +118,15 @@ export function ActiveJobCard({ job }: { job: PipelineJob }) {
       {job.status === 'succeeded' && job.result && (() => {
         const skipped = new Set(job.result.skipped_stages ?? [])
         const cell = (stage: string | null, v: string) =>
-          stage && skipped.has(stage) ? '跳过' : v
+          stage && skipped.has(stage) ? tx('跳过') : v
         // 按结果里实际存在的字段渲染: 独立除权因子同步没有日K/分钟K字段, 不显示 "0 天"
         const pills: { label: string; value: string }[] = []
-        if (job.result.universe_size != null) pills.push({ label: '标的池', value: String(job.result.universe_size) })
-        if (job.result.daily_days != null) pills.push({ label: '日 K', value: cell(null, `${job.result.daily_days} 天`) })
-        if (job.result.adj_factor_symbols != null) pills.push({ label: '除权因子', value: cell('sync_adj', `${job.result.adj_factor_symbols} 只`) })
-        if (job.result.enriched_days != null) pills.push({ label: 'enriched', value: cell(null, `${job.result.enriched_days} 行`) })
-        if (job.result.remaining_gaps != null) pills.push({ label: '剩余缺口', value: `${job.result.remaining_gaps} 条` })
-        if (job.result.minute_rows != null) pills.push({ label: job.result.requested_gaps != null ? '新增分钟K' : '分钟K', value: cell('sync_minute', `${job.result.minute_rows} 行`) })
+        if (job.result.universe_size != null) pills.push({ label: tx('标的池'), value: String(job.result.universe_size) })
+        if (job.result.daily_days != null) pills.push({ label: tx('日 K'), value: cell(null, tx('{n} 天', { n: job.result.daily_days })) })
+        if (job.result.adj_factor_symbols != null) pills.push({ label: tx('除权因子'), value: cell('sync_adj', tx('{n} 只', { n: job.result.adj_factor_symbols })) })
+        if (job.result.enriched_days != null) pills.push({ label: 'enriched', value: cell(null, tx('{n} 行', { n: job.result.enriched_days })) })
+        if (job.result.remaining_gaps != null) pills.push({ label: tx('剩余缺口'), value: tx('{n} 条', { n: job.result.remaining_gaps }) })
+        if (job.result.minute_rows != null) pills.push({ label: job.result.requested_gaps != null ? tx('新增分钟K') : tx('分钟K'), value: cell('sync_minute', tx('{n} 行', { n: job.result.minute_rows })) })
         if (pills.length === 0) return null
         return (
           <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
@@ -134,11 +137,9 @@ export function ActiveJobCard({ job }: { job: PipelineJob }) {
       {job.status === 'failed' && job.error && (
         <div className="mt-3 rounded-btn border border-danger/40 bg-danger/5 px-3 py-2 text-xs text-danger">
           {job.error}
-          {job.error.includes('超时自动取消') && (
+          {job.error.includes('超时自动取消') && ( // i18n-exempt: 与后端错误文案做字符串比较, 不能翻译
             <div className="mt-1 text-[10px] text-muted">
-              判定依据是「无进度」而非总时长, 任务只要仍在推进就不会被中断;
-              若网络环境较慢可在 设置 → 网络设置 中调大停滞阈值。
-            </div>
+              {tx('判定依据是「无进度」而非总时长, 任务只要仍在推进就不会被中断; 若网络环境较慢可在 设置 → 网络设置 中调大停滞阈值。')}</div>
           )}
         </div>
       )}

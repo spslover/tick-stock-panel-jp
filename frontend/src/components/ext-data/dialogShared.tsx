@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { tx } from '@/lib/i18n'
 
 /** 扩展数据弹窗共用的分节标题: mono 序号 + 标题 + 发丝线 + 右侧动作区 */
 export function SectionHead({ num, title, children }: {
@@ -26,9 +27,9 @@ export const MAX_PULL_INTERVAL_SECONDS = 2_592_000
 export function validatePullInterval(value: number, unit: 'seconds' | 'minutes'): string | null {
   if (unit === 'seconds') {
     return Number.isInteger(value) && value >= MIN_PULL_INTERVAL_SECONDS && value <= MAX_PULL_INTERVAL_SECONDS
-      ? null : `秒级拉取间隔须为 ${MIN_PULL_INTERVAL_SECONDS}~${MAX_PULL_INTERVAL_SECONDS} 的整数（最多 30 天）`
+      ? null : tx('秒级拉取间隔须为 {min}~{max} 的整数（最多 30 天）', { min: MIN_PULL_INTERVAL_SECONDS, max: MAX_PULL_INTERVAL_SECONDS })
   }
-  return Number.isInteger(value) && value >= 1 ? null : '分钟拉取间隔须为大于等于 1 的整数'
+  return Number.isInteger(value) && value >= 1 ? null : tx('分钟拉取间隔须为大于等于 1 的整数')
 }
 
 /** 间隔摘要 (与后端 _interval_seconds 同口径): schedule_seconds 优先, 回退分钟。
@@ -37,5 +38,5 @@ export function formatIntervalSummary(
   seconds: number | null | undefined, minutes: number | null | undefined,
 ): string {
   const secs = seconds ?? (minutes ?? 1440) * 60
-  return secs >= 60 && secs % 60 === 0 ? `每 ${secs / 60} 分钟` : `每 ${secs} 秒`
+  return secs >= 60 && secs % 60 === 0 ? tx('每 {n} 分钟', { n: secs / 60 }) : tx('每 {n} 秒', { n: secs })
 }

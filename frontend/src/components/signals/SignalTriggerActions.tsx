@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Settings2, Zap } from 'lucide-react'
 import type { CustomSignal } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 import { CustomSignalDialog } from './CustomSignalDialog'
 import { AddFactorSignalDialog } from '@/pages/backtest/AddFactorSignalDialog'
 
@@ -36,7 +37,7 @@ export function SignalTriggerActions({ kind, signals, onChange, buttonClassName,
       <button
         type="button"
         onClick={() => setFactorOpen(true)}
-        title="从因子快速创建条件（阈值给建议值）"
+        title={tx('从因子快速创建条件（阈值给建议值）')}
         className={`${btnCls} hover:border-amber-400/40 hover:text-amber-400`}
       >
         <Zap className={iconCls} />
@@ -44,7 +45,7 @@ export function SignalTriggerActions({ kind, signals, onChange, buttonClassName,
       <button
         type="button"
         onClick={() => setOpen(true)}
-        title="新增自定义信号"
+        title={tx('新增自定义信号')}
         className={`${btnCls} ${accent}`}
       >
         <Plus className={iconCls} />
@@ -52,7 +53,7 @@ export function SignalTriggerActions({ kind, signals, onChange, buttonClassName,
       <button
         type="button"
         onClick={() => navigate('/signals?highlight=signals')}
-        title="去信号库"
+        title={tx('去信号库')}
         className={`${btnCls} hover:border-amber-400/40 hover:text-amber-400`}
       >
         <Settings2 className={iconCls} />

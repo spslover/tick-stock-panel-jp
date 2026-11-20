@@ -1,3 +1,4 @@
+import { useI18n } from '@/lib/i18n'
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Activity, Settings } from 'lucide-react'
@@ -18,6 +19,7 @@ export function QuoteConfigCard({ enabled, running, isTrading, lastFetchMs, inte
   onShowIntervalEdit: () => void
   onIntervalChange: (v: number) => void
 }) {
+  const { tx, locale } = useI18n()
   const statusColor = running && isTrading
     ? 'bg-accent shadow-[0_0_6px_rgba(61,214,140,0.5)]'
     : enabled && running
@@ -25,15 +27,15 @@ export function QuoteConfigCard({ enabled, running, isTrading, lastFetchMs, inte
       : 'bg-muted'
 
   const statusText = !enabled
-    ? '已关闭'
+    ? tx('已关闭')
     : !isTrading
-      ? '非交易时段'
+      ? tx('非交易时段')
       : running
-        ? '行情运行中'
-        : '已停止'
+        ? tx('行情运行中')
+        : tx('已停止')
 
   const lastFetchTime = lastFetchMs
-    ? new Date(lastFetchMs).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    ? new Date(lastFetchMs).toLocaleString(locale, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : null
 
   return (
@@ -41,7 +43,7 @@ export function QuoteConfigCard({ enabled, running, isTrading, lastFetchMs, inte
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-secondary" />
-          <h3 className="text-sm font-medium text-foreground">实时行情</h3>
+          <h3 className="text-sm font-medium text-foreground">{tx('实时行情')}</h3>
         </div>
         <button
           onClick={() => onToggle(!enabled)}
@@ -68,23 +70,23 @@ export function QuoteConfigCard({ enabled, running, isTrading, lastFetchMs, inte
       ) : (
         <div className="space-y-2">
           <div className="flex items-center justify-between text-[11px]">
-            <span className="text-muted">状态</span>
+            <span className="text-muted">{tx('状态')}</span>
             <div className="flex items-center gap-1.5">
               <span className={`inline-block h-1.5 w-1.5 rounded-full ${statusColor} ${running && isTrading ? 'animate-pulse' : ''}`} />
               <span className="font-mono text-secondary">{statusText}</span>
             </div>
           </div>
           <div className="flex items-center justify-between text-[11px]">
-            <span className="text-muted">交易时段</span>
-            <span className={`font-mono ${isTrading ? 'text-accent' : 'text-muted'}`}>{isTrading ? '交易中' : '休市'}</span>
+            <span className="text-muted">{tx('交易时段')}</span>
+            <span className={`font-mono ${isTrading ? 'text-accent' : 'text-muted'}`}>{isTrading ? tx('交易中') : tx('休市')}</span>
           </div>
           <div className="flex items-center justify-between text-[11px]">
             <div className="flex items-center gap-1">
-              <span className="text-muted">轮询间隔</span>
+              <span className="text-muted">{tx('轮询间隔')}</span>
               <button
                 onClick={() => onShowIntervalEdit()}
                 className={`p-0.5 rounded hover:bg-elevated transition-colors ${showIntervalEdit ? 'text-accent' : 'text-secondary'}`}
-                title="设置轮询间隔"
+                title={tx('设置轮询间隔')}
               >
                 <Settings className="h-3 w-3" />
               </button>
@@ -92,7 +94,7 @@ export function QuoteConfigCard({ enabled, running, isTrading, lastFetchMs, inte
             <span className="font-mono text-secondary">{intervalS}s</span>
           </div>
           <div className="flex items-center justify-between text-[11px]">
-            <span className="text-muted">最后获取</span>
+            <span className="text-muted">{tx('最后获取')}</span>
             <span className="font-mono text-secondary">{lastFetchTime ?? '—'}</span>
           </div>
         </div>
@@ -123,6 +125,7 @@ export function QuoteConfigCard({ enabled, running, isTrading, lastFetchMs, inte
 function IntervalEditor({ min, max, value, onChange }: {
   min: number; max: number; value: number; onChange: (v: number) => void
 }) {
+  const { tx } = useI18n()
   const [draft, setDraft] = useState(value)
   const clamped = Math.max(min, Math.min(max, draft))
   const step = min < 1 ? 0.1 : min < 3 ? 0.5 : 1
@@ -131,7 +134,7 @@ function IntervalEditor({ min, max, value, onChange }: {
   return (
     <div className="mt-2 pt-2 border-t border-border/50">
       <div className="text-[10px] text-muted mb-1.5">
-        轮询间隔 <span className="text-muted/60">({min}s ~ {max}s)</span>
+        {tx('轮询间隔')} <span className="text-muted/60">({min}s ~ {max}s)</span>
       </div>
       <div className="flex flex-wrap gap-1 mb-2">
         {presets.map(p => (

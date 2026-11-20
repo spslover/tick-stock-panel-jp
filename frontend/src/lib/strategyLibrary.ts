@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18n'
 import { useEffect } from 'react'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import type { StrategyLibraryInfo } from './api'
@@ -16,7 +17,7 @@ export function selectableStrategies<T extends StrategyChoice>(items: readonly T
 }
 
 export function strategyOptionLabel(item: StrategyChoice): string {
-  return `${item.name || item.id}${item.library?.archived ? '（已归档）' : ''}`
+  return `${item.name || item.id}${item.library?.archived ? tx('（已归档）') : ''}`
 }
 
 export function strategyChoiceGroups<T extends StrategyChoice>(items: readonly T[]) {

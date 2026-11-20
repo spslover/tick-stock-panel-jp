@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18n'
 import type { Time, UTCTimestamp, CandlestickData, LineData, HistogramData, WhitespaceData } from 'lightweight-charts'
 import type { MinuteKlineSession } from './api'
 import type { OHLC } from './chart-types'
@@ -29,7 +30,7 @@ export interface PlotSeries {
 /** 画布专用北京墙钟键，不回传给 API，不受浏览器宿主时区影响。 */
 export function minuteTime(value: string): UTCTimestamp {
   const match = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(value)
-  if (!match) throw new Error(`分钟时间格式异常: ${value}`)
+  if (!match) throw new Error(tx('分钟时间格式异常: {v}', { v: value }))
   const [, y, m, d, h, min, sec] = match
   return (Date.UTC(+y, +m - 1, +d, +h, +min, +(sec ?? 0)) / 1000) as UTCTimestamp
 }

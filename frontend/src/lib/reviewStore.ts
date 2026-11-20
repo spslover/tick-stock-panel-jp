@@ -11,6 +11,7 @@
  *  - 订阅者列表(notify 机制),Review mount 时订阅、unmount 时退订
  */
 import { api, friendlyStreamError } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 
 export type ReviewPhase = 'idle' | 'loading' | 'streaming' | 'done' | 'error'
 
@@ -105,7 +106,7 @@ export async function startReviewGeneration(
         notify()
       } else if (evt.type === 'error') {
         failed = true
-        state = { ...state, error: evt.message ?? '复盘失败', phase: 'error' }
+        state = { ...state, error: evt.message ?? tx('复盘失败'), phase: 'error' }
         notify()
         return
       } else if (evt.type === 'done') {
@@ -125,7 +126,7 @@ export async function startReviewGeneration(
     }
   } catch (e: any) {
     if (!signal.aborted) {
-      state = { ...state, error: friendlyStreamError(e?.message) || '复盘失败', phase: 'error' }
+      state = { ...state, error: friendlyStreamError(e?.message) || tx('复盘失败'), phase: 'error' }
       notify()
     }
   } finally {
@@ -218,7 +219,7 @@ export function feedReviewEvent(evt: any): void {
     notify()
   } else if (t === 'error') {
     if (generatingSource !== 'sse') return
-    state = { ...state, error: evt.message ?? '复盘生成失败', phase: 'error' }
+    state = { ...state, error: evt.message ?? tx('复盘生成失败'), phase: 'error' }
     notify()
     generatingSource = null
   } else if (t === 'done') {

@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18n'
 /**
  * 运行时页面插件加载 — 从后端拉取已启用清单, 在启动引导窗口动态 import。
  *
@@ -103,17 +104,17 @@ function createMountComponent(mount: PagePackRoute['mount']): ComponentType {
  * 的失败隔离同一出口。
  */
 export function packToExtension(pack: unknown): FrontendExtension {
-  if (!pack || typeof pack !== 'object') throw new Error('页面插件必须 default 导出清单对象')
+  if (!pack || typeof pack !== 'object') throw new Error(tx('页面插件必须 default 导出清单对象'))
   const p = pack as Partial<PagePackExtension>
-  if (p.apiVersion !== 1) throw new Error(`apiVersion 必须为 1, 收到 ${String(p.apiVersion)}`)
-  if (typeof p.id !== 'string' || !p.id.includes('.')) throw new Error('id 必须是带命名空间的字符串 (如 demo.hello)')
-  if (!Array.isArray(p.routes) || p.routes.length === 0) throw new Error('routes 不能为空')
-  if (!Array.isArray(p.navigation) || p.navigation.length === 0) throw new Error('navigation 不能为空')
+  if (p.apiVersion !== 1) throw new Error(tx('apiVersion 必须为 1, 收到 {v}', { v: String(p.apiVersion) }))
+  if (typeof p.id !== 'string' || !p.id.includes('.')) throw new Error(tx('id 必须是带命名空间的字符串 (如 demo.hello)'))
+  if (!Array.isArray(p.routes) || p.routes.length === 0) throw new Error(tx('routes 不能为空'))
+  if (!Array.isArray(p.navigation) || p.navigation.length === 0) throw new Error(tx('navigation 不能为空'))
   for (const r of p.routes as PagePackRoute[]) {
     if (typeof r?.id !== 'string' || typeof r?.path !== 'string' || !r.path.startsWith('/') || r.path === '/') {
-      throw new Error(`路由 ${r?.id} 的 path 必须是非根绝对路径`)
+      throw new Error(tx('路由 {id} 的 path 必须是非根绝对路径', { id: r?.id }))
     }
-    if (typeof r?.mount !== 'function') throw new Error(`路由 ${r.id} 缺少 mount(el, ctx) 函数`)
+    if (typeof r?.mount !== 'function') throw new Error(tx('路由 {id} 缺少 mount(el, ctx) 函数', { id: r.id }))
   }
   return {
     id: p.id,
@@ -173,7 +174,7 @@ export async function loadRuntimePageExtensions(opts: LoadRuntimeOptions = {}): 
       const impl = importModule ? importModule(url) : import(/* @vite-ignore */ url)
       return withTimeout(impl, timeoutMs).then(m => {
         const extension = packToExtension(m.default)
-        if (page.managed_by && extension.id !== page.managed_by) throw new Error('页面与配套后端的扩展 ID 不一致')
+        if (page.managed_by && extension.id !== page.managed_by) throw new Error(tx('页面与配套后端的扩展 ID 不一致'))
         return { default: extension }
       })
     }

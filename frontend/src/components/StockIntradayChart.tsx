@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { api, type MinuteKlineRow } from '@/lib/api'
-import { tx } from '@/lib/i18n'
+import { useI18n } from '@/lib/i18n'
 import { QK } from '@/lib/queryKeys'
 import { klineMinuteQueryOptions, minuteRefetchInterval } from '@/lib/kline'
 import type { DailySummary } from '@/lib/intraday-chart'
@@ -41,6 +41,7 @@ export function StockIntradayChart({
   priceLines,
   refetchIntervalMs,
 }: Props) {
+  const { tx } = useI18n()
   const qc = useQueryClient()
   const [minuteDismissed, setMinuteDismissed] = useState(false)
 
@@ -80,7 +81,7 @@ export function StockIntradayChart({
 
   return (
     <div className={className} style={{ height: renderer === 'lightweight' && minuteRows.length > 0 ? undefined : height, minHeight: height, flexShrink: 0 }}>
-      {minute.isLoading && <div className="text-xs text-muted py-2">分时加载中…</div>}
+      {minute.isLoading && <div className="text-xs text-muted py-2">{tx('分时加载中…')}</div>}
       {!minute.isLoading && minuteRows.length === 0 && (
         <>
           {fetchMinute.isPending ? (
@@ -99,7 +100,7 @@ export function StockIntradayChart({
                 onClick={() => fetchMinute.mutate()}
                 className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs font-medium hover:bg-elevated/80 transition-colors duration-150"
               >
-                重新获取
+                {tx('重新获取')}
               </button>
             </div>
           ) : minuteDismissed ? (
@@ -109,7 +110,7 @@ export function StockIntradayChart({
                 onClick={() => setMinuteDismissed(false)}
                 className="px-4 py-1.5 rounded-btn bg-accent/90 text-white text-xs font-medium hover:bg-accent transition-colors duration-150"
               >
-                获取分钟K
+                {tx('获取分钟K')}
               </button>
             </div>
           ) : (
@@ -120,13 +121,13 @@ export function StockIntradayChart({
                   onClick={() => fetchMinute.mutate()}
                   className="px-4 py-1.5 rounded-btn bg-accent/90 text-white text-xs font-medium hover:bg-accent transition-colors duration-150"
                 >
-                  确定
+                  {tx('确定')}
                 </button>
                 <button
                   onClick={() => setMinuteDismissed(true)}
                   className="px-4 py-1.5 rounded-btn bg-elevated text-secondary text-xs hover:bg-elevated/80 transition-colors duration-150"
                 >
-                  取消
+                  {tx('取消')}
                 </button>
               </div>
             </div>

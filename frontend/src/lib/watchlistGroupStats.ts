@@ -7,6 +7,7 @@
  */
 
 import { fmtPct } from '@/lib/format'
+import { tx } from '@/lib/i18n'
 import { storage } from '@/lib/storage'
 
 export interface GroupPctInfo {
@@ -202,19 +203,36 @@ export function groupMetricValue(info: GroupPctInfo | undefined, metric: GroupMe
 
 /** 悬停明细: 按当前指标给出数值 + 全套统计, 任意指标下信息完整 */
 export function groupMetricTitle(info: GroupPctInfo | undefined, metric: GroupMetric): string {
-  if (!info || info.sampled === 0) return '暂无涨跌幅数据'
+  if (!info || info.sampled === 0) return tx('暂无涨跌幅数据')
   const value = groupMetricValue(info, metric)
-  const metricLabel = GROUP_METRICS.find(m => m.id === metric)?.label ?? ''
+  const metricLabel = tx(GROUP_METRICS.find(m => m.id === metric)?.label ?? '')
   const valueText = value == null
     ? '—'
     : metric === 'up_ratio'
       ? `${(value * 100).toFixed(1)}%`
       : fmtPct(value)
-  return `${metricLabel} ${valueText} · 等权 ${fmtPct(info.pct)} · 中位 ${fmtPct(info.median)} · 最强 ${fmtPct(info.max)} · 最弱 ${fmtPct(info.min)} · 上涨${info.up} 下跌${info.down} 平${info.flat} (共${info.sampled}只)`
+  return tx('{m} {v} · 等权 {a} · 中位 {b} · 最强 {c} · 最弱 {d} · 上涨{u} 下跌{dn} 平{f} (共{n}只)', {
+    m: metricLabel,
+    v: valueText,
+    a: fmtPct(info.pct),
+    b: fmtPct(info.median),
+    c: fmtPct(info.max),
+    d: fmtPct(info.min),
+    u: info.up,
+    dn: info.down,
+    f: info.flat,
+    n: info.sampled,
+  })
 }
 
 /** 悬停明细: 等权平均 +1.23% · 上涨12 下跌5 平1 (格式化复用全站 fmtPct) */
 export function groupPctTitle(info: GroupPctInfo | undefined): string {
   if (!info || info.pct == null) return '暂无涨跌幅数据'
-  return `等权平均 ${fmtPct(info.pct)} · 上涨${info.up} 下跌${info.down} 平${info.flat} (共${info.sampled}只)`
+  return tx('等权平均 {v} · 上涨{u} 下跌{dn} 平{f} (共{n}只)', {
+    v: fmtPct(info.pct),
+    u: info.up,
+    dn: info.down,
+    f: info.flat,
+    n: info.sampled,
+  })
 }

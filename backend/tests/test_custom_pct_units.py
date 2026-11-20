@@ -3,7 +3,9 @@
 契约: change_pct/amplitude/turnover_rate 为小数制 (0.0366 = 3.66%)。
 单位只认显式声明 pct_unit: percent|decimal, 不靠数值猜:
   - 声明 percent → 无条件 /100; 声明 decimal → 无条件透传;
-  - 未声明 → change_pct 保留截面中位数判定(涨跌停 30% 上限物理可判),
+  - 未声明 → 不做任何按数值的推断 (百分制 0.05 与小数制 0.05 数值相同,
+    截面启发式会掩盖真实数据错误): change_pct 由 (last_price - prev_close)
+    / prev_close 重算 (价格比值与源端单位无关, 恒为小数制), 缺价格时置 None;
     amplitude/turnover_rate 置 None 交下游重算(fail-closed),
     已被 transforms 显式处理过的列视为用户接管单位, 透传。
 """
@@ -79,29 +81,42 @@ def test_declared_decimal_wins_even_when_values_look_percent():
 # ---- 未声明: change_pct 保留截面判定(物理可判) ----
 
 
-def test_undeclared_change_pct_percent_batch_normalized():
+def test_undeclared_change_pct_is_not_scaled_by_value():
+    """未声明单位时不得按数值推断 (旧实现按截面中位数整批 /100)。
+
+    旧行为在"百分制 + 平静行情/小样本"下会把 0.05(=0.05%)当成小数制 5%,
+    产生 100 倍错误且无任何告警 (CONTRIBUTING §3.1 明令禁止启发式换算)。
+    """
     out = _normalize_pct_units(_df([1.5, -2.2, 0.9, 2.8, 3.3, 0.6]))
-    assert out["change_pct"][0] == pytest.approx(0.015)
+    # 缺价格 → 无法重算 → fail-closed
+    assert out["change_pct"].null_count() == 6
+    # 不得出现任何被 /100 缩放过的数值
+    assert out["change_pct"].to_list() == [None] * 6
 
 
 def test_limit_up_fraction_30cm_not_divided():
-    # 北交所 30% 涨跌停的小数制极值不应被误判为百分制
+    # 北交所 30% 涨跌停的小数制极值不应被误判为百分制 (旧实现靠数值上界判定,
+    # 平静行情下同样可能误判); 未声明单位一律不推断。
     out = _normalize_pct_units(_df([0.30, 0.29, 0.28, 0.27, 0.26]))
-    assert out["change_pct"].to_list() == [0.30, 0.29, 0.28, 0.27, 0.26]
+    assert out["change_pct"].to_list() == [None] * 5
 
 
-def test_small_batch_uses_max():
-    # <5 样本退用最大值: 百分制小盘整批归一
+def test_small_batch_is_not_guessed():
+    # <5 样本的旧"退用最大值"判定正是 100 倍误判的主要来源 (平静小盘批次),
+    # 未声明单位时一律不推断。
     out = _normalize_pct_units(_df([0.5, 0.2]))
-    assert out["change_pct"].to_list() == [pytest.approx(0.005), pytest.approx(0.002)]
-    # 小数制小样本不动
+    assert out["change_pct"].to_list() == [None, None]
     out2 = _normalize_pct_units(_df([0.005, 0.002]))
-    assert out2["change_pct"].to_list() == [0.005, 0.002]
+    assert out2["change_pct"].to_list() == [None, None]
 
 
 def test_string_values_are_cast():
-    out = _normalize_pct_units(_df(["1.5", "-2.2", "0.9", "2.8", "3.3", "0.6"]))
+    # 字符串数值仍被转成 Float64 (声明 percent 时按声明换算)
+    out = _normalize_pct_units(
+        _df(["1.5", "-2.2", "0.9", "2.8", "3.3", "0.6"]), pct_unit="percent"
+    )
     assert out["change_pct"][0] == pytest.approx(0.015)
+    assert out["change_pct"].dtype == pl.Float64
 
 
 # ---- 未声明: amplitude/turnover_rate fail-closed (核心修复) ----
@@ -118,8 +133,8 @@ def test_undeclared_amplitude_and_turnover_are_nulled():
     )
     assert out["amplitude"].null_count() == 6
     assert out["turnover_rate"].null_count() == 6
-    # change_pct 仍正常归一
-    assert out["change_pct"][0] == pytest.approx(0.015)
+    # change_pct 缺价格无法重算 → 同样 fail-closed
+    assert out["change_pct"].null_count() == 6
 
 
 def test_undeclared_transformed_column_passes_through():
@@ -141,6 +156,37 @@ def test_missing_or_null_columns_noop():
     # 全 null 的不可判定列保持 null
     out3 = _normalize_pct_units(_df([1.5, -2.2, 0.9, 2.8, 3.3, 0.6], turnovers=[None] * 6))
     assert out3["turnover_rate"].null_count() == 6
+
+
+def test_undeclared_change_pct_recomputed_from_prices():
+    """未声明单位时 change_pct 由价格重算 —— 比值与源端单位无关。"""
+    df = pl.DataFrame({
+        "change_pct": [0.5, -0.2],
+        "last_price": [10.05, 9.80],
+        "prev_close": [10.00, 10.00],
+    })
+    out = _normalize_pct_units(df)
+    assert out["change_pct"][0] == pytest.approx(0.005)
+    assert out["change_pct"][1] == pytest.approx(-0.02)
+
+
+def test_undeclared_change_pct_never_hundredfold_scaled():
+    """回归: 百分制源(平静批次)不得被当成小数制 —— 不得出现 100 倍错值。"""
+    df = pl.DataFrame({
+        # 源端百分制: 0.05 = +0.05%; 若被误当小数制, 会变成 5%
+        "change_pct": [0.05, 0.02],
+        "last_price": [10.005, 10.002],
+        "prev_close": [10.0, 10.0],
+    })
+    out = _normalize_pct_units(df)
+    assert out["change_pct"][0] == pytest.approx(0.0005)
+    assert out["change_pct"][1] == pytest.approx(0.0002)
+    assert all(abs(v) < 0.01 for v in out["change_pct"].to_list())
+
+
+def test_undeclared_change_pct_null_without_prices():
+    out = _normalize_pct_units(_df([0.05, 0.02]))
+    assert out["change_pct"].to_list() == [None, None]
 
 
 # ---- provider 集成 ----
@@ -201,8 +247,9 @@ def test_get_realtime_undeclared_nulls_ambiguous_columns():
     finally:
         provider.close()
     by_sym = {r["symbol"]: r for r in rows}
-    # change_pct 截面判定仍归一
-    assert by_sym["S1"]["change_pct"] == pytest.approx(0.0152)
+    # change_pct 由价格重算 (与源端单位无关, 恒为小数制)
+    assert by_sym["S1"]["change_pct"] == pytest.approx(0.015228, rel=1e-4)
+    assert by_sym["S2"]["change_pct"] == pytest.approx(-0.021526, rel=1e-4)
     # 不可判定列 fail-closed
     assert by_sym["S1"]["amplitude"] is None
     assert by_sym["S1"]["turnover_rate"] is None

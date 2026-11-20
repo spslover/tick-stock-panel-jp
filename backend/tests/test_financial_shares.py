@@ -139,7 +139,56 @@ def test_historical_turnover_uses_only_available_share_capital(monkeypatch):
         historical_shares=shares,
     )
 
-    assert result["turnover_rate"].to_list() == pytest.approx([0.5, 0.5, 1.0, 2.0, 0.5])
+    # 公告日未知的行 (period_end 2024-06-30 / announce_date=None) 不参与历史匹配,
+    # 不得按 period_end 提前生效 (CONTRIBUTING §3.4 报表期泄露):
+    # 2024-06-30 仍用上一条已公告的 1 亿股 (100M) → turnover 1.0, 而非 2.0。
+    assert result["turnover_rate"].to_list() == pytest.approx([0.5, 0.5, 1.0, 1.0, 0.5])
+
+
+def test_share_row_without_announce_date_is_not_available_at_period_end(monkeypatch):
+    """回归: 缺公告日的历史股本不得在 period_end 当天提前生效 (DATA-002)。"""
+    monkeypatch.setattr(pipeline, "cn_today", lambda: date(2026, 7, 18))
+    bars = pl.DataFrame({
+        "symbol": ["600000.SH"] * 3,
+        "date": [date(2024, 6, 28), date(2024, 6, 30), date(2026, 7, 18)],
+        "volume": [10_000.0] * 3,
+    })
+    instruments = pl.DataFrame({"symbol": ["600000.SH"], "float_shares": [200_000_000.0]})
+    shares = pl.DataFrame({
+        "symbol": ["600000.SH"],
+        "period_end": ["2024-06-30"],
+        "announce_date": [None],
+        "float_shares": [50_000_000.0],
+    })
+
+    result = pipeline.compute_limit_signals(
+        bars, instruments, needed={"turnover_rate"}, historical_shares=shares,
+    )
+
+    # 全程使用最新维表股本 (200M) 兜底, 不出现 50M 带来的 2.0
+    assert result["turnover_rate"].to_list() == pytest.approx([0.5, 0.5, 0.5])
+
+
+def test_share_row_without_announce_date_column_is_not_used_for_history(monkeypatch):
+    """整表无 announce_date 列时同样不可用于历史 (公告时间不可知)。"""
+    monkeypatch.setattr(pipeline, "cn_today", lambda: date(2026, 7, 18))
+    bars = pl.DataFrame({
+        "symbol": ["600000.SH"] * 2,
+        "date": [date(2024, 6, 30), date(2026, 7, 18)],
+        "volume": [10_000.0] * 2,
+    })
+    instruments = pl.DataFrame({"symbol": ["600000.SH"], "float_shares": [200_000_000.0]})
+    shares = pl.DataFrame({
+        "symbol": ["600000.SH"],
+        "period_end": ["2024-06-30"],
+        "float_shares": [50_000_000.0],
+    })
+
+    result = pipeline.compute_limit_signals(
+        bars, instruments, needed={"turnover_rate"}, historical_shares=shares,
+    )
+
+    assert result["turnover_rate"].to_list() == pytest.approx([0.5, 0.5])
 
 
 def test_turnover_without_share_history_keeps_existing_behavior(monkeypatch):

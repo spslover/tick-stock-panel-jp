@@ -19,7 +19,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { X, GripVertical, Plus, ChevronDown, ChevronRight, Database, Settings2, Search } from 'lucide-react'
 import { api } from '@/lib/api'
-import { tx } from '@/lib/i18n'
+import { useI18n } from '@/lib/i18n'
 import { useQuery } from '@tanstack/react-query'
 import { QK } from '@/lib/queryKeys'
 import type { ColumnConfig, ColumnGroup, ExtColumnDisplayConfig, CandleColumnConfig, IntradayColumnConfig, AuctionBarWidth, ChartLinkConfig } from '@/lib/list-columns'
@@ -172,6 +172,7 @@ function SortableActiveCol({ col, onRemove, onConfig, configOpen, extTableLabel,
   showStandaloneToggle?: boolean
   onToggleStandalone?: (id: string) => void
 }) {
+  const { tx } = useI18n()
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
   } = useSortable({ id: col.id })
@@ -259,8 +260,8 @@ export function ListColumnCustomizerInner({
   onChange,
   open,
   onClose,
-  title = tx('自定义列'),
-  builtinSectionLabel = tx('内置列'),
+  title: titleProp,
+  builtinSectionLabel: builtinLabelProp,
   extColumnAlign = 'center',
   extFieldFilter,
   showExtColumns = true,
@@ -268,6 +269,9 @@ export function ListColumnCustomizerInner({
   disableBackdropBlur = false,
   baselineStore,
 }: ListColumnCustomizerProps) {
+  const { tx } = useI18n()
+  const title = titleProp ?? tx('自定义列')
+  const builtinSectionLabel = builtinLabelProp ?? tx('内置列')
   const extSchema = useQuery({
     queryKey: QK.extDataSchemaAll,
     queryFn: api.extDataSchemaAll,
@@ -702,7 +706,7 @@ function extGranularityOf(
                   />
                 </label>
                 <label className="flex items-center gap-1">
-                  <span className="text-secondary shrink-0">高</span>
+                  <span className="text-secondary shrink-0">{tx('高')}</span>
                   <RangeNumberInput
                     value={col.extDisplay?.chartHeight ?? 80}
                     min={24} max={160} step={4}
@@ -751,7 +755,7 @@ function extGranularityOf(
                   />
                 </label>
                 <label className="flex items-center gap-1">
-                  <span className="text-secondary shrink-0">高</span>
+                  <span className="text-secondary shrink-0">{tx('高')}</span>
                   <RangeNumberInput
                     value={col.extDisplay?.chartHeight ?? 80}
                     min={24} max={160} step={4}
@@ -814,8 +818,7 @@ function extGranularityOf(
         {col.extDisplay && (
           <div className="flex justify-end pt-1">
             <button onClick={() => resetExtDisplay(col.id)} className="text-[10px] text-muted hover:text-foreground transition-colors">
-              恢复默认
-            </button>
+              {tx('恢复默认')}</button>
           </div>
         )}
       </div>
@@ -893,8 +896,7 @@ function extGranularityOf(
         {col.extDisplay && (
           <div className="flex justify-end pt-1">
             <button onClick={() => resetExtDisplay(col.id)} className="text-[10px] text-muted hover:text-foreground transition-colors">
-              恢复默认
-            </button>
+              {tx('恢复默认')}</button>
           </div>
         )}
       </div>
@@ -1060,8 +1062,7 @@ function extGranularityOf(
           {col.candleConfig && (
             <div className="flex justify-end pt-1">
               <button onClick={() => resetCandleConfig(col.id)} className="text-[10px] text-muted hover:text-foreground transition-colors">
-                恢复默认
-              </button>
+                {tx('恢复默认')}</button>
             </div>
           )}
         </div>
@@ -1152,7 +1153,7 @@ function extGranularityOf(
     // 显示)、插入位置、时序表默认迷你图都现成。叠加窄栏看形态, 数据列扫全场/排序。
     const fieldMeta = new Map((auctionTable?.columns ?? []).map(c => [c.name, c]))
     const auctionDataCols = ([
-      ['priceField', '价格'],
+      ['priceField', tx('价格')],
       ['matchField', tx('匹配量')],
       ['unmatchedField', tx('未匹配量')],
     ] as const).flatMap(([key, name]) => {
@@ -1319,8 +1320,7 @@ function extGranularityOf(
           {col.intradayConfig && (
             <div className="flex justify-end pt-1">
               <button onClick={() => resetIntradayConfig(col.id)} className="text-[10px] text-muted hover:text-foreground transition-colors">
-                恢复默认
-              </button>
+                {tx('恢复默认')}</button>
             </div>
           )}
         </div>
@@ -1549,8 +1549,7 @@ function extGranularityOf(
                       onClick={() => setConfirmReset(true)}
                       className="text-[10px] text-muted hover:text-foreground transition-colors"
                     >
-                      恢复默认
-                    </button>
+                      {tx('恢复默认')}</button>
                   </div>
                 </div>
                 <div className="flex-1 overflow-y-auto px-2 py-1.5 space-y-0.5">
@@ -1607,8 +1606,7 @@ function extGranularityOf(
                       onClick={() => setConfirmReset(false)}
                       className="px-3 py-1.5 rounded-btn bg-elevated text-secondary hover:bg-elevated/80 text-xs transition-colors"
                     >
-                      取消
-                    </button>
+                      {tx('取消')}</button>
                     <button
                       onClick={() => { resetAllColumns(); setConfirmReset(false) }}
                       className="px-3 py-1.5 rounded-btn bg-danger/90 text-white text-xs font-medium hover:bg-danger transition-colors"

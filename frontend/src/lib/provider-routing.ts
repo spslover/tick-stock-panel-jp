@@ -1,4 +1,5 @@
 import type { CapabilityRoute, ProviderField } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 
 /** 全部可路由偏好字段的默认生效源。 */
 export const DEFAULT_ROUTING: Record<ProviderField, string> = {
@@ -27,7 +28,7 @@ export function buildProviderRouting(
   capabilities: readonly Pick<CapabilityRoute, 'id' | 'field'>[],
 ): Record<ProviderField, string> {
   if (!capabilities.length) {
-    throw new Error('能力矩阵未加载, 无法套用数据源, 请稍后重试')
+    throw new Error(tx('能力矩阵未加载, 无法套用数据源, 请稍后重试'))
   }
   const supported = new Set(datasets)
   const routing: Record<ProviderField, string> = { ...DEFAULT_ROUTING }

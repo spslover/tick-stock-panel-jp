@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Loader2, Check, AlertCircle } from 'lucide-react'
 import { useActiveTasks, restoreDialog } from '@/lib/aiReportStore'
+import { useI18n } from '@/lib/i18n'
 import { getPageScale } from '@/lib/pageZoom'
 import type { ActiveTask } from '@/lib/aiReportStore'
 
@@ -161,6 +162,7 @@ function BubbleItem({ task, isLast, onPointerDown }: {
   isLast: boolean
   onPointerDown: () => void
 }) {
+  const { tx } = useI18n()
   const isWorking = task.phase === 'loading' || task.phase === 'streaming'
   const isError = task.phase === 'error'
 
@@ -183,7 +185,7 @@ function BubbleItem({ task, isLast, onPointerDown }: {
         onPointerDown={onPointerDown}
         role="button"
         tabIndex={0}
-        title={isWorking ? '生成中,点击恢复对话框' : isError ? '分析失败,点击重试' : '点击查看报告'}
+        title={isWorking ? tx('生成中,点击恢复对话框') : isError ? tx('分析失败,点击重试') : tx('点击查看报告')}
         className={`group relative flex w-full cursor-pointer items-center gap-1.5 overflow-hidden rounded-lg border bg-gradient-to-br px-2 py-1.5 backdrop-blur-xl transition-all duration-200 hover:scale-[1.02] active:scale-[0.99] ${accent}`}
       >
         {/* 生成中:顶部进度流光 */}
@@ -212,11 +214,11 @@ function BubbleItem({ task, isLast, onPointerDown }: {
         {/* 状态后缀 */}
         <span className="shrink-0 text-[9px] leading-none">
           {isWorking ? (
-            <span className="text-purple-300/80">分析中</span>
+            <span className="text-purple-300/80">{tx('分析中')}</span>
           ) : isError ? (
-            <span className="text-red-300/80">失败</span>
+            <span className="text-red-300/80">{tx('失败')}</span>
           ) : (
-            <span className="text-emerald-300/80">点击查看</span>
+            <span className="text-emerald-300/80">{tx('点击查看')}</span>
           )}
         </span>
       </div>

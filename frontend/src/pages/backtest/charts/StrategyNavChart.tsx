@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createChart, AreaSeries, BaselineSeries, LineSeries, ColorType, CrosshairMode, LineStyle, LineType,
   type AutoscaleInfo, type IChartApi, type ISeriesApi, type SeriesType, type Time, type MouseEventParams } from 'lightweight-charts'
 import type { StrategyBacktestResult } from '@/lib/api'
+import { useI18n } from '@/lib/i18n'
 import { useChartTheme } from '@/lib/theme'
 import { timeKey } from '@/lib/lightweight-model'
 
@@ -23,14 +24,17 @@ const BENCHMARK_COLOR = '#64748b'
 const DRAWDOWN_COLOR = '#f04438'
 const MAIN_PRICE_MARGINS = { top: 0.08, bottom: 0.06 }
 
-const moneyFmt = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 0 })
-const axisMoneyFmt = (v: number) => {
-  if (Math.abs(v) >= 100_000_000) return `${(v / 100_000_000).toFixed(1)}亿`
-  if (Math.abs(v) >= 10_000) return `${(v / 10_000).toFixed(0)}万`
-  return moneyFmt.format(v)
-}
-
 export function StrategyNavChart({ result }: Props) {
+  const { tx, locale } = useI18n()
+  // 图表本地化: 坐标轴/提示/数字格式跟随界面语言
+  const chartLocale = locale === 'ja' ? 'ja-JP' : locale === 'en' ? 'en-US' : 'zh-CN'
+  const moneyFmt = useMemo(() => new Intl.NumberFormat(chartLocale, { maximumFractionDigits: 0 }), [chartLocale])
+  // 万/亿 是中文数量级, 英文用 K/M, 日文用 万/億 —— 走词库翻译
+  const axisMoneyFmt = (v: number) => {
+    if (Math.abs(v) >= 100_000_000) return tx('{v}亿', { v: (v / 100_000_000).toFixed(1) })
+    if (Math.abs(v) >= 10_000) return tx('{v}万', { v: (v / 10_000).toFixed(0) })
+    return moneyFmt.format(v)
+  }
   const ct = useChartTheme()
   // 图例点选显隐 (策略净值/回撤常显)。隐藏即从窗格移除, 窗格拓扑随之重建。
   const [hidden, setHidden] = useState<Set<string>>(new Set())
@@ -91,7 +95,7 @@ export function StrategyNavChart({ result }: Props) {
       leftPriceScale: { visible: false, borderVisible: false, minimumWidth: 44, scaleMargins: MAIN_PRICE_MARGINS },
       timeScale: { borderColor: theme.border, fixLeftEdge: true, fixRightEdge: true, minBarSpacing: 0.5,
         tickMarkFormatter: (time: Time) => timeKey(time).slice(2, 10) },
-      localization: { locale: 'zh-CN', timeFormatter: (time: Time) => timeKey(time) },
+      localization: { locale: chartLocale, timeFormatter: (time: Time) => timeKey(time) },
     })
     chartRef.current = chart
     const onMove = (event: MouseEventParams<Time>) => {
@@ -209,12 +213,12 @@ export function StrategyNavChart({ result }: Props) {
     if (view) chart.timeScale().setVisibleLogicalRange(view)
     else chart.timeScale().fitContent()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, showPosition, showBenchmark, result.run_id])
+  }, [rows, showPosition, showBenchmark, result.run_id, locale])
 
   const hoverRow = hover != null && rows[hover] ? rows[hover] : null
 
   if (rows.length === 0) {
-    return <div className="flex h-[340px] items-center justify-center text-xs text-muted">净值数据不足，无法绘制曲线</div>
+    return <div className="flex h-[340px] items-center justify-center text-xs text-muted">{tx('净值数据不足，无法绘制曲线')}</div>
   }
 
   return (
@@ -222,35 +226,31 @@ export function StrategyNavChart({ result }: Props) {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 pb-2">
         <span className="flex items-center gap-1.5 text-[10px] text-secondary">
           <span className="w-3 h-0.5 rounded bg-[#3b82f6]" />
-          策略净值
-        </span>
+          {tx('策略净值')}</span>
         <span className="flex items-center gap-1.5 text-[10px] text-secondary">
           <span className="w-3 h-0.5 rounded bg-[#f04438]" />
-          回撤
-        </span>
+          {tx('回撤')}</span>
         {hasPosition && (
-          <button type="button" onClick={() => toggleLegend('仓位')} title="点击显示/隐藏"
+          <button type="button" onClick={() => toggleLegend('仓位')} title={tx('点击显示/隐藏')}
             className={`flex items-center gap-1.5 text-[10px] text-secondary cursor-pointer transition-opacity ${showPosition ? 'opacity-100' : 'opacity-40'}`}>
             <span className="h-2.5 w-3 rounded-sm bg-amber-500/15" />
-            仓位
-          </button>
+            {tx('仓位')}</button>
         )}
         {hasBenchmark && (
-          <button type="button" onClick={() => toggleLegend('同期上证指数')} title="点击显示/隐藏"
+          <button type="button" onClick={() => toggleLegend('同期上证指数')} title={tx('点击显示/隐藏')}
             className={`flex items-center gap-1.5 text-[10px] text-secondary cursor-pointer transition-opacity ${showBenchmark ? 'opacity-100' : 'opacity-40'}`}>
             <span className="w-3 h-0.5 rounded border-t border-dashed border-[#64748b]" />
-            同期上证指数
-          </button>
+            {tx('同期上证指数')}</button>
         )}
         {/* 悬停读数: 十字线所在日期各序列当前值 */}
         <span className="ml-auto flex items-center gap-3 font-mono text-[10px] text-muted">
           {hoverRow ? <>
             <span>{hoverRow.date}</span>
             <span className="text-[#3b82f6]">{moneyFmt.format(hoverRow.nav)}</span>
-            {showBenchmark && hoverRow.benchmark != null && <span className="text-[#94a3b8]">{hoverRow.benchmark.toFixed(2)}点</span>}
+            {showBenchmark && hoverRow.benchmark != null && <span className="text-[#94a3b8]">{hoverRow.benchmark.toFixed(2)}{tx('点')}</span>}
             {showPosition && hoverRow.position != null && <span className="text-[#f59e0b]">{hoverRow.position.toFixed(0)}%</span>}
             {hoverRow.drawdown != null && <span className="text-[#f04438]">{hoverRow.drawdown.toFixed(1)}%</span>}
-          </> : <span>滚轮缩放 · 拖动平移 · 悬停读数</span>}
+          </> : <span>{tx('滚轮缩放 · 拖动平移 · 悬停读数')}</span>}
         </span>
       </div>
       <div ref={hostRef} className="h-[340px]" />

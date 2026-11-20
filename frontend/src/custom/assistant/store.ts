@@ -17,6 +17,7 @@ import {
 } from './client'
 import { mergeSessions } from './sessionsMerge'
 import { hydrateUiPrefs, setUiPref } from '@/lib/uiPrefs'
+import { tx } from '@/lib/i18n'
 
 /**
  * running=执行中; awaiting=动作工具等待用户确认; approved/denied=用户已点
@@ -397,7 +398,7 @@ function applyEvent(event: AssistantEvent, cursor: TurnCursor) {
                 args: { reached: event.reached },
                 status: 'awaiting' as ToolCallStatus,
                 confirm: {
-                  label: `已连续 ${event.reached} 轮工具调用仍未完成`,
+                  label: tx('已连续 {n} 轮工具调用仍未完成', { n: event.reached }),
                   risk: '继续将再运行一个周期(至多再 100 轮), 消耗更多时间与 token; 停止则保留已生成内容。',
                 },
               }],

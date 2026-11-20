@@ -103,7 +103,12 @@ export function Indices() {
     queryKey: QK.indexDaily(selectedSymbol, range.start, range.end),
     queryFn: () => api.indexDaily(selectedSymbol, 180, range),
     enabled: !!selectedSymbol,
-    placeholderData: (prev) => prev,
+    // 仅同一 symbol 的缓存可作占位: 切换指数时不得把上一只指数的日K
+    // 挂在新指数标题下 (CONTRIBUTING §7: 不得把上一上下文的缓存当当前结果)。
+    placeholderData: (prev, prevQuery) => {
+      const prevKey = prevQuery?.queryKey as readonly unknown[] | undefined
+      return prevKey?.[1] === selectedSymbol ? prev : undefined
+    },
   })
 
   const minute = useQuery({
@@ -129,7 +134,11 @@ export function Indices() {
   const selectedQuoteValue = selectedQuote?.last_price ?? selectedQuote?.price ?? selectedQuote?.close
   const selectedQuotePct = selectedQuote?.change_pct ?? selectedQuote?.pct
 
-  const chartRows = useMemo(() => toOHLC(daily.data?.rows ?? []), [daily.data?.rows])
+  // 双保险: 只渲染与当前选中标的匹配的响应 (minute 行已用同一口径)。
+  const chartRows = useMemo(
+    () => (daily.data?.symbol === selectedSymbol ? toOHLC(daily.data?.rows ?? []) : []),
+    [daily.data?.symbol, daily.data?.rows, selectedSymbol],
+  )
   const selectedInfo = topRows.find(r => r.symbol === selectedSymbol) || daily.data?.index_info
   const minuteRows: MinuteKlineRow[] = minute.data?.symbol === selectedSymbol
     && minute.data?.date === selectedDate && daily.data?.symbol === selectedSymbol

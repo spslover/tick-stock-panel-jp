@@ -5,7 +5,7 @@ import type { ECharts, EChartsOption } from '@/lib/echarts'
 import type { MinuteKlineRow, PriceLimitInfo } from '@/lib/api'
 import { computeIntradayAverage, formatMinuteTime, FULL_DAY_TIMES, summarizeMinutes, getLimitPrices, type DailySummary } from '@/lib/intraday-chart'
 import { useChartTheme, type ChartTheme } from '@/lib/theme'
-import { pricePrecision } from '@/lib/format'
+import { compactNumber, pricePrecision } from '@/lib/format'
 import { intradayScale } from '@/lib/intraday-scale'
 
 type YMode = 'adaptive' | 'limit'
@@ -37,9 +37,7 @@ interface Props {
 
 function fmtAmt(v: number | null | undefined): string {
   if (v == null || !Number.isFinite(v)) return '—'
-  if (v >= 1_000_000_000) return `${(v / 1_000_000_000).toFixed(2)}${tx('亿')}`
-  if (v >= 10_000) return `${(v / 10_000).toFixed(0)}${tx('万')}`
-  return v.toFixed(0)
+  return compactNumber(v)
 }
 
 function isValidPrice(v: number | null | undefined): v is number {

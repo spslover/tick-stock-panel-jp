@@ -1,3 +1,4 @@
+import { tx } from '@/lib/i18n'
 import { useSyncExternalStore } from 'react'
 import { api, friendlyStreamError, type PriceLevel, type LevelType } from './api'
 
@@ -168,7 +169,7 @@ export async function startAnalysis(symbol: string, name: string, focus = ''): P
   }
   const ongoing = activeTasks.filter(t => t.phase === 'loading' || t.phase === 'streaming')
   if (ongoing.length >= MAX_ACTIVE) {
-    return { error: `同时进行的个股分析任务不能超过 ${MAX_ACTIVE} 个,请等待现有任务完成` }
+    return { error: tx('同时进行的个股分析任务不能超过 {n} 个,请等待现有任务完成', { n: MAX_ACTIVE }) }
   }
 
   const id = `stask_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`

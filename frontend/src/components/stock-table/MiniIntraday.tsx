@@ -36,6 +36,7 @@ React.memo: rows 引用由上游收敛 (Watchlist 的 minuteData 出口 reuseUnc
 */
 import { memo, useId } from 'react'
 import type { MinuteKlineRow } from '@/lib/api'
+import { tx } from '@/lib/i18n'
 import { AUCTION_WIDTH_RATIOS, type AuctionBarWidth } from '@/lib/list-columns'
 
 export type MiniIntradayYMode = 'adaptive' | 'limit'
@@ -205,7 +206,7 @@ function AuctionOnly({ rows, prevClose, match, unmatched, width, height, auction
   // 价格点 x = 所在桶中心 (与量柱逐点对齐; 末点 circle 同映射)
   const xAtT = (t: number) => axis.xAt(axis.bucketIndex(t))
   return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block" aria-label="集合竞价 (暂无分时)">
+    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block" aria-label={tx('集合竞价 (暂无分时)')}>
       {/* 竞价窄栏底色 + 右侧留白区分两栏 */}
       <rect x={0} y={0} width={auctionW} height={H} fill={LINE_PREV_CLOSE} opacity={0.08} />
       <line
@@ -230,8 +231,7 @@ function AuctionOnly({ rows, prevClose, match, unmatched, width, height, auction
         textAnchor="middle" dominantBaseline="middle"
         fill={LINE_PREV_CLOSE} fontSize={8} opacity={0.55}
       >
-        暂无分时
-      </text>
+        {tx('暂无分时')}</text>
     </svg>
   )
 }
@@ -275,7 +275,7 @@ export const MiniIntraday = memo(function MiniIntraday({ rows, prevClose, change
   const auctionPriceRaw = filterAuctionPoints(auction?.price)
   if (!rows || rows.length < 2) {
     if (auctionPriceRaw.length < 2) {
-      return <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block" aria-label="暂无分时" />
+      return <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block" aria-label={tx('暂无分时')} />
     }
     return <AuctionOnly rows={auctionPriceRaw} prevClose={prevClose} match={auction?.match} unmatched={auction?.unmatched} width={W} height={H} auctionWidth={auctionWidth} />
   }

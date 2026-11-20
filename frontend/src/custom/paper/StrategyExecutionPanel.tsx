@@ -109,7 +109,7 @@ export function StrategyExecutionPanel({ account }: { account: string }) {
       <div className="text-[10px] text-muted">{tx('最近处理信号日：')}{binding.last_bar || tx('尚未处理')} {tx('· 快照')} {binding.revision.slice(0, 10)}</div>
       <details><summary className="cursor-pointer text-xs text-accent">{tx('参数与差异')}</summary><div className="mt-2"><SnapshotDetails preview={binding} /></div></details>
       <p className="text-[10px] leading-relaxed text-muted">{tx('请勿在本账户手动下单或启用旧规则；检测到其他来源委托会暂停跟单。暂停不撤销已有委托，请在订单列表处理。')}</p>
-      <details><summary className="cursor-pointer text-xs text-muted">{tx('最近执行记录 (')}{binding.events.length})</summary><div className="mt-2 max-h-44 space-y-2 overflow-y-auto text-[10px] text-muted">{!binding.events.length && <div>{tx('暂无委托决策')}</div>}{binding.events.map((e, i) => <div key={`${e.at}-${i}`} className="break-words">{e.at.slice(5, 19).replace('T', ' ')} · {e.symbol} · {e.side === 'buy' ? tx('买入') : tx('卖出')} · {reasonLabels[e.reason] || e.reason} · {e.message}</div>)}</div></details>
+      <details><summary className="cursor-pointer text-xs text-muted">{tx('最近执行记录 (')}{binding.events.length})</summary><div className="mt-2 max-h-44 space-y-2 overflow-y-auto text-[10px] text-muted">{!binding.events.length && <div>{tx('暂无委托决策')}</div>}{binding.events.map((e, i) => <div key={`${e.at}-${i}`} className="break-words">{e.at.slice(5, 19).replace('T', ' ')} · {e.symbol} · {e.side === 'buy' ? tx('买入') : tx('卖出')} · {tx(reasonLabels[e.reason]) || e.reason} · {e.message}</div>)}</div></details>
     </>}
     {toggle.isError && <p role="alert" className="text-xs text-danger">{toggle.error.message}</p>}
     {open && <BindingDialog key={account} account={account} binding={binding ?? null} onClose={() => setOpen(false)} />}

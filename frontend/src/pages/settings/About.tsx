@@ -122,21 +122,20 @@ export function SettingsAboutPanel() {
 
         <div ref={updateRowRef} className="flex scroll-mt-24 items-center justify-between gap-4 py-2">
           <div className="min-w-0">
-            <div className="text-sm text-foreground">检查更新</div>
+            <div className="text-sm text-foreground">{tx('检查更新')}</div>
             {updateState === 'found' && updateInfo ? (
               <div className="mt-0.5 inline-flex items-center gap-1.5 rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-[11px] text-accent">
                 <Sparkles className="h-3 w-3" />
-                发现新版本
-                <span className="font-semibold">v{updateInfo.latest.replace(/^v/, '')}</span>
-                <span className="text-accent/60">· 当前 v{versionData?.version?.replace(/^v/, '') ?? '—'}</span>
+                {tx('发现新版本')}<span className="font-semibold">v{updateInfo.latest.replace(/^v/, '')}</span>
+                <span className="text-accent/60">{tx('· 当前 v')}{versionData?.version?.replace(/^v/, '') ?? '—'}</span>
               </div>
             ) : (
               <div className="text-[11px] text-muted truncate">
                 {updateState === 'latest'
-                  ? `已是最新版本 (v${versionData?.version?.replace(/^v/, '') ?? '—'})`
+                  ? tx('已是最新版本 (v{ver})', { ver: versionData?.version?.replace(/^v/, '') ?? '—' })
                   : updateState === 'error'
-                    ? '检查失败 (网络受限?), 可直接前往 Releases'
-                    : '对比 GitHub Releases 最新 Release, 提示新版本'}
+                    ? tx('检查失败 (网络受限?), 可直接前往 Releases')
+                    : tx('对比 GitHub Releases 最新 Release, 提示新版本')}
               </div>
             )}
           </div>
@@ -149,8 +148,7 @@ export function SettingsAboutPanel() {
                          bg-elevated text-secondary hover:text-foreground transition-colors"
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              官网
-            </a>
+              {tx('官网')}</a>
             {updateState === 'found' && updateInfo && (
               <a
                 href={updateInfo.url}
@@ -160,7 +158,7 @@ export function SettingsAboutPanel() {
                            bg-accent text-white hover:bg-accent/90 transition-colors"
               >
                 <Download className="h-3.5 w-3.5" />
-                前往下载 v{updateInfo.latest.replace(/^v/, '')}
+                {tx('前往下载 v')}{updateInfo.latest.replace(/^v/, '')}
               </a>
             )}
             <button
@@ -256,7 +254,7 @@ export function SettingsAboutPanel() {
               <button
                 onClick={() => setQrZoom(null)}
                 className="p-1 rounded hover:bg-neutral-100 transition-colors text-neutral-500"
-                aria-label="关闭"
+                aria-label={tx('关闭')}
               >
                 <X className="h-4 w-4" />
               </button>
