@@ -518,8 +518,11 @@ async def _application_lifespan(app: FastAPI):
         gmanager = getattr(app.state, "guardian_manager", None)
         if gmanager:
             gmanager.shutdown()
-        if app.state.scheduler:
-            app.state.scheduler.shutdown(wait=False)
+        if app.state.scheduler and getattr(app.state.scheduler, "running", False):
+            try:
+                app.state.scheduler.shutdown(wait=False)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("scheduler shutdown ignored: %s", exc)
         ps = getattr(app.state, "pull_scheduler", None)
         if ps:
             ps.stop()
@@ -973,6 +976,19 @@ async def workload_middleware(request: Request, call_next):
 
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
+    # /metrics 暴露内部运行指标: 仅允许本机/内网或已登录会话访问, 防止公网信息泄露
+    if path == "/metrics":
+        from app.services import auth as auth_service
+
+        if auth_api._is_local_network(auth_api._client_ip(request)):
+            return await call_next(request)
+        if auth_service.is_configured():
+            token = request.cookies.get(auth_api.COOKIE_NAME)
+            if token and auth_service.is_valid_session(token):
+                return await call_next(request)
+            return JSONResponse(status_code=401, content={"detail": "未登录或会话已过期"})
+        return JSONResponse(status_code=403, content={"detail": "指标端点仅允许本机或内网访问"})
+
     # /docs, /redoc, /openapi.json 暴露内部接口清单: 已设密码时要求有效会话, 未设密码时仅本机/内网
     if path in _DOCS_PATHS:
         from app.services import auth as auth_service
@@ -1056,15 +1072,44 @@ async def auth_middleware(request: Request, call_next):
     return JSONResponse(status_code=401, content={"detail": "未登录或会话已过期"})
 
 
+async def observability_middleware(request: Request, call_next):
+    """最外层关联 ID + HTTP Prometheus 指标中间件。"""
+    import time as _time
+
+    from app.services.observability import (
+        REQUEST_ID_HEADER,
+        metrics_registry,
+        reset_request_id,
+        sanitize_request_id,
+        set_request_id,
+    )
+
+    req_id = sanitize_request_id(request.headers.get(REQUEST_ID_HEADER))
+    token = set_request_id(req_id)
+    metrics_registry.on_request_start()
+    started = _time.perf_counter()
+    status_code = 500
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+        response.headers[REQUEST_ID_HEADER] = req_id
+        return response
+    finally:
+        elapsed = _time.perf_counter() - started
+        metrics_registry.on_request_end(request.method, request.url.path, status_code, elapsed)
+        reset_request_id(token)
+
+
 # 中间件执行顺序 (外 -> 内):
-#   SecurityHeadersMiddleware -> _DynamicCORSMiddleware -> BodyLimitMiddleware
-#   -> auth_middleware -> workload_middleware -> router
+#   observability_middleware -> SecurityHeadersMiddleware -> _DynamicCORSMiddleware
+#   -> BodyLimitMiddleware -> auth_middleware -> workload_middleware -> router
 # Starlette 后注册者在外层, 故按逆序挂载。
 app.middleware("http")(workload_middleware)
 app.middleware("http")(auth_middleware)
 app.add_middleware(BodyLimitMiddleware)
 app.add_middleware(_DynamicCORSMiddleware)
 app.add_middleware(SecurityHeadersMiddleware, static_dir=Path(settings.static_dir))
+app.middleware("http")(observability_middleware)
 
 
 # 路由

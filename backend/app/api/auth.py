@@ -145,6 +145,9 @@ def setup_password(req: PasswordIn, request: Request) -> dict:
 
     auth.set_password(req.password)
     logger.info("access password set up from %s", client_ip)
+    from app.services.observability import record_audit_event
+
+    record_audit_event("auth.setup", actor="local", target="password", outcome="ok", client_ip=client_ip)
     return {"ok": True, "configured": True}
 
 
@@ -157,12 +160,16 @@ def login(req: LoginIn, request: Request, response: Response) -> dict:
     if not auth.is_configured():
         raise HTTPException(status_code=409, detail="尚未设置访问密码")
 
+    from app.services.observability import record_audit_event
+
     token = auth.verify_and_create_session(req.password)
     if not token:
         _record_login_fail(ip)
+        record_audit_event("auth.login", actor="anonymous", target="session", outcome="failed", client_ip=ip)
         raise HTTPException(status_code=401, detail="密码错误")
 
     _clear_login_fails(ip)
+    record_audit_event("auth.login", actor="session", target="session", outcome="ok", client_ip=ip)
     # HttpOnly: 防 XSS 窃取; SameSite=Lax: 防 CSRF; Path=/: 全站生效
     response.set_cookie(
         key=COOKIE_NAME,
@@ -182,6 +189,9 @@ def logout(request: Request, response: Response) -> dict:
     token = request.cookies.get(COOKIE_NAME)
     if token:
         auth.revoke_session(token)
+    from app.services.observability import record_audit_event
+
+    record_audit_event("auth.logout", actor="session", target="session", outcome="ok", client_ip=_client_ip(request))
     response.delete_cookie(
         key=COOKIE_NAME,
         path="/",
@@ -205,10 +215,13 @@ def change_password(req: ChangePasswordIn, request: Request, response: Response)
     ip = _client_ip(request)
     _check_login_rate_limit(ip)
 
+    from app.services.observability import record_audit_event
+
     # 验证旧密码
     new_token = auth.verify_and_create_session(req.old_password)
     if not new_token:
         _record_login_fail(ip)
+        record_audit_event("auth.change_password", actor="session", target="password", outcome="failed", client_ip=ip)
         raise HTTPException(status_code=401, detail="旧密码错误")
     # 临时 token 用完即弃
     auth.revoke_session(new_token)
@@ -216,6 +229,7 @@ def change_password(req: ChangePasswordIn, request: Request, response: Response)
 
     # 改密码(set_password 会清空所有会话)
     auth.set_password(req.new_password)
+    record_audit_event("auth.change_password", actor="session", target="password", outcome="ok", client_ip=ip)
     response.delete_cookie(
         key=COOKIE_NAME,
         path="/",

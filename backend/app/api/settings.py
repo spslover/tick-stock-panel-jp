@@ -2517,21 +2517,49 @@ def api_tokens_list(request: Request) -> dict:
 @router.post("/api-tokens")
 def api_tokens_create(body: ApiTokenCreateIn, request: Request) -> dict:
     """创建 Token — 明文只在本次响应出现一次, 前端弹窗提示立即保存。"""
+    from app.api import auth as auth_api
     from app.services import api_tokens as svc
+    from app.services.observability import record_audit_event
 
+    data_dir = request.app.state.repo.store.data_dir
     try:
-        record, plaintext = svc.create_token(request.app.state.repo.store.data_dir, body.name, body.scopes)
+        record, plaintext = svc.create_token(data_dir, body.name, body.scopes)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    record_audit_event(
+        "api_token.create",
+        actor="session",
+        target=record.get("id", ""),
+        outcome="ok",
+        client_ip=auth_api._client_ip(request),
+        detail={
+            "token_id": record.get("id", ""),
+            "token_name": record.get("name", ""),
+            "scopes": record.get("scopes", []),
+        },
+        data_dir=data_dir,
+    )
     return {"token": record, "plaintext": plaintext}
 
 
 @router.delete("/api-tokens/{token_id}")
 def api_tokens_revoke(token_id: str, request: Request) -> dict:
+    from app.api import auth as auth_api
     from app.services import api_tokens as svc
+    from app.services.observability import record_audit_event
 
-    if not svc.revoke_token(request.app.state.repo.store.data_dir, token_id):
+    data_dir = request.app.state.repo.store.data_dir
+    if not svc.revoke_token(data_dir, token_id):
         raise HTTPException(status_code=404, detail=f"Token '{token_id}' 不存在")
+    record_audit_event(
+        "api_token.revoke",
+        actor="session",
+        target=token_id,
+        outcome="ok",
+        client_ip=auth_api._client_ip(request),
+        detail={"token_id": token_id},
+        data_dir=data_dir,
+    )
     return {"status": "revoked", "id": token_id}
 
 

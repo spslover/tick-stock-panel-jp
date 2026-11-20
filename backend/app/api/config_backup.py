@@ -32,10 +32,22 @@ def _category_param(raw: str) -> frozenset[str] | None:
 
 
 @router.get("/export")
-def export_backup(categories: str = "") -> Response:
+def export_backup(request: Request, categories: str = "") -> Response:
     """导出用户配置为 ZIP 下载。categories 逗号分隔类别键, 不传导出全部 (不含密钥);
     显式包含 "secrets" 才打包明文密钥。"""
-    data, filename = config_backup.build_backup(categories=_category_param(categories))
+    from app.api import auth as auth_api
+    from app.services.observability import record_audit_event
+
+    cats = _category_param(categories)
+    data, filename = config_backup.build_backup(categories=cats)
+    record_audit_event(
+        "config_backup.export",
+        actor="session",
+        target=filename,
+        outcome="ok",
+        client_ip=auth_api._client_ip(request),
+        detail={"categories": sorted(cats) if cats else ["all"]},
+    )
     return Response(
         content=data,
         media_type="application/zip",
@@ -96,15 +108,35 @@ async def apply_backup(
 
 
 def _apply_backup(request: Request, data: bytes, allow_overwrite: bool, categories: str) -> dict:
+    from app.api import auth as auth_api
+    from app.services.observability import record_audit_event
+
+    cats = _category_param(categories)
     try:
         result = config_backup.apply_archive(
             data,
             allow_overwrite=allow_overwrite,
-            categories=_category_param(categories),
+            categories=cats,
         )
     except config_backup.ConfigBackupError as e:
+        record_audit_event(
+            "config_backup.apply",
+            actor="session",
+            target="archive",
+            outcome="failed",
+            client_ip=auth_api._client_ip(request),
+            detail={"allow_overwrite": allow_overwrite, "categories": sorted(cats) if cats else ["all"]},
+        )
         raise HTTPException(status_code=400, detail=str(e)) from e
     _reload_states(request, result)
+    record_audit_event(
+        "config_backup.apply",
+        actor="session",
+        target="archive",
+        outcome="ok",
+        client_ip=auth_api._client_ip(request),
+        detail={"allow_overwrite": allow_overwrite, "categories": sorted(cats) if cats else ["all"]},
+    )
     return result
 
 

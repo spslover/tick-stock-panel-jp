@@ -4,8 +4,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app import __version__
+from app.services.observability import metrics_registry
 from app.tickflow import client as tf_client
 from app.tickflow.policy import detect_capabilities, tier_label
 
@@ -75,6 +77,45 @@ def health() -> dict:
         "mode": tf_client.current_mode(),
         "memory": _memory_snapshot(),
     }
+
+
+@router.get("/health/live", include_in_schema=False)
+def health_live() -> dict:
+    """Kubernetes/Docker 存活探针 — 仅验证事件循环与进程可响应, 不触碰磁盘或锁。"""
+    return {
+        "status": "ok",
+        "version": __version__,
+    }
+
+
+@router.get("/health/ready", include_in_schema=False)
+def health_ready(request: Request) -> JSONResponse:
+    """就绪探针 — 验证仓库、数据目录可用性与核心初始化状态。"""
+    repo = getattr(request.app.state, "repo", None)
+    data_dir = getattr(getattr(repo, "store", None), "data_dir", None)
+    data_dir_ok = bool(data_dir is not None and Path(data_dir).exists() and Path(data_dir).is_dir())
+    indicators_ready = getattr(request.app.state, "indicators_ready", True)
+    checks = {
+        "repo": repo is not None,
+        "data_dir": data_dir_ok,
+        "indicators_ready": bool(indicators_ready),
+    }
+    ready = all(checks.values())
+    payload = {
+        "status": "ready" if ready else "not_ready",
+        "version": __version__,
+        "checks": checks,
+    }
+    return JSONResponse(status_code=200 if ready else 503, content=payload)
+
+
+@router.get("/metrics", include_in_schema=False)
+def prometheus_metrics() -> PlainTextResponse:
+    """Prometheus 文本格式指标端点 (默认由中间件限制仅本机/内网或已认证会话访问)。"""
+    return PlainTextResponse(
+        content=metrics_registry.render_prometheus(),
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
 
 
 @router.get("/api/capabilities")

@@ -1,0 +1,223 @@
+{
+  "audit_id": "2026-11-20-AUDIT-002",
+  "project": "tick-stock-panel-jp",
+  "version": "0.3.37",
+  "git_commit": "e408a89",
+  "branch": "main",
+  "execution_mode": "audit_and_fix",
+  "target_env": "local",
+  "generated_at": "2026-11-20T15:48:00+09:00",
+  "findings": [
+    {
+      "id": "OPS-OBS-001",
+      "dimension": "Observability & Security Audit",
+      "title": "缺少生产级健康探针 (/health/live, /health/ready)、Prometheus /metrics、X-Request-ID 关联与脱敏安全审计日志 (audit.jsonl)",
+      "severity": "High",
+      "priority": "P0",
+      "confidence": "CONFIRMED",
+      "status": "VERIFIED",
+      "locations": [
+        "backend/app/services/observability.py",
+        "backend/app/api/routes.py",
+        "backend/app/main.py",
+        "backend/app/api/auth.py",
+        "backend/app/api/settings.py",
+        "backend/app/api/config_backup.py"
+      ],
+      "evidence": "基线运行 tests/e2e_prod/test_tier1_health_auth_gateway.py 时 5 个 r3_post_fix 用例 (live/ready/metrics/request-id/audit.jsonl) 全部失败 (404 / 缺失头部 / 缺失文件)。",
+      "impact": "容器编排无法区分存活与就绪状态；监控系统无法采集标准化吞吐/时延/内存指标；跨请求排障缺少关联 ID；认证与令牌操作缺乏可审计留痕。",
+      "remediation": "新增 app/services/observability.py，实现 X-Request-ID 生成/清洗/透传、轻量 Prometheus 指标注册表与脱敏 append-only audit.jsonl；暴露 /health/live、/health/ready、/metrics（仅限本机/内网或已认证会话）；在 auth/settings/config_backup 关键写操作接入审计留痕。",
+      "verification": "tests/e2e_prod/test_tier1_health_auth_gateway.py -m r3_post_fix 5/5 PASSED；tests/test_audit_observability_hardening.py 4/4 PASSED；本地微基准 200 次请求 0 错误。",
+      "rollback": "回滚 observability.py 及 routes.py/main.py/auth.py/settings.py/config_backup.py 对应改动，不影响原有 /health 与业务 API 契约。"
+    },
+    {
+      "id": "FE-HOOK-001",
+      "dimension": "Code Quality & Runtime Stability",
+      "title": "MiningWorkbench.tsx 在 5 个普通工具函数中调用 React Hook useI18n()，违反 Rules of Hooks 导致运行时崩溃",
+      "severity": "High",
+      "priority": "P1",
+      "confidence": "CONFIRMED",
+      "status": "VERIFIED",
+      "locations": [
+        "frontend/src/pages/backtest/MiningWorkbench.tsx:134",
+        "frontend/src/pages/backtest/MiningWorkbench.tsx:160",
+        "frontend/src/pages/backtest/MiningWorkbench.tsx:175",
+        "frontend/src/pages/backtest/MiningWorkbench.tsx:180",
+        "frontend/src/pages/backtest/MiningWorkbench.tsx:220"
+      ],
+      "evidence": "基线运行 corepack pnpm eslint --quiet . 报 5 个 react-hooks/rules-of-hooks 错误（parseBoundedNumber/statusLabel/confidenceLabel/definitionLabel/foldKindLabel）。",
+      "impact": "用户在回测挖掘工作台触发参数校验、状态渲染或候选列表渲染时触发 Invalid Hook Call 导致页面白屏崩溃。",
+      "remediation": "在 MiningWorkbench.tsx 顶层引入非 Hook 翻译函数 tx，移除 5 个工具函数内的 useI18n() 调用。",
+      "verification": "corepack pnpm eslint --quiet . 返回 0 errors；corepack pnpm build 与 vitest 全量通过。",
+      "rollback": "恢复 MiningWorkbench.tsx 单文件修改。"
+    },
+    {
+      "id": "REL-SHUTDOWN-001",
+      "dimension": "Availability & Lifecycle",
+      "title": "应用关闭阶段未判断 APScheduler 运行状态直接调用 shutdown() 触发 SchedulerNotRunningError",
+      "severity": "Medium",
+      "priority": "P1",
+      "confidence": "CONFIRMED",
+      "status": "VERIFIED",
+      "locations": [
+        "backend/app/main.py:521-525"
+      ],
+      "evidence": "基线运行 test_tier1_health_auth_gateway.py 时在 _application_lifespan finally 块抛出 apscheduler.schedulers.SchedulerNotRunningError，阻断后续 pull_scheduler/quote_service/delivery_executors 优雅停机。",
+      "impact": "降级启动或快速退出场景下生命周期清理中断，导致后台线程/连接句柄未释放。",
+      "remediation": "在调用 scheduler.shutdown(wait=False) 前检查 getattr(scheduler, 'running', False) 并捕获异常记录告警，保证后续资源释放始终执行。",
+      "verification": "本地生命周期微基准与全部 pytest 回归用例优雅关闭无异常。",
+      "rollback": "恢复 backend/app/main.py:521-525。"
+    },
+    {
+      "id": "REL-TASK-001",
+      "dimension": "Concurrency & Reliability",
+      "title": "6 处裸 asyncio.create_task() 悬空任务未保留强引用 (RUF006)，存在被 GC 静默取消风险",
+      "severity": "Medium",
+      "priority": "P1",
+      "confidence": "CONFIRMED",
+      "status": "VERIFIED",
+      "locations": [
+        "backend/app/api/kline.py:1562",
+        "backend/app/api/kline.py:1777",
+        "backend/app/api/kline.py:1869",
+        "backend/app/api/kline.py:1964",
+        "backend/app/api/pipeline.py:106",
+        "backend/app/services/data_integrity.py:721"
+      ],
+      "evidence": "基线运行 ruff check --statistics app/ tests/ 检出 6 处 RUF006。",
+      "impact": "盘后管道、日K补全、分钟K同步、enriched 重建与数据自愈任务在事件循环运行中可能被垃圾回收静默中断，导致任务卡在 running 状态或数据写入不完整。",
+      "remediation": "在 app/services/observability.py 新增 spawn_background_task() 强引用集合与 done_callback 异常日志记录，替换全部 6 处裸 create_task。",
+      "verification": "ruff check --select F821,F811,RUF006 app/ tests/ 返回 All checks passed；test_spawn_background_task_tracks_and_cleans_up PASSED。",
+      "rollback": "将 6 处调用回退为 asyncio.create_task。"
+    },
+    {
+      "id": "QUAL-BUG-001",
+      "dimension": "Code Quality",
+      "title": "daily_pipeline.py:187 引用未定义类型名 _date (F821) 及 test_data_integrity.py:8 重复导入 (F811)",
+      "severity": "Medium",
+      "priority": "P1",
+      "confidence": "CONFIRMED",
+      "status": "VERIFIED",
+      "locations": [
+        "backend/app/jobs/daily_pipeline.py:187",
+        "backend/tests/test_data_integrity.py:8"
+      ],
+      "evidence": "基线 ruff check 报 F821 Undefined name '_date' 及 F811 Redefined unused 'time'。",
+      "impact": "运行期反射（如 typing.get_type_hints）或静态类型检查解析 run_now 签名时将抛 NameError。",
+      "remediation": "在 daily_pipeline.py 显式导入 from datetime import date as _date；移除 test_data_integrity.py 第 8 行冗余 import time。",
+      "verification": "ruff check --select F821,F811,RUF006 app/ tests/ 0 错误。",
+      "rollback": "恢复两处导入行。"
+    },
+    {
+      "id": "TEST-M2-001",
+      "dimension": "Testing & Contract Accuracy",
+      "title": "test_m2_1_hardening.py 中 2 个基线断言与真实契约/HTTP 规范存在偏差",
+      "severity": "Low",
+      "priority": "P2",
+      "confidence": "CONFIRMED",
+      "status": "VERIFIED",
+      "locations": [
+        "backend/tests/test_m2_1_hardening.py:300",
+        "backend/tests/test_m2_1_hardening.py:459"
+      ],
+      "evidence": "基线运行 test_m2_1_hardening.py 时 2 个用例失败：load_benchmark_momentum 对单指数回退到 5 个板块键返回 25 行（5 日 × 5 键）；httpx 按 RFC 3986 将 /api/paper/orders/.. 规范化为 /api/paper/ 返回 404。",
+      "impact": "导致安全与数据加固回归套件基线常红，掩盖真实回归。",
+      "remediation": "按实际业务契约校验 date 唯一数 == 5 且 SH 基准行数 == 5；新增 /api/paper/orders/%2e%2e 明确命中路由并返回 400 的路径穿越断言。",
+      "verification": "pytest tests/test_m2_1_hardening.py 全部通过（169/169 回归测试通过）。",
+      "rollback": "恢复 test_m2_1_hardening.py 两处断言。"
+    },
+    {
+      "id": "QUAL-LINT-001",
+      "dimension": "Code Quality",
+      "title": "前端其余 3 处 ESLint 错误阻断 lint 质量门禁",
+      "severity": "Low",
+      "priority": "P2",
+      "confidence": "CONFIRMED",
+      "status": "VERIFIED",
+      "locations": [
+        "frontend/src/pages/Watchlist.tsx:138",
+        "frontend/scripts/i18n-audit.mjs:15",
+        "frontend/scripts/i18n-reactive.mjs:80"
+      ],
+      "evidence": "基线 corepack pnpm eslint --quiet . 报 no-useless-escape 与 2 处 no-unused-vars。",
+      "impact": "无法在 CI 中强制开启 eslint 零错误门禁。",
+      "remediation": "修正字符类末尾转义并清理未使用的常量与死函数。",
+      "verification": "corepack pnpm eslint --quiet . 退出码 0。",
+      "rollback": "恢复三处单行/局部修改。"
+    },
+    {
+      "id": "OPS-CONTAINER-001",
+      "dimension": "Deployment & SRE",
+      "title": "Dockerfile 与 docker-compose.yml 缺少 HEALTHCHECK、非 root 运行隔离与显式资源限额",
+      "severity": "High",
+      "priority": "P1",
+      "confidence": "CONFIRMED",
+      "status": "PARTIAL",
+      "locations": [
+        "Dockerfile:131-133",
+        "docker-compose.yml:12-39"
+      ],
+      "evidence": "Dockerfile 原无 HEALTHCHECK 且以 root 运行；docker-compose.yml 默认监听 0.0.0.0:3018 且无健康检查与内存限额。",
+      "impact": "编排器无法自动感知假死容器；容器逃逸面偏大；宿主机 OOM 风险缺乏硬隔离。",
+      "remediation": "已向 Dockerfile 与 docker-compose.yml 添加基于 /health/live 的 HEALTHCHECK；非 root USER 与 HOST=127.0.0.1 反向代理隔离因涉及现有卷权限与部署拓扑兼容，纳入残余风险与发布前运维核查清单。",
+      "verification": "静态审查与 /health/live 实测通过；Docker 镜像构建因 ALLOW_NETWORK=false / 本地未执行构建标记 NOT_EXECUTED。",
+      "rollback": "移除 Dockerfile 与 docker-compose.yml 新增 HEALTHCHECK 段。"
+    },
+    {
+      "id": "OPS-CI-001",
+      "dimension": "CI/CD & Supply Chain",
+      "title": "CI 流水线缺失后端关键缺陷静态门禁与前端 ESLint 门禁，且 docker.yml 未受 CI 成功门控",
+      "severity": "Medium",
+      "priority": "P1",
+      "confidence": "CONFIRMED",
+      "status": "PARTIAL",
+      "locations": [
+        ".github/workflows/ci.yml:36-68",
+        ".github/workflows/docker.yml"
+      ],
+      "evidence": "基线 ci.yml 仅跑 pytest 与 vite build，未运行 ruff 与 eslint，导致 FE-HOOK-001/QUAL-BUG-001/REL-TASK-001 漏入主干。",
+      "impact": "运行时崩溃类缺陷与悬空异步任务可直接合入 main 并触发镜像发布。",
+      "remediation": "已在 .github/workflows/ci.yml 接入 ruff check --select F821,F811,RUF006 与 pnpm eslint --quiet . 门禁；docker.yml 依赖 workflow_run 门控与镜像 SBOM/Trivy 扫描待远端 CI 权限与网络可用时实施。",
+      "verification": "本地执行两条新门禁命令均退出码 0；GitHub Actions 远端触发标记 NOT_EXECUTED。",
+      "rollback": "移除 .github/workflows/ci.yml 新增的两步 step。"
+    },
+    {
+      "id": "ARC-SINGLE-NODE-001",
+      "dimension": "Architecture & High Availability",
+      "title": "单进程模块化单体 + 本地 Parquet/SQLite 存储架构尚不具备多活与跨机容灾能力",
+      "severity": "High",
+      "priority": "P1",
+      "confidence": "CONFIRMED",
+      "status": "BLOCKED",
+      "locations": [
+        "backend/app/main.py",
+        "backend/app/tickflow/repository.py",
+        "backend/app/strategy/paper.py",
+        "backend/app/watchdog.py"
+      ],
+      "evidence": "状态存储在本地 data/ 目录（Parquet/JSON/SQLite），会话与速率限制/指标位于进程内存，看门狗通过 os._exit(70) 依赖外部 supervisor 重启。",
+      "impact": "单节点故障或磁盘损坏将导致服务中断；无法直接水平扩展以达成 99.99% 可用性设计目标（年停机 <52.6 分钟）。",
+      "remediation": "单次最小侵入审计不进行分布式重写；已在 02-architecture-review.md 给出分阶段演进路线（ADR），并在 operations/backup-restore-and-incident.md 补充 Parquet/SQLite 快照备份与 RTO/RPO 演练方案。",
+      "verification": "架构评估已核实代码；跨节点故障切换与真实 RTO/RPO 压测在本地环境标记 NOT_EXECUTED。",
+      "rollback": "N/A（架构演进建议，未变更持久化拓扑）。"
+    },
+    {
+      "id": "TEST-E2E-ENV-001",
+      "dimension": "Test Infrastructure & Realtime",
+      "title": "e2e_prod 中 SSE 实时流用例在同步 TestClient 下阻塞，且部分用例依赖历史 enriched 列与隔离锁",
+      "severity": "Medium",
+      "priority": "P2",
+      "confidence": "CONFIRMED",
+      "status": "PARTIAL",
+      "locations": [
+        "backend/tests/e2e_prod/test_tier1_data_realtime.py",
+        "backend/tests/e2e_prod/test_tier1_health_auth_gateway.py"
+      ],
+      "evidence": "基线运行完整 e2e_prod 时 test_sse_ticket_issuance_and_scoped_event_stream 在 TestClient 同步流读取阻塞 >110s；test_data_workload_records_request_groups 因离线无上游行情返回 502。",
+      "impact": "全量 e2e_prod 套件尚不能作为无条件离线门禁直接运行。",
+      "remediation": "已完成 r3_post_fix 5/5 用例修复并通过；SSE 流式用例需改用 async httpx.AsyncClient + 超时取消，行情回源用例需完善离线桩，列为下一迭代测试基础设施项。",
+      "verification": "r3_post_fix 5/5 PASSED；其余离线/SSE 桩用例标记 PARTIAL。",
+      "rollback": "N/A。"
+    }
+  ]
+}

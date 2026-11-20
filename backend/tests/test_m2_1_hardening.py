@@ -297,7 +297,9 @@ def test_benchmark_cache_invalidates_on_mutation_and_is_thread_safe(tmp_path: Pa
         "close": [16.0],
     }).write_parquet(extra_file)
     f3 = pipeline.load_benchmark_momentum(tmp_path)
-    assert f3 is not None and f3.height == 5
+    assert f3 is not None
+    assert f3["date"].n_unique() == 5
+    assert f3.filter(pl.col("bench_key") == "SH").height == 5
 
     # Delete file -> invalidated immediately
     p.unlink()
@@ -456,7 +458,8 @@ def test_paper_order_and_account_traversal_blocked(tmp_path: Path) -> None:
     )
     client = TestClient(app)
     assert client.delete("/api/paper/orders/bad..id").status_code == 400
-    assert client.delete("/api/paper/orders/..").status_code == 400
+    assert client.delete("/api/paper/orders/%2e%2e").status_code == 400
+    assert client.delete("/api/paper/orders/..").status_code in (400, 404)
 
 
 def test_paper_fsync_and_cn_now_used(tmp_path: Path, monkeypatch) -> None:

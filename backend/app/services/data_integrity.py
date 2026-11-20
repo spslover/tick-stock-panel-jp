@@ -718,7 +718,9 @@ def launch_integrity_repair(
         async def task() -> None:
             await loop.run_in_executor(None, _execute)
 
-        asyncio.create_task(task())
+        from app.services.observability import spawn_background_task
+
+        spawn_background_task(task(), name=f"integrity-repair-{job_id[:8]}")
     except RuntimeError:
         threading.Thread(
             target=_execute, daemon=True, name=f"integrity-repair-{job_id[:8]}"

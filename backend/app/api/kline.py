@@ -1559,7 +1559,9 @@ async def trigger_minute_sync(
         finally:
             release_run_slot(job_id)
 
-    asyncio.create_task(task())
+    from app.services.observability import spawn_background_task
+
+    spawn_background_task(task(), name=f"sync-minute-{job_id[:8]}")
     return {"status": "started", "job_id": job_id}
 
 
@@ -1774,7 +1776,9 @@ async def extend_history(request: Request):
             finally:
                 release_run_slot(job_id)
 
-        asyncio.create_task(task())
+        from app.services.observability import spawn_background_task
+
+        spawn_background_task(task(), name=f"kline-job-{job_id[:8]}")
         return {"status": "started", "job_id": job_id}
     except HTTPException:
         raise
@@ -1866,7 +1870,9 @@ async def repair_daily(request: Request):
             finally:
                 release_run_slot(job_id)
 
-        asyncio.create_task(task())
+        from app.services.observability import spawn_background_task
+
+        spawn_background_task(task(), name=f"kline-job-{job_id[:8]}")
         return {"status": "started", "job_id": job_id}
     except HTTPException:
         raise
@@ -1961,7 +1967,9 @@ async def rebuild_enriched(request: Request):
             finally:
                 release_run_slot(job_id)
 
-        asyncio.create_task(task())
+        from app.services.observability import spawn_background_task
+
+        spawn_background_task(task(), name=f"kline-job-{job_id[:8]}")
         return {"status": "started", "job_id": job_id}
     except Exception as e:
         import traceback as _tb

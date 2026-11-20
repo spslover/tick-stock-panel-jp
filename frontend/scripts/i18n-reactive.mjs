@@ -76,16 +76,6 @@ function subtreeUsesTx(fn) {
   return used
 }
 
-/** 最近的祖先函数（没有则返回 null，表示模块级）。 */
-function nearestFn(node) {
-  let p = node.parent
-  while (p && !ts.isSourceFile(p)) {
-    if (ts.isFunctionLike(p)) return p
-    p = p.parent
-  }
-  return null
-}
-
 const withTx = new Set()
 for (const fn of candidates) {
   if (subtreeUsesTx(fn) && !declaresTx(fn) && isComponentLike(fn)) withTx.add(fn)

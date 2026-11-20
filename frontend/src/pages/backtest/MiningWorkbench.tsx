@@ -40,7 +40,7 @@ import {
   useMiningTask,
 } from '@/lib/miningTask'
 import { QK } from '@/lib/queryKeys'
-import { useI18n } from '@/lib/i18n'
+import { tx, useI18n } from '@/lib/i18n'
 import { selectableStrategies, strategyOptionLabel } from '@/lib/strategyLibrary'
 import { selectableDefinitions, definitionOptionLabel } from '@/lib/definitionOptions'
 import { usePreferences } from '@/lib/useSharedQueries'
@@ -131,7 +131,6 @@ function loadDraft(): MiningDraft {
 }
 
 function parseBoundedNumber(value: string, label: string, min: number, max: number, integer = false) {
-  const { tx } = useI18n()
   const parsed = Number(value)
   if (!Number.isFinite(parsed) || parsed < min || parsed > max || (integer && !Number.isInteger(parsed))) {
     toast(integer ? tx('{label}需为 {min}–{max} 的整数', { label, min, max }) : tx('{label}需为 {min}–{max}', { label, min, max }), 'error')
@@ -157,7 +156,6 @@ function formatBytes(value: number | null | undefined) {
 }
 
 function statusLabel(status?: string) {
-  const { tx } = useI18n()
   return ({
     queued: tx('排队中'),
     running: tx('挖掘中'),
@@ -172,12 +170,10 @@ function statusLabel(status?: string) {
 }
 
 function confidenceLabel(value?: string) {
-  const { tx } = useI18n()
   return value === 'high' ? tx('高') : value === 'standard' ? tx('标准') : tx('低')
 }
 
 function definitionLabel(candidate: MiningCandidateRow) {
-  const { tx } = useI18n()
   if (candidate.kind === 'existing_strategy') return candidate.strategy_id || tx('已有策略')
   return candidate.factor_names?.join(' + ') || tx('因子组合')
 }
@@ -217,7 +213,6 @@ function formatBps(ratio: number | null | undefined, digits = 1) {
 }
 
 function foldKindLabel(kind?: string | null) {
-  const { tx } = useI18n()
   if (kind === 'cross') return tx('跨折')
   if (kind === 'benchmark') return tx('对照')
   return undefined

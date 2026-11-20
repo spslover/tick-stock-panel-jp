@@ -12,7 +12,6 @@ import ts from 'typescript'
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const SRC = path.resolve(HERE, '..', 'src')
 const CJK = /[\u4e00-\u9fff]/
-const BT = String.fromCharCode(96)
 
 export function maskComments(src) {
   let out = ''

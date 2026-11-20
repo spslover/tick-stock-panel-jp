@@ -103,7 +103,9 @@ async def _submit_job(repo, quote_service, make_run) -> dict:
         finally:
             release_run_slot(job_id)
 
-    asyncio.create_task(task())
+    from app.services.observability import spawn_background_task
+
+    spawn_background_task(task(), name=f"pipeline-run-{job_id[:8]}")
     return {"job_id": job_id, "reused": False}
 
 
